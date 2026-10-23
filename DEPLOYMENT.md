@@ -27,6 +27,18 @@ persistent state file. Local account/journal data is intentionally not published
 If needed, privately transfer backend/store.json to the disk while the service
 is stopped, never through a public repository.
 
+## Share a github.io link
+
+After the full app is live, set repository Settings → Pages → Source to
+GitHub Actions. In Actions → Publish website link → Run workflow, supply the
+actual Render HTTPS application URL. The workflow checks its health and publishes
+the entry page at https://prog-anshu36.github.io/intensefxtrades/.
+That shareable link redirects the browser to the full hosted app. GitHub Pages
+does not execute Python, and the backend must remain running. No invented or
+unverified live URL is embedded in the repository. The hosted app requires the
+owner gate credentials; share access deliberately. It is currently a shared
+single-owner workspace, not independently isolated accounts for each visitor.
+
 ## CSV transport
 
 The original `XAUUSD_Data` has a file larger than GitHub's regular per-file

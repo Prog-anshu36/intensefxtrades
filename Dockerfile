@@ -3,8 +3,12 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
+COPY dataset-package ./dataset-package
+COPY scripts/dataset_package.py ./scripts/dataset_package.py
+COPY backend/xauusd_data_provider.py ./backend/xauusd_data_provider.py
 RUN python scripts/dataset_package.py restore
+RUN python -c "from backend.xauusd_data_provider import LocalXAUUSDDataProvider; LocalXAUUSDDataProvider(cache_dir='/app/prebuilt-cache').ensure_index()"
+COPY . .
 ENV PORT=5050
 EXPOSE 5050
-CMD ["sh", "-c", "exec gunicorn --workers 1 --threads 8 --timeout 300 --bind 0.0.0.0:${PORT:-5050} backend.app:app"]
+CMD ["python", "scripts/start_hosted.py"]

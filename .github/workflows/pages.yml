@@ -1,0 +1,41 @@
+name: Publish website link
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: Public HTTPS URL of the deployed Python application
+        required: true
+        type: string
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build website entry
+        env:
+          APP_URL: ${{ inputs.app_url }}
+        run: python scripts/build_pages.py --app-url "$APP_URL"
+      - name: Verify hosted application is reachable
+        env:
+          APP_URL: ${{ inputs.app_url }}
+        run: curl --fail --silent --show-error --max-time 120 "${APP_URL%/}/healthz"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

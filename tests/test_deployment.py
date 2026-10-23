@@ -12,6 +12,15 @@ spec.loader.exec_module(package)
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_pages_entry_requires_a_real_host(self):
+        spec=importlib.util.spec_from_file_location('build_pages',Path(__file__).resolve().parents[1]/'scripts/build_pages.py')
+        pages=importlib.util.module_from_spec(spec);spec.loader.exec_module(pages)
+        with tempfile.TemporaryDirectory() as folder:
+            pages.build('https://example.onrender.com',folder)
+            self.assertIn('window.location.replace("https://example.onrender.com/")',(Path(folder)/'index.html').read_text(encoding='utf-8'))
+            for url in ('http://localhost:5050','https://localhost','javascript:alert(1)','https://user:password@example.com'):
+                with self.assertRaises(ValueError): pages.build(url,folder)
+
     def test_owner_gate_and_health(self):
         with patch.dict(os.environ, {'TRADEFXBOOK_OWNER_USER':'trader', 'TRADEFXBOOK_OWNER_PASSWORD':'test-only-password'}):
             client = backend.app.test_client()

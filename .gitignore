@@ -16,3 +16,4 @@ release/
 deployment-check/
 /*-verified.png
 /.upload-*
+_site/
