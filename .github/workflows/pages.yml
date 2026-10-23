@@ -1,11 +1,8 @@
-name: Publish website link
+name: Publish free browser app
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      app_url:
-        description: Public HTTPS URL of the deployed Python application
-        required: true
-        type: string
 permissions:
   contents: read
   pages: write
@@ -16,6 +13,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -24,18 +22,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Build website entry
-        env:
-          APP_URL: ${{ inputs.app_url }}
-        run: python scripts/build_pages.py --app-url "$APP_URL"
-      - name: Verify hosted application is reachable
-        env:
-          APP_URL: ${{ inputs.app_url }}
-        run: curl --fail --silent --show-error --max-time 120 "${APP_URL%/}/healthz"
+      - name: Install build dependencies
+        run: pip install -r requirements.txt
+      - name: Restore original real CSV data
+        run: python scripts/dataset_package.py restore
+      - name: Build browser application and bounded history chunks
+        run: python scripts/build_static_pages.py
+      - name: Test browser history against the original CSV provider
+        run: node tests/pages_history.test.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
-      - name: Deploy GitHub Pages
+      - name: Deploy full app to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4

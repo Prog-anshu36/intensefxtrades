@@ -1083,7 +1083,6 @@ def update_floating():
             contract_size = _contract_size(t["symbol"])
             # Evaluate only a candle completed after entry, never its pre-entry range.
             if tick.get("time") is not None and t.get("opened_at"):
-                from datetime import timezone
                 opened = datetime.fromisoformat(t["opened_at"].replace("Z", "+00:00"))
                 opened_ms = opened.replace(tzinfo=opened.tzinfo or timezone.utc).timestamp() * 1000
                 if tick["time"] < opened_ms:

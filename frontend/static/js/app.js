@@ -232,7 +232,7 @@ async function boot() {
   } catch (error) {
     const splash = document.getElementById("appSplash");
     if (splash) {
-      splash.querySelector(".splash-label")?.replaceChildren(document.createTextNode("Unable to connect to the local trading workspace."));
+      splash.querySelector(".splash-label")?.replaceChildren(document.createTextNode(window.TradeFXBookPages ? "Browser workspace could not start: " + error.message + ". Check your connection and browser storage, then reload." : "Unable to connect to the local trading workspace."));
       splash.classList.add("error");
     }
     console.error("TradeFXBook boot failed", error);

@@ -1,7 +1,9 @@
 # intensefxTRADES
 
-Deployment, GitHub Codespaces, and the real CSV transfer package are documented
-in [DEPLOYMENT.md](DEPLOYMENT.md). GitHub Pages alone cannot run the Flask backend.
+The free website runs directly on GitHub Pages using a browser Python worker,
+bounded real-CSV history and device-local persistence. See
+[FREE_GITHUB_PAGES.md](FREE_GITHUB_PAGES.md). No Render account or paid backend is
+required. Local Flask development remains available as documented below.
 
 A full rebuild of your trading replay/journal tool, restyled to match the
 intensefxTRADES reference screenshots: dark, card-based UI with a Dashboard,

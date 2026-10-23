@@ -1,5 +1,9 @@
 # Open TradeFXBook online
 
+**Use the free browser-only deployment in [FREE_GITHUB_PAGES.md](FREE_GITHUB_PAGES.md).**
+The prior paid Render configuration has been removed. Notes below describe the
+older server-based alternative only and are not used by the current workflow.
+
 This is a Flask application. GitHub Pages cannot execute its Python API, CSV
 indexer, replay order execution or journal persistence. Publishing only its
 HTML would produce a broken app.
