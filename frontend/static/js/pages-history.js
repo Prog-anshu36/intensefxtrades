@@ -1,7 +1,7 @@
 /* Bounded real-CSV binary history reader, shared by the Pages worker and tests. */
 (function(scope){
   class PagesHistory {
-    constructor(base,fetcher=fetch){this.base=base;this.fetch=fetcher;this.cache=new Map();this.pending=new Map();}
+    constructor(base,fetcher=globalThis.fetch.bind(globalThis)){this.base=base;this.fetch=fetcher;this.cache=new Map();this.pending=new Map();}
     async info(){if(!this.manifest)this.manifest=await this.fetch(new URL('history/manifest.json',this.base),{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('XAUUSD historical dataset could not be loaded.');return r.json();});return this.manifest;}
     async chunk(frame,index){
       const item=frame.chunks[index],key=item.path;

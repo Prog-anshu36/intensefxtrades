@@ -8,7 +8,7 @@
   worker.onmessage=({data})=>{
     if(data.type==='status'){setStatus(data.text);return;}
     const item=pending.get(data.id);if(!item)return;pending.delete(data.id);
-    if(data.error)item.reject(Error(data.error));else item.resolve(data.result);
+    if(data.error){const status=document.getElementById('pagesStorageStatus');if(status)status.textContent=data.error;console.error('Browser API:',data.error);item.reject(Error(data.error));}else item.resolve(data.result);
   };
   worker.onerror=event=>{const error=Error(event.message || 'Browser trading engine failed to start.');for(const item of pending.values())item.reject(error);pending.clear();setStatus(error.message);};
   async function request(path,options={}){
