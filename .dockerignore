@@ -1,0 +1,12 @@
+.git
+.venv
+.vscode
+**/__pycache__
+.pytest_cache
+.env*
+backend/store.json*
+backend/market_cache
+XAUUSD_Data
+v20-python
+release
+deployment-check

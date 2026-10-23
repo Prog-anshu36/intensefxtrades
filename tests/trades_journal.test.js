@@ -1,0 +1,13 @@
+const fs = require('fs'), vm = require('vm'), assert = require('assert');
+const sandbox = {Store:{state:{history:Array.from({length:1000},(_,i)=>({id:i+1,symbol:'XAUUSD',type:'BUY',entry:2650,exit:2660,lots:.1,pnl:100,result:'WIN',strategy:i===100?'NY':'Asia',notes:'',tags:i===100?['Late Entry']:[]}))}},MarketData:{getMeta:()=>({decimals:2})},SymbolUI:{colorFor:()=>''},Fmt:{price:String,money:String,cls:()=>''},emptyState:()=>''};
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync('frontend/static/js/page_trades.js','utf8')+'\nthis.page=PageTrades;',sandbox);
+const page=sandbox.page;
+assert.equal((page.renderClosed().match(/data-review-trade=/g)||[]).length,50,'only one page is rendered');
+page.search='late entry';
+assert.equal((page.renderClosed().match(/data-review-trade=/g)||[]).length,1,'tag search filters trades');
+page.reviewId=101; sandbox.Store.state.history[100].notes='<script>alert(1)</script>';
+assert.ok(page.renderReview().includes('&lt;script&gt;'));
+assert.ok(!page.renderReview().includes('<script>'));
+page.search='unmatched'; assert.ok(page.renderClosed().includes('0 matching trades'));
+console.log('trades_journal.test.js passed');
