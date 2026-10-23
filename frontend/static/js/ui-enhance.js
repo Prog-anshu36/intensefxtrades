@@ -706,7 +706,7 @@ const UI = (() => {
   /* ---------------- Splash screen ---------------- */
   function initSplash() {
     const splash = document.getElementById("appSplash");
-    if (!splash) return;
+    if (!splash || window.TradeFXBookPages) return;
     window.addEventListener("load", () => {
       setTimeout(() => splash.classList.add("hidden"), 260);
     });

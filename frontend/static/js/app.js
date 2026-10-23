@@ -240,6 +240,7 @@ async function boot() {
   }
   document.body.classList.toggle("light-mode", Store.state.settings?.theme === "light");
   Router.init();
+  if (window.TradeFXBookPages) document.getElementById("appSplash")?.classList.add("hidden");
   initAccountControls();
   initAuthControls();
 
