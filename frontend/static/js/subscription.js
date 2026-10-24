@@ -57,7 +57,27 @@
     if (!PLANS[code] || !["active", "trialing"].includes(status) || (hasEnd && (!Number.isFinite(end) || end <= Date.now()))) return "blue";
     return code;
   }
-  function getUserPlan() { return PLANS[normalizePlan(window.IntenseFXAuth?.getSubscription?.())]; }
+  const VIP_KEYS = Object.freeze({ siuuu: "red", pro: "green", elite: "purple" });
+  const VIP_STORAGE_KEY = "intensefx_vip_plan";
+  function getVipPlanCode() {
+    try {
+      const code = localStorage.getItem(VIP_STORAGE_KEY);
+      return ORDER.includes(code) && code !== "blue" ? code : null;
+    } catch { return null; }
+  }
+  function redeemVipKey(value) {
+    const code = String(value ?? "").trim().toLowerCase();
+    const planCode = VIP_KEYS[code];
+    if (!planCode) return { ok: false };
+    try { localStorage.setItem(VIP_STORAGE_KEY, planCode); }
+    catch { return { ok: false, storageUnavailable: true }; }
+    window.dispatchEvent(new Event("intensefx:subscription-changed"));
+    return { ok: true, plan: PLANS[planCode] };
+  }
+  function getUserPlan() {
+    const verified = normalizePlan(window.IntenseFXAuth?.getSubscription?.());
+    return PLANS[verified !== "blue" ? verified : (getVipPlanCode() || "blue")];
+  }
   function getUserEntitlements(plan = getUserPlan()) { return new Set(plan.features); }
   function canAccessFeature(feature, plan = getUserPlan()) { return Boolean(plan?.features.has(feature)); }
   function requiredPlan(feature) { return PLANS[FEATURES[feature]?.required || "blue"]; }
@@ -124,5 +144,5 @@
 
   window.SubscriptionSystem = { PLANS, FEATURES, ORDER, normalizePlan, getUserPlan, getUserEntitlements,
     canAccessFeature, requiredPlan, canCreateAccount, getPermittedReplayRange, canAccessHistoricalData, canAccessReplayRange,
-    protectFeatureControls, requestUpgrade };
+    protectFeatureControls, getVipPlanCode, redeemVipKey, requestUpgrade };
 })();
