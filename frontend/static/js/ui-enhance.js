@@ -146,7 +146,7 @@ const UI = (() => {
       toggle.classList.toggle("on", enabled);
       toggle.setAttribute("aria-pressed", String(enabled));
       toggle.addEventListener("click", async () => {
-        if (key === "glassEffects" && window.SubscriptionSystem && !SubscriptionSystem.canAccessFeature("premiumAppearance")) {
+        if (key === "glassEffects" && !window.SubscriptionSystem?.canAccessFeature("premiumAppearance")) {
           PageSubscription.requestFeature("premiumAppearance", "Glass panel effects are included with Red · Elite.");
           return;
         }
@@ -539,7 +539,7 @@ const UI = (() => {
       swatchHost.querySelectorAll(".ui-color-swatch").forEach((sw) => {
         if (sw.dataset.color === prefs.accent) sw.classList.add("active");
         sw.addEventListener("click", () => {
-          if (window.SubscriptionSystem && !SubscriptionSystem.canAccessFeature("premiumAppearance")) {
+          if (!window.SubscriptionSystem?.canAccessFeature("premiumAppearance")) {
             PageSubscription.requestFeature("premiumAppearance", "Accent customization is included with Red · Elite.");
             return;
           }
@@ -567,7 +567,7 @@ const UI = (() => {
       input.value = prefs[key];
       if (label) label.textContent = fmt(prefs[key]);
       input.addEventListener("input", () => {
-        if (key !== "gridOpacity" && window.SubscriptionSystem && !SubscriptionSystem.canAccessFeature("premiumAppearance")) {
+        if (key !== "gridOpacity" && !window.SubscriptionSystem?.canAccessFeature("premiumAppearance")) {
           PageSubscription.requestFeature("premiumAppearance", "Advanced appearance controls are included with Red · Elite.");
           input.value = prefs[key];
           return;
@@ -583,7 +583,7 @@ const UI = (() => {
       compactToggle.classList.toggle("on", prefs.compact);
       compactToggle.setAttribute("aria-pressed", String(!!prefs.compact));
       compactToggle.addEventListener("click", () => {
-        if (window.SubscriptionSystem && !SubscriptionSystem.canAccessFeature("premiumAppearance")) {
+        if (!window.SubscriptionSystem?.canAccessFeature("premiumAppearance")) {
           PageSubscription.requestFeature("premiumAppearance", "Interface density customization is included with Red · Elite.");
           return;
         }
