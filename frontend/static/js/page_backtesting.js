@@ -1189,17 +1189,11 @@ const PageBacktesting = {
 
   renderSessionToolbar() {
     const fxn = this.getFxnIndicator();
-    const config = this.sessionEngine?.getConfig?.();
-    const current = this.currentSessionStats();
-    const label = current ? current.shortName : "OFF SESSION";
     return `<div class="tv-session-menu-wrap">
       <button class="tv-action ${fxn?.config.enabled ? 'active' : ''}" id="fxnToggleBtn" aria-pressed="${!!fxn?.config.enabled}" title="FXN - Asian Session Range by RobMinty">FXN - Asian Session Range: ${fxn?.config.enabled ? 'ON' : 'OFF'}</button>
       <button class="tv-action" id="fxnSettingsBtn" title="FXN indicator settings">FXN ⚙</button>
       ${this.fxnSettingsOpen ? this.renderFxnSettings() : ''}
       <button class="tv-action ${this.isVolumeVisible() ? 'active' : ''}" id="volumeToggleBtn" aria-pressed="${this.isVolumeVisible()}">Vol: ${this.isVolumeVisible() ? 'ON' : 'OFF'}</button>
-      <button class="tv-action ${config?.enabled ? "active" : ""}" id="sessionToggleBtn" aria-pressed="${!!config?.enabled}" title="Show or hide market sessions">Sessions: ${config?.enabled ? "ON" : "OFF"}</button>
-      <button class="tv-action tv-session-current" id="sessionMenuBtn" title="Open session settings">${this.replayActive ? "REPLAY · " : ""}${this.escapeHtml(label)}</button>
-      ${this.sessionSettingsOpen ? this.renderSessionMenu(config) : ""}
     </div>`;
   },
 
@@ -1255,10 +1249,16 @@ const PageBacktesting = {
   syncNewYorkSession(){
     const fxn=this.getFxnIndicator(),engine=this.sessionEngine;
     if(!fxn || !engine)return;
-    const c=fxn.config,old=engine.getConfig(),ny=old.definitions['new-york'];
-    engine.setConfig({displayTimezone:'Asia/Kolkata',definitions:{'new-york':{
-      ...ny,timezone:c.sessionTimezone,startTime:`${c.ny_ssth}:${c.ny_sstm}`,endTime:`${c.ny_esth}:${c.ny_estm}`,
-    }}});
+    const c=fxn.config,old=engine.getConfig();
+    const def=(id,name,shortName,startHour,startMinute,endHour,endMinute)=>({
+      ...old.definitions[id],enabled:true,timezone:c.sessionTimezone,name,shortName,
+      startTime:`${c[startHour]}:${c[startMinute]}`,endTime:`${c[endHour]}:${c[endMinute]}`,
+    });
+    engine.setConfig({enabled:true,displayTimezone:'Asia/Kolkata',definitions:{
+      asia:def('asia','Asian Session','ASIA','user_ssth','user_sstm','user_esth','user_estm'),
+      london:def('london','London Session','LONDON','london_ssth','london_sstm','london_esth','london_estm'),
+      'new-york':def('new-york','New York Session','NEW YORK','ny_ssth','ny_sstm','ny_esth','ny_estm'),
+    }});
     this.saveSessionSettings();
   },
 
@@ -1320,7 +1320,6 @@ const PageBacktesting = {
         <button class="replay-btn active" id="btnGoSession" title="Go to selected ${this.escapeHtml(selectedName)} on date">GO TO ${this.escapeHtml(selectedShort)}</button>
         <button class="replay-btn" id="btnNextSession" title="Next ${this.escapeHtml(selectedName)}">Next ${this.escapeHtml(selectedShort)}</button>
       </div>
-      ${this.sessionRangeOpen ? this.renderSessionSettings(config) : ""}
       ${this.renderSessionRangeTable()}
     </div>`;
   },
@@ -2084,11 +2083,9 @@ const PageBacktesting = {
 
   sessionDateValue(timestamp = null, sessionType = this.selectedSessionType()) {
     const ts = timestamp || this.candles[this.idx]?.date?.getTime() || Date.now();
-    const timezone = this.sessionEngine?.getConfig?.()?.definitions?.[sessionType]?.timezone;
-    if (!timezone) return new Date(ts).toISOString().slice(0, 10);
     try {
       const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
-        timeZone: timezone,
+        timeZone: "Asia/Kolkata",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -4265,14 +4262,6 @@ const PageBacktesting = {
     container.querySelectorAll("[data-replay-speed]").forEach((btn) => btn.addEventListener("click", () => this.setReplaySpeed(parseFloat(btn.dataset.replaySpeed))));
     container.querySelector("#btnReplayDate")?.addEventListener("click", () => this.jumpReplayToDate(container.querySelector("#replayDateInput")?.value));
     container.querySelector("#replayProgress")?.addEventListener("input", (e) => this.seekReplayToIndex(parseInt(e.target.value, 10)));
-    container.querySelector("#sessionToggleBtn")?.addEventListener("click", () => this.toggleSessions());
-    container.querySelector("#sessionMenuBtn")?.addEventListener("click", () => { this.sessionSettingsOpen = !this.sessionSettingsOpen; this.rerender(); });
-    container.querySelector("#sessionSettingsExpandBtn")?.addEventListener("click", () => { this.sessionRangeOpen = !this.sessionRangeOpen; this.rerender(); });
-    container.querySelectorAll("[data-session-toggle]").forEach((input) => input.addEventListener("change", () => this.handleSessionToggle(input.dataset.sessionToggle, input.checked)));
-    container.querySelectorAll("[data-session-def-enabled]").forEach((input) => input.addEventListener("change", () => this.updateSessionDefinition(input.dataset.sessionDefEnabled, { enabled: input.checked })));
-    container.querySelectorAll("[data-session-start]").forEach((input) => input.addEventListener("change", () => this.updateSessionDefinition(input.dataset.sessionStart, { startTime: input.value })));
-    container.querySelectorAll("[data-session-end]").forEach((input) => input.addEventListener("change", () => this.updateSessionDefinition(input.dataset.sessionEnd, { endTime: input.value })));
-    container.querySelectorAll("[data-session-zone]").forEach((input) => input.addEventListener("change", () => this.updateSessionDefinition(input.dataset.sessionZone, { timezone: input.value })));
     container.querySelector("#sessionDateInput")?.addEventListener("change", (e) => { this.sessionNavigator.date = e.target.value; });
     container.querySelector("#sessionSelectInput")?.addEventListener("change", (e) => {
       this.setSelectedSessionType(e.target.value, { rerender: true });
@@ -5532,12 +5521,25 @@ const PageBacktesting = {
     const sessionType = this.container?.querySelector("#sessionSelectInput")?.value || this.selectedSessionType();
     const date = this.container?.querySelector("#sessionDateInput")?.value || this.sessionNavigator.date || this.sessionDateValue(null, sessionType);
     this.setSelectedSessionType(sessionType, { date, rerender: false });
-    const session = this.sessionEngine?.getSessionOfTypeOnDate?.(date, sessionType);
+    const session = this.fxnSessionOnIstDate(date, sessionType);
     if (!this.sessionHasLoadedCandles(session)) {
       toast("Session not found for that date.", "error");
       return;
     }
     this.seekReplayToSession(session, "selected-session");
+  },
+
+  fxnSessionOnIstDate(dateKey, sessionType) {
+    const indicator=this.getFxnIndicator();
+    if(!indicator || !/^\d{4}-\d{2}-\d{2}$/.test(String(dateKey)))return null;
+    const type=sessionType==='asia'?'asia':sessionType==='london'?'london':sessionType==='new-york'?'ny':null;
+    if(!type)return null;
+    const [year,month,day]=dateKey.split('-').map(Number);
+    const bounds=indicator.bounds(Date.UTC(year,month-1,day,12),type);
+    if(!bounds || !Number.isFinite(bounds.start) || !Number.isFinite(bounds.end) || this.sessionDateValue(bounds.start,sessionType)!==dateKey)return null;
+    const def=this.sessionEngine?.getConfig?.().definitions?.[sessionType];
+    const labels={asia:['Asian Session','ASIA'],london:['London Session','LONDON'],'new-york':['New York Session','NEW YORK']}[sessionType];
+    return {id:`${sessionType}:${dateKey}`,type:sessionType,dateKey,name:def?.name||labels[0],shortName:def?.shortName||labels[1],start:bounds.start,end:bounds.end,timezone:'Asia/Kolkata',enabled:true};
   },
 
   jumpQuickSession(sessionType) {
@@ -5548,7 +5550,7 @@ const PageBacktesting = {
       toast(`No additional ${this.sessionShortLabel(sessionType)} session available.`, "error");
       return;
     }
-    this.sessionNavigator.date = session.dateKey;
+    this.sessionNavigator.date = this.sessionDateValue(session.start, sessionType);
     this.seekReplayToSession(session, "quick-session");
   },
 
@@ -5564,7 +5566,7 @@ const PageBacktesting = {
       return;
     }
     this.sessionNavigator.selectedSessionType = session.type;
-    this.sessionNavigator.date = session.dateKey;
+    this.sessionNavigator.date = this.sessionDateValue(session.start, sessionType);
     this.seekReplayToSession(session, direction > 0 ? "next-session" : "previous-session");
   },
 
@@ -6214,4 +6216,5 @@ const PageBacktesting = {
 };
 
 window.PageBacktesting = PageBacktesting;
+
 

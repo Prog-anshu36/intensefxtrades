@@ -78,6 +78,19 @@ assert.equal(boundary.days.size,2,'FXN daily boundary changes at midnight IST (1
 page.sessionEngine=new sandbox.window.IntenseSessions.SessionEngine({config:{definitions:{'new-york':{timezone:'UTC',startTime:'08:00'}}}});
 page.saveSessionSettings=()=>{};
 page.syncNewYorkSession();
+const synced=page.sessionEngine.getConfig();
+for(const [id,keys] of [['asia',['user_ssth','user_sstm','user_esth','user_estm']],['london',['london_ssth','london_sstm','london_esth','london_estm']],['new-york',['ny_ssth','ny_sstm','ny_esth','ny_estm']]]){
+ const [sh,sm,eh,em]=keys,definition=synced.definitions[id];
+ assert.equal(definition.startTime,`${page.fxnIndicator.config[sh]}:${page.fxnIndicator.config[sm]}`,`${id} navigator open follows FXN`);
+ assert.equal(definition.endTime,`${page.fxnIndicator.config[eh]}:${page.fxnIndicator.config[em]}`,`${id} navigator close follows FXN`);
+ assert.equal(definition.timezone,page.fxnIndicator.config.sessionTimezone,`${id} navigator uses FXN timezone`);
+}
+assert.ok(page.renderSessionToolbar().includes('FXN - Asian Session Range'));
+assert.ok(!page.renderSessionToolbar().includes('Sessions:'),'duplicate session indicator toggle is removed');
+assert.ok(!page.renderSessionToolbar().includes('sessionMenuBtn'),'duplicate session settings menu is removed');
+const istAsia=page.fxnSessionOnIstDate('2026-01-24','asia');
+assert.ok(istAsia,'navigator resolves FXN session by its IST calendar date');
+assert.equal(page.sessionDateValue(istAsia.start,'asia'),'2026-01-24');
 for(const date of ['2026-01-23','2026-10-23']){
  const expected=page.fxnIndicator.bounds(Date.parse(date+'T18:00Z'),'ny');
  const nav=page.sessionEngine.getSessionByDate(date,'new-york');
@@ -86,3 +99,4 @@ for(const date of ['2026-01-23','2026-10-23']){
 }
 assert.equal(page.sessionEngine.getConfig().displayTimezone,'Asia/Kolkata');
 console.log('fxn_asian_session_range.test.js passed');
+

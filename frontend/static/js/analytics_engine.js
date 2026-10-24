@@ -242,6 +242,16 @@ const TradeAnalyticsEngine = {
   },
 
   sessionForDate(date) {
+    const timestamp = date instanceof Date ? date.getTime() : new Date(date).getTime();
+    const page = typeof window !== "undefined" ? window.PageBacktesting : null;
+    const indicator = page?.getFxnIndicator?.();
+    if (indicator && Number.isFinite(timestamp)) {
+      for (const [type, label] of [["asia", "Asia"], ["london", "London"], ["ny", "New York"]]) {
+        const bounds = indicator.bounds(timestamp, type);
+        if (bounds && timestamp >= bounds.start && timestamp < bounds.end) return label;
+      }
+      return "Off session";
+    }
     const h = new Date(date).getUTCHours();
     if (h >= 21 || h < 6) return "Sydney";
     if (h >= 0 && h < 9) return "Tokyo";
@@ -329,3 +339,4 @@ const TradeAnalyticsEngine = {
     return `${value >= 0 ? "+" : ""}${Number(value || 0).toFixed(2)}`;
   },
 };
+
