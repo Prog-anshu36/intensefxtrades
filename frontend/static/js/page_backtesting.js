@@ -2001,6 +2001,7 @@ const PageBacktesting = {
     if (indicatorsAllowed) this.drawIndicators(ctx, visible, xFor, yFor, candleW, chartWidth, height, bottomAxis, volumeHeight, maxVol);
     this.drawPriceSeries(ctx, visible, start, xFor, yFor, candleW, bodyW, height, bottomAxis);
     this.drawTradeLevels(ctx, yFor, chartWidth, meta);
+    this.drawOrderDraft(ctx, yFor, chartWidth, height, bottomAxis, meta);
     const drawingCanvas = this.container?.querySelector("#tvDrawingCanvas");
     const drawingCtx = drawingCanvas ? this.prepareCanvas(drawingCanvas, rect, dpr) : ctx;
     if (drawingCanvas) drawingCtx.clearRect(0, 0, width, height);
@@ -2519,6 +2520,88 @@ const PageBacktesting = {
         if(draft.error){ctx.save();ctx.fillStyle='#ff6b78';ctx.font='11px Inter, sans-serif';ctx.fillText(draft.error,8,y+44);ctx.restore();}
       }
     });
+  },
+
+  drawOrderDraft(ctx, yFor, chartWidth, height, bottomAxis, meta) {
+    const draft = this.orderDraft;
+    this._orderDraftHits = [];
+    if (!draft || draft.symbol !== this.symbol || !Number.isFinite(Number(draft.entry))) return;
+    const direction = draft.type === "BUY" ? 1 : -1;
+    const entry = Number(draft.entry);
+    const stop = Number(draft.sl);
+    const target = Number(draft.tp);
+    if (!Number.isFinite(stop) || !Number.isFinite(target)) return;
+    const entryY = yFor(entry), stopY = yFor(stop), targetY = yFor(target);
+    const left = Math.max(8, Math.min(chartWidth - 300, chartWidth * 0.43));
+    const right = chartWidth - 6;
+    const contract = meta.kind === "fx" ? 100000 : meta.kind === "crypto" ? 1 : (this.symbol === "SILVER" ? 5000 : 100);
+    const moneyFor = (priceDelta) => Fmt.moneyPlain(priceDelta * contract * Number(draft.lots || this.lots));
+    const drawLevel = (key, price, y, color, text, fill) => {
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = fill;
+      ctx.fillRect(left, Math.min(entryY, y), Math.max(0, right - left), Math.abs(y - entryY));
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(chartWidth, y + 0.5); ctx.stroke();
+      ctx.setLineDash([]);
+      const labelWidth = Math.min(244, Math.max(136, ctx.measureText(text).width + 20));
+      const labelX = Math.max(4, right - labelWidth);
+      const labelY = Math.max(4, Math.min(height - bottomAxis - 25, y - 12));
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.roundRect(labelX, labelY, labelWidth, 22, 5); ctx.fill();
+      ctx.fillStyle = "#f7f9fc";
+      ctx.font = "600 11px Inter, sans-serif";
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ctx.fillText(text, labelX + 8, labelY + 11, labelWidth - 14);
+      ctx.restore();
+      this._orderDraftHits.push({ key, x: 0, width: chartWidth, y, kind: "level" });
+    };
+    drawLevel("tp", target, targetY, "#00b894", `TP  ${moneyFor(Math.abs(target - entry))}  ·  ${Fmt.price(target, meta.decimals)}`, "#00b894");
+    drawLevel("sl", stop, stopY, "#ff5364", `SL  ${moneyFor(-Math.abs(entry - stop))}  ·  ${Fmt.price(stop, meta.decimals)}`, "#ff5364");
+
+    ctx.save();
+    ctx.strokeStyle = "#4388ff"; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(0, entryY + 0.5); ctx.lineTo(chartWidth, entryY + 0.5); ctx.stroke(); ctx.setLineDash([]);
+    const entryText = `${draft.type}  ${Number(draft.lots || this.lots).toFixed(2)} lots  ·  ${Fmt.price(entry, meta.decimals)}`;
+    ctx.font = "700 10px Inter, sans-serif"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    const entryW = Math.max(112, ctx.measureText(entryText).width + 16);
+    const labelX = Math.max(4, Math.min(chartWidth - entryW - 151, chartWidth * 0.3));
+    const labelY = Math.max(5, Math.min(height - bottomAxis - 29, entryY - 14));
+    ctx.fillStyle = "#10203b"; ctx.strokeStyle = "#4388ff"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(labelX, labelY, entryW, 24, 5); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#dce8ff"; ctx.fillText(entryText, labelX + 8, labelY + 12, entryW - 14);
+    let buttonX = labelX + entryW + 7;
+    const buttons = [
+      { key: "discard", text: "Discard", width: 64, color: "#343b48" },
+      { key: "confirm", text: draft.saving ? "Saving…" : "Confirm", width: 70, color: "#2962ff" },
+    ];
+    buttons.forEach((button) => {
+      ctx.fillStyle = button.color;
+      ctx.beginPath(); ctx.roundRect(buttonX, labelY, button.width, 24, 5); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center";
+      ctx.fillText(button.text, buttonX + button.width / 2, labelY + 12);
+      this._orderDraftHits.push({ key: button.key, x: buttonX, width: button.width, y: labelY + 12, kind: "action" });
+      buttonX += button.width + 5;
+    });
+    ctx.fillStyle = "#4388ff";
+    ctx.beginPath(); ctx.arc(Math.min(chartWidth - 5, Math.max(5, left)), entryY, 4, 0, Math.PI * 2); ctx.fill();
+    if (draft.error) {
+      ctx.fillStyle = "#ff7884"; ctx.textAlign = "left";
+      ctx.fillText(draft.error, 8, Math.min(height - bottomAxis - 10, labelY + 38), chartWidth - 16);
+    }
+    ctx.restore();
+    this._orderDraftHits.push({ key: "entry", x: 0, width: chartWidth, y: entryY, kind: "level" });
+  },
+
+  orderDraftHit(point) {
+    if (!this.orderDraft || !point) return null;
+    const hits = [...(this._orderDraftHits || [])].reverse();
+    return hits.find((hit) => hit.kind === "action" && point.x >= hit.x && point.x <= hit.x + hit.width && Math.abs(point.y - hit.y) <= 13) || hits.find((hit) => (
+      point.x >= hit.x && point.x <= hit.x + hit.width && Math.abs(point.y - hit.y) <= (hit.kind === "action" ? 13 : 9)
+    )) || null;
   },
 
   tradeLevelHit(point) {
@@ -4378,6 +4461,7 @@ const PageBacktesting = {
       const reward = this.orderDraft.tp == null ? null : Math.abs(this.orderDraft.tp - this.orderDraft.entry);
       const ratio = container.querySelector('#draftRiskReward');
       if (ratio) ratio.textContent = risk > 0 && reward != null ? `1 : ${(reward / risk).toFixed(2)}` : '—';
+      this.scheduleDraw();
     }));
     container.querySelector("#useRiskPlanBtn")?.addEventListener("click", () => this.applyRiskPlanToOrder());
     container.querySelector('#createPlanTradeBtn')?.addEventListener('click', async () => {
@@ -4798,6 +4882,8 @@ const PageBacktesting = {
       canvas.style.cursor = zone === "price" ? "ns-resize" : zone === "time" ? "ew-resize" : pointer?.mode === "pan" ? "grabbing" : this._spacePan ? "grab" : this.chartCursor();
       if (!pointer) {
         const point = updateCrosshair(event);
+        const orderHit = this.orderDraftHit(point);
+        if (orderHit) canvas.style.cursor = orderHit.kind === "action" ? "pointer" : orderHit.key === "entry" ? "move" : "ns-resize";
         if(this.tradeLevelHit(point)) canvas.style.cursor='ns-resize';
         if (this.drawingToolType() && this.engineToolForUiTool(this.tool) && this.drawingEngine?.handlePointerMove?.(event)) return;
         const hover = !this.drawingToolType() || this.tool === "eraser" ? this.hitTestDrawing(point) : null;
@@ -4811,6 +4897,45 @@ const PageBacktesting = {
       const dy = event.clientY - pointer.y;
       const now = performance.now();
       pointer.moved = pointer.moved || Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > 3;
+      if (pointer.mode === "order-draft") {
+        const point = updateCrosshair(event);
+        const draft = this.orderDraft;
+        if (draft && !draft.saving) {
+          const pip = Number(MarketData.getMeta(this.symbol).pip) || 0.01;
+          const direction = draft.type === "BUY" ? 1 : -1;
+          const minGap = Math.max(pip, Math.abs(Number(draft.entry)) * 1e-7);
+          const draggedPrice = Number(point.price);
+          if (Number.isFinite(draggedPrice)) {
+            if (pointer.key === "entry") {
+              const delta = draggedPrice - Number(draft.entry);
+              draft.entry = Number((Number(draft.entry) + delta).toFixed(MarketData.getMeta(this.symbol).decimals));
+              if (draft.sl != null) draft.sl = Number((Number(draft.sl) + delta).toFixed(MarketData.getMeta(this.symbol).decimals));
+              if (draft.tp != null) draft.tp = Number((Number(draft.tp) + delta).toFixed(MarketData.getMeta(this.symbol).decimals));
+              if (this.orderTab !== "Market") {
+                this.pendingPrice = draft.entry;
+                const pendingInput = this.container?.querySelector("#pendingPriceInput");
+                if (pendingInput) pendingInput.value = String(draft.entry);
+              }
+            } else if (pointer.key === "sl") {
+              draft.sl = Number((direction > 0 ? Math.min(draggedPrice, draft.entry - minGap) : Math.max(draggedPrice, draft.entry + minGap)).toFixed(MarketData.getMeta(this.symbol).decimals));
+            } else if (pointer.key === "tp") {
+              draft.tp = Number((direction > 0 ? Math.max(draggedPrice, draft.entry + minGap) : Math.min(draggedPrice, draft.entry - minGap)).toFixed(MarketData.getMeta(this.symbol).decimals));
+            }
+            draft.error = "";
+            this.slPips = Math.max(1, Math.round(Math.abs(draft.entry - draft.sl) / pip));
+            this.tpPips = Math.max(1, Math.round(Math.abs(draft.tp - draft.entry) / pip));
+            const slInput = this.container?.querySelector('[data-draft-price="sl"]');
+            const tpInput = this.container?.querySelector('[data-draft-price="tp"]');
+            if (slInput) slInput.value = String(draft.sl);
+            if (tpInput) tpInput.value = String(draft.tp);
+            const risk = Math.abs(draft.entry - draft.sl), reward = Math.abs(draft.tp - draft.entry);
+            const ratio = this.container?.querySelector("#draftRiskReward");
+            if (ratio) ratio.textContent = risk > 0 ? `1 : ${(reward / risk).toFixed(2)}` : "—";
+            this.scheduleDraw();
+          }
+        }
+        return;
+      }
       if(pointer.mode === 'trade-protection') {
         const point=updateCrosshair(event);
         if(this.tradeProtectionDraft && !this.tradeProtectionDraft.saving){
@@ -4900,6 +5025,15 @@ const PageBacktesting = {
       const zone = axisAt(event, rect);
       const anchor = anchorFromEvent(event, rect);
       updateCrosshair(event);
+      const orderHit = zone === "chart" && event.button === 0 ? this.orderDraftHit(this.crosshair) : null;
+      if (orderHit) {
+        if (orderHit.key === "discard") { this.orderDraft = null; this.rerender(); return; }
+        if (orderHit.key === "confirm") { this.confirmOrderDraft(); return; }
+        if (this.orderDraft?.saving) return;
+        if (orderHit.key === "entry" && this.orderTab === "Market") return;
+        pointer = { id: event.pointerId, mode: "order-draft", key: orderHit.key, startX: event.clientX, startY: event.clientY, moved: false };
+        return;
+      }
       const tradeHit=zone==='chart' && event.button===0 && !this.drawingToolType() && this.tradeLevelHit(this.crosshair);
       if(tradeHit) {
         if(this.tradeProtectionDraft?.saving)return;
@@ -4981,6 +5115,7 @@ const PageBacktesting = {
       updateCrosshair(event);
       const wasMoved = pointer.moved;
       const mode = pointer.mode;
+      if (mode === "order-draft") { pointer = null; this.scheduleDraw(); return; }
       if(mode==='trade-protection'){pointer=null;this.scheduleDraw();return;}
       if (mode === "tool") {
         this.drawingEngine?.handlePointerUp?.(event);
@@ -6213,6 +6348,29 @@ const PageBacktesting = {
     const direction = type === 'BUY' ? 1 : -1;
     this.orderDraft = { type, symbol: this.symbol, timeframe: this.timeframe, time: candle.time,
       orderTab: this.orderTab, entry, lots: this.lots,
+      sl: entry - direction * Math.max(1, this.slPips) * pip,
+      tp: entry + direction * Math.max(1, this.tpPips) * pip, error: '', saving: false };
+    // Every backtest preview starts with visible, editable protection levels.
+    // The order ticket inputs remain available for exact numeric adjustments.
+    this.slEnabled = true;
+    this.tpEnabled = true;
+    this.rerender();
+    this.container?.querySelector('.tv-order-draft')?.scrollIntoView({ block: 'nearest' });
+  },
+
+
+    const candle = this.candles[this.idx];
+    if (!candle || this._placingOrder || (MarketData.isLocal(this.symbol) && (this.dataSource !== 'local-csv' || this._historyError))) return;
+    this.stopPlay();
+    if (typeof UI !== "undefined" && !UI.getSetting?.("confirmBeforeOrder")) {
+      this.placeTrade(type);
+      return;
+    }
+    const entry = Number(this.orderPrice(type, candle));
+    const pip = MarketData.getMeta(this.symbol).pip;
+    const direction = type === 'BUY' ? 1 : -1;
+    this.orderDraft = { type, symbol: this.symbol, timeframe: this.timeframe, time: candle.time,
+      orderTab: this.orderTab, entry, lots: this.lots,
       sl: this.slEnabled ? entry - direction * this.slPips * pip : null,
       tp: this.tpEnabled ? entry + direction * this.tpPips * pip : null, error: '' };
     this.rerender();
@@ -6254,6 +6412,27 @@ const PageBacktesting = {
   },
 
   async confirmOrderDraft() {
+    const draft = this.orderDraft;
+    if (!draft || this._placingOrder) return;
+    const sameContext = draft.symbol === this.symbol && draft.timeframe === this.timeframe && draft.time === this.candles[this.idx]?.time && draft.orderTab === this.orderTab && draft.entry === Number(this.orderPrice(draft.type));
+    const direction = draft.type === 'BUY' ? 1 : -1;
+    const valid = Number.isFinite(draft.entry) && draft.entry > 0 && Number.isFinite(draft.lots) && draft.lots > 0 &&
+      (draft.sl == null || (Number.isFinite(draft.sl) && draft.sl > 0 && direction * (draft.entry - draft.sl) > 0)) &&
+      (draft.tp == null || (Number.isFinite(draft.tp) && draft.tp > 0 && direction * (draft.tp - draft.entry) > 0));
+    if (!sameContext || !valid) {
+      draft.error = !sameContext ? 'Chart time or order entry changed. Cancel and preview again.' : 'SL and TP must be on the correct sides of entry; prices and lots must be positive.';
+      this.rerender();
+      return;
+    }
+    draft.saving = true;
+    await this.placeTrade(draft.type, draft);
+    if (this.orderDraft === draft) {
+      draft.saving = false;
+      this.rerender();
+    }
+  },
+
+
     const draft = this.orderDraft;
     if (!draft || this._placingOrder) return;
     const sameContext = draft.symbol === this.symbol && draft.timeframe === this.timeframe && draft.time === this.candles[this.idx]?.time && draft.orderTab === this.orderTab && draft.entry === Number(this.orderPrice(draft.type));
