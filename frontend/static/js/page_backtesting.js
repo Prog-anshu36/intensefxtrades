@@ -1928,7 +1928,8 @@ const PageBacktesting = {
     const height = rect.height;
     const metrics = this.chartMetrics(rect);
     const { rightAxis, bottomAxis, topPad, chartWidth, candleW, totalSlots } = metrics;
-    const volumeHeight = this.isVolumeVisible() || this.indicator === 'rsi' ? 88 : 0;
+    const indicatorsAllowed = Boolean(window.SubscriptionSystem?.canAccessFeature("technicalIndicators"));
+    const volumeHeight = indicatorsAllowed && (this.isVolumeVisible() || this.indicator === 'rsi') ? 88 : 0;
     const priceHeight = height - bottomAxis - topPad;
     const windowState = this.chartWindow();
     this._chartFrame = { rect, dpr, windowState, metrics };
@@ -1955,7 +1956,7 @@ const PageBacktesting = {
       fxn.render(ctx,{candles:this.candles,limit:this.getReplayLimit(),timeframeMs:(MarketData.TF_MINUTES[this.timeframe]||1)*60000,from:coords.xToTime(0,context),to:coords.xToTime(chartWidth,context),x:time=>this.xForTimestamp(time,windowState,metrics),y:yFor,width:chartWidth,tickSize:Math.pow(10,-meta.decimals)});
       ctx.restore();
     }
-    this.drawIndicators(ctx, visible, xFor, yFor, candleW, chartWidth, height, bottomAxis, volumeHeight, maxVol);
+    if (indicatorsAllowed) this.drawIndicators(ctx, visible, xFor, yFor, candleW, chartWidth, height, bottomAxis, volumeHeight, maxVol);
     this.drawPriceSeries(ctx, visible, start, xFor, yFor, candleW, bodyW, height, bottomAxis);
     this.drawTradeLevels(ctx, yFor, chartWidth, meta);
     const drawingCanvas = this.container?.querySelector("#tvDrawingCanvas");
@@ -4136,9 +4137,9 @@ const PageBacktesting = {
       this.scheduleDraw();
     });
     container.querySelector("#indicatorSelect")?.addEventListener("change", (e) => {
-      if (!['none','volume'].includes(e.target.value) && window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("technicalIndicators")) {
+      if (e.target.value !== 'none' && !window.SubscriptionSystem?.canAccessFeature("technicalIndicators")) {
         e.target.value = this.indicator || "volume";
-        window.SubscriptionSystem.requestUpgrade("technicalIndicators");
+        window.SubscriptionSystem?.requestUpgrade("technicalIndicators");
         return;
       }
       if(e.target.value==='fxn'){
@@ -4149,12 +4150,12 @@ const PageBacktesting = {
       this.scheduleDraw();
     });
     container.querySelector('#fxnToggleBtn')?.addEventListener('click',()=>{
-      if(window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("technicalIndicators")){window.SubscriptionSystem.requestUpgrade("technicalIndicators");return;}
+      if(!window.SubscriptionSystem?.canAccessFeature("technicalIndicators")){window.SubscriptionSystem?.requestUpgrade("technicalIndicators");return;}
       const enabled=!this.getFxnIndicator().config.enabled;
       if(enabled && this.sessionEngine?.getConfig?.().asianRange)this.updateSessionConfig({asianRange:false,enabled:false},{rerender:false});
       this.updateFxnSettings({enabled});
     });
-    container.querySelector('#fxnSettingsBtn')?.addEventListener('click',()=>{if(window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("technicalIndicators")){window.SubscriptionSystem.requestUpgrade("technicalIndicators");return;}this.fxnSettingsOpen=!this.fxnSettingsOpen;this.rerender();});
+    container.querySelector('#fxnSettingsBtn')?.addEventListener('click',()=>{if(!window.SubscriptionSystem?.canAccessFeature("technicalIndicators")){window.SubscriptionSystem?.requestUpgrade("technicalIndicators");return;}this.fxnSettingsOpen=!this.fxnSettingsOpen;this.rerender();});
     container.querySelectorAll('[data-plan-feature]').forEach(button=>button.addEventListener('click',()=>window.SubscriptionSystem?.requestUpgrade(button.dataset.planFeature)));
     container.querySelector('#fxnSettingsCloseBtn')?.addEventListener('click',()=>{this.fxnSettingsOpen=false;this.rerender();});
     container.querySelector('#fxnResetBtn')?.addEventListener('click',()=>this.updateFxnSettings({...window.FXNAsianSessionRange.defaults,enabled:this.getFxnIndicator().config.enabled}));
@@ -4164,6 +4165,7 @@ const PageBacktesting = {
       this.updateFxnSettings({[key]:input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value});
     }));
     container.querySelector('#volumeToggleBtn')?.addEventListener('click',()=>{
+      if(!window.SubscriptionSystem?.canAccessFeature("technicalIndicators")){window.SubscriptionSystem?.requestUpgrade("technicalIndicators");return;}
       this.volumeVisible=!this.isVolumeVisible();
       try{localStorage.setItem('tfb_volume_visible_v1',String(this.volumeVisible));}catch{}
       this.rerender();
