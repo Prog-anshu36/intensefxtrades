@@ -45,7 +45,7 @@ function initThemeToggle() {
   document.body.classList.toggle("light-mode", Store.state.settings?.theme === "light");
   btn.addEventListener("click", () => {
     const next = document.body.classList.toggle("light-mode") ? "light" : "dark";
-    API.updateSettings({ theme: next });
+    UI?.setSetting?.("darkTheme", next === "dark");
     toast(`${next === "light" ? "Light" : "Dark"} mode enabled.`, "success");
   });
 }
@@ -246,6 +246,7 @@ async function boot() {
     return;
   }
   document.body.classList.toggle("light-mode", Store.state.settings?.theme === "light");
+  UI?.setSetting?.("darkTheme", Store.state.settings?.theme !== "light");
   Router.init();
   if (window.TradeFXBookPages) document.getElementById("appSplash")?.classList.add("hidden");
   initAccountControls();

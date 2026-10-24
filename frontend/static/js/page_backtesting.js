@@ -1015,7 +1015,7 @@ const PageBacktesting = {
     if (!trades.length) return emptyState("No open position on this symbol", "Use Buy/Sell to simulate an order.");
     const decimals = MarketData.getMeta(this.symbol).decimals;
     return `<table class="data-table"><thead><tr><th>Side</th><th>Entry</th><th>Lots</th><th>SL</th><th>TP</th><th>Floating P&amp;L</th></tr></thead><tbody>
-      ${trades.map((t) => `<tr><td><span class="dir-pill ${t.type === "BUY" ? "long" : "short"}">${t.type}</span></td><td class="mono">${Fmt.price(t.entry, decimals)}</td><td class="mono">${t.lots}</td><td class="mono dim">${t.sl ? Fmt.price(t.sl, decimals) : "-"}</td><td class="mono dim">${t.tp ? Fmt.price(t.tp, decimals) : "-"}</td><td class="mono ${Fmt.cls(t.floating_pnl || 0)}">${Fmt.money(t.floating_pnl || 0)}</td></tr>`).join("")}
+      ${trades.map((t) => `<tr><td><span class="dir-pill ${t.type === "BUY" ? "long" : "short"}">${t.type}</span></td><td class="mono">${Fmt.price(t.entry, decimals)}</td><td class="mono">${t.lots}</td><td class="mono dim">${t.sl ? Fmt.price(t.sl, decimals) : "-"}</td><td class="mono dim">${t.tp ? Fmt.price(t.tp, decimals) : "-"}</td><td class="mono ${Fmt.cls(t.floating_pnl || 0)}">${this.formatTradePnl(t, true)}</td></tr>`).join("")}
     </tbody></table>`;
   },
 
@@ -1023,8 +1023,22 @@ const PageBacktesting = {
     if (!history.length) return emptyState("No closed trades on this symbol yet", "Closed trades will show up here.");
     const decimals = MarketData.getMeta(this.symbol).decimals;
     return `<table class="data-table"><thead><tr><th>#</th><th>Side</th><th>Entry</th><th>Exit</th><th>Lots</th><th>P&amp;L</th><th>Result</th></tr></thead><tbody>
-      ${[...history].reverse().map((t) => `<tr><td class="dim">${t.id}</td><td><span class="dir-pill ${t.type === "BUY" ? "long" : "short"}">${t.type}</span></td><td class="mono">${Fmt.price(t.entry, decimals)}</td><td class="mono">${Fmt.price(t.exit, decimals)}</td><td class="mono">${t.lots}</td><td class="mono ${Fmt.cls(t.pnl)}">${Fmt.money(t.pnl)}</td><td><span class="result-pill ${t.result === "WIN" ? "win" : "loss"}">${t.result}</span></td></tr>`).join("")}
+      ${[...history].reverse().map((t) => `<tr><td class="dim">${t.id}</td><td><span class="dir-pill ${t.type === "BUY" ? "long" : "short"}">${t.type}</span></td><td class="mono">${Fmt.price(t.entry, decimals)}</td><td class="mono">${Fmt.price(t.exit, decimals)}</td><td class="mono">${t.lots}</td><td class="mono ${Fmt.cls(t.pnl)}">${this.formatTradePnl(t)}</td><td><span class="result-pill ${t.result === "WIN" ? "win" : "loss"}">${t.result}</span></td></tr>`).join("")}
     </tbody></table>`;
+  },
+
+  formatTradePnl(trade, floating = false) {
+    if (typeof UI === "undefined" || !UI.getSetting?.("showPips")) return Fmt.money(floating ? trade.floating_pnl || 0 : trade.pnl || 0);
+    const pip = MarketData.getMeta(trade.symbol).pip || 1;
+    let pips;
+    if (floating) {
+      const contract = ({ EURUSD: 100000, GBPUSD: 100000, USDJPY: 100000, XAUUSD: 100, GOLD: 100, SILVER: 5000, BTCUSD: 1, ETHUSD: 1 })[trade.symbol] || 100000;
+      pips = (Number(trade.floating_pnl) || 0) / (Math.max(Number(trade.lots) || 0, 1e-12) * contract * pip);
+    } else {
+      const direction = trade.type === "SELL" ? -1 : 1;
+      pips = ((Number(trade.exit) - Number(trade.entry)) * direction) / pip;
+    }
+    return `${pips >= 0 ? "+" : ""}${pips.toFixed(1)} pips`;
   },
 
   renderChartSurface() {
@@ -1834,6 +1848,7 @@ const PageBacktesting = {
     const px = (v) => Math.round(v) + 0.5;
     const xFor = (i) => (frame.window.start + i - frame.window.logicalStart) * frame.metrics.candleW + frame.metrics.candleW * 0.5;
     const gridOpacity = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--user-grid-opacity")) || 1;
+    const showGridLines = !document.body.classList.contains("settings-chart-grid-off");
 
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "#0b0d10";
@@ -1842,15 +1857,17 @@ const PageBacktesting = {
     ctx.font = "11px JetBrains Mono, monospace";
     ctx.textBaseline = "middle";
 
-    ctx.save();
-    ctx.globalAlpha = 0.4 * gridOpacity;
-    ctx.strokeStyle = "#141619";
-    for (let g = 0; g <= 32; g++) {
-      if (g % 4 === 0) continue;
-      const y = px(topPad + ((priceHeight - topPad) / 32) * g);
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartWidth, y); ctx.stroke();
+    if (showGridLines) {
+      ctx.save();
+      ctx.globalAlpha = 0.4 * gridOpacity;
+      ctx.strokeStyle = "#141619";
+      for (let g = 0; g <= 32; g++) {
+        if (g % 4 === 0) continue;
+        const y = px(topPad + ((priceHeight - topPad) / 32) * g);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(chartWidth, y); ctx.stroke();
+      }
+      ctx.restore();
     }
-    ctx.restore();
 
     ctx.save();
     ctx.globalAlpha = gridOpacity;
@@ -1858,10 +1875,12 @@ const PageBacktesting = {
     for (let g = 0; g <= 8; g++) {
       const y = px(topPad + ((priceHeight - topPad) / 8) * g);
       const p = hi - (g / 8) * range;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(chartWidth, y);
-      ctx.stroke();
+      if (showGridLines) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(chartWidth, y);
+        ctx.stroke();
+      }
       ctx.fillStyle = "#787B86";
       ctx.fillText(Fmt.price(p, meta.decimals), chartWidth + 8, y);
     }
@@ -1878,10 +1897,12 @@ const PageBacktesting = {
       const last = this.candles[lastIndex];
       const date = this.candles[Math.min(logicalIndex, lastIndex)]?.date;
       const axisDate = logicalIndex <= lastIndex ? date : new Date(last.date.getTime() + (logicalIndex - lastIndex) * (MarketData.TF_MINUTES[this.timeframe] || 1) * 60000);
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height - bottomAxis);
-      ctx.stroke();
+      if (showGridLines) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height - bottomAxis);
+        ctx.stroke();
+      }
       ctx.fillStyle = "#787B86";
       ctx.textAlign = "center";
       ctx.fillText(this.timeAxisLabel(axisDate), x, height - 10);
@@ -5082,6 +5103,7 @@ const PageBacktesting = {
     if (this._keyUpHandler) document.removeEventListener("keyup", this._keyUpHandler);
     this._keyHandler = (e) => {
       if (!document.querySelector(".tv-shell")) return;
+      if (typeof UI !== "undefined" && UI.getSetting?.("keyboardShortcuts") === false) return;
       const tag = (e.target.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       if (e.code === "Space") {
@@ -5692,6 +5714,7 @@ const PageBacktesting = {
         this.syncReplayTimestamp();
         this.syncReplayBuffers();
         await this.evaluateCandle();
+        this.playBarCloseSound();
       }
       if (this.autoFollow) { this.viewEnd = this.followViewEnd(); this.syncMouseEngineCamera(); }
       this.updateReplayChrome();
@@ -5714,6 +5737,7 @@ const PageBacktesting = {
         this.syncReplayTimestamp();
         this.syncReplayBuffers();
         await this.evaluateCandle();
+      this.playBarCloseSound();
       }
     } else {
       this.idx = target;
@@ -5982,7 +6006,10 @@ const PageBacktesting = {
     this._evaluatingCandle = true;
     try {
       const result = await API.updateFloating({ [this.symbol]: { ...c, closed_time: c.time + this.candleDuration() } });
-      if (result.closed?.length) result.closed.forEach((t) => toast(`${t.symbol} closed ${t.reason}: ${Fmt.money(t.pnl)}`, t.pnl > 0 ? "success" : "error"));
+      if (result.closed?.length) {
+        result.closed.forEach((t) => toast(`${t.symbol} closed ${t.reason}: ${Fmt.money(t.pnl)}`, t.pnl > 0 ? "success" : "error"));
+        if (typeof UI !== "undefined" && UI.getSetting?.("autoPauseOnTrade")) this.stopPlay();
+      }
       await Store.refresh({fresh:true});
     } finally {
       this._evaluatingCandle = false;
@@ -5993,6 +6020,10 @@ const PageBacktesting = {
     const candle = this.candles[this.idx];
     if (!candle || this._placingOrder || (MarketData.isLocal(this.symbol) && (this.dataSource !== 'local-csv' || this._historyError))) return;
     this.stopPlay();
+    if (typeof UI !== "undefined" && !UI.getSetting?.("confirmBeforeOrder")) {
+      this.placeTrade(type);
+      return;
+    }
     const entry = Number(this.orderPrice(type, candle));
     const pip = MarketData.getMeta(this.symbol).pip;
     const direction = type === 'BUY' ? 1 : -1;
@@ -6002,6 +6033,24 @@ const PageBacktesting = {
       tp: this.tpEnabled ? entry + direction * this.tpPips * pip : null, error: '' };
     this.rerender();
     this.container?.querySelector('.tv-order-draft')?.scrollIntoView({ block: 'nearest' });
+  },
+
+  playBarCloseSound() {
+    if (typeof UI === "undefined" || !UI.getSetting?.("soundOnBarClose")) return;
+    try {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) return;
+      this._barAudio ||= new Audio();
+      if (this._barAudio.state === "suspended") this._barAudio.resume().catch(() => {});
+      const oscillator = this._barAudio.createOscillator();
+      const gain = this._barAudio.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = 680;
+      gain.gain.setValueAtTime(0.035, this._barAudio.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this._barAudio.currentTime + 0.07);
+      oscillator.connect(gain); gain.connect(this._barAudio.destination);
+      oscillator.start(); oscillator.stop(this._barAudio.currentTime + 0.07);
+    } catch (_) { /* Audio is optional and may be blocked by the browser. */ }
   },
 
   renderOrderDraft(meta) {

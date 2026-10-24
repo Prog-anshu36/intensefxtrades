@@ -1064,6 +1064,7 @@
 .tv-crosshair-tip b {
   color: #fff;
 }
+body.settings-crosshair-ohlc-off .tv-crosshair-tip { display: none !important; }
 .tv-chart-watermark {
   position: absolute;
   left: 14px;
@@ -1073,6 +1074,7 @@
   font-weight: 800;
   pointer-events: none;
 }
+body.settings-watermark-off .tv-chart-watermark { display: none !important; }
 .tv-drawing-manager {
   position: absolute;
   right: 12px;

@@ -193,9 +193,9 @@
         <div class="ui-settings-panels">
           <div class="ui-settings-panel active" data-panel="appearance">
             <h4>Appearance</h4>
-            <div class="ui-settings-row"><span>Dark theme</span><button class="ui-toggle on"></button></div>
+            <div class="ui-settings-row"><span>Dark theme</span><button class="ui-toggle on" data-setting="darkTheme" aria-label="Toggle dark theme" aria-pressed="true"></button></div>
             <div class="ui-settings-row"><span>Compact density</span><button class="ui-toggle" id="compactModeToggle"></button></div>
-            <div class="ui-settings-row"><span>Glass panel effects</span><button class="ui-toggle on"></button></div>
+            <div class="ui-settings-row"><span>Glass panel effects</span><button class="ui-toggle on" data-setting="glassEffects" aria-label="Toggle glass panel effects" aria-pressed="true"></button></div>
             <div class="ui-settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
               <span>Accent color</span>
               <div class="ui-color-swatches" id="accentSwatches">
@@ -242,24 +242,24 @@
           </div>
           <div class="ui-settings-panel" data-panel="chart">
             <h4>Chart</h4>
-            <div class="ui-settings-row"><span>Show grid lines</span><button class="ui-toggle on"></button></div>
-            <div class="ui-settings-row"><span>Show crosshair OHLC tooltip</span><button class="ui-toggle on"></button></div>
-            <div class="ui-settings-row"><span>Watermark</span><button class="ui-toggle on"></button></div>
+            <div class="ui-settings-row"><span>Show grid lines</span><button class="ui-toggle on" data-setting="chartGrid" aria-label="Toggle chart grid lines" aria-pressed="true"></button></div>
+            <div class="ui-settings-row"><span>Show crosshair OHLC tooltip</span><button class="ui-toggle on" data-setting="crosshairOhlc" aria-label="Toggle crosshair OHLC tooltip" aria-pressed="true"></button></div>
+            <div class="ui-settings-row"><span>Watermark</span><button class="ui-toggle on" data-setting="chartWatermark" aria-label="Toggle chart watermark" aria-pressed="true"></button></div>
           </div>
           <div class="ui-settings-panel" data-panel="replay">
             <h4>Replay</h4>
-            <div class="ui-settings-row"><span>Auto-pause on trade</span><button class="ui-toggle"></button></div>
-            <div class="ui-settings-row"><span>Sound on bar close</span><button class="ui-toggle"></button></div>
+            <div class="ui-settings-row"><span>Auto-pause on trade</span><button class="ui-toggle" data-setting="autoPauseOnTrade" aria-label="Toggle auto-pause on trade" aria-pressed="false"></button></div>
+            <div class="ui-settings-row"><span>Sound on bar close</span><button class="ui-toggle" data-setting="soundOnBarClose" aria-label="Toggle sound on bar close" aria-pressed="false"></button></div>
           </div>
           <div class="ui-settings-panel" data-panel="trading">
             <h4>Trading</h4>
-            <div class="ui-settings-row"><span>Confirm before order</span><button class="ui-toggle on"></button></div>
-            <div class="ui-settings-row"><span>Show P/L in pips</span><button class="ui-toggle"></button></div>
+            <div class="ui-settings-row"><span>Confirm before order</span><button class="ui-toggle on" data-setting="confirmBeforeOrder" aria-label="Toggle confirmation before order" aria-pressed="true"></button></div>
+            <div class="ui-settings-row"><span>Show P/L in pips</span><button class="ui-toggle" data-setting="showPips" aria-label="Toggle P/L in pips" aria-pressed="false"></button></div>
           </div>
           <div class="ui-settings-panel" data-panel="general">
             <h4>General</h4>
-            <div class="ui-settings-row"><span>Desktop notifications</span><button class="ui-toggle"></button></div>
-            <div class="ui-settings-row"><span>Keyboard shortcuts</span><button class="ui-toggle on"></button></div>
+            <div class="ui-settings-row"><span>Desktop notifications</span><button class="ui-toggle" data-setting="desktopNotifications" aria-label="Toggle desktop notifications" aria-pressed="false"></button></div>
+            <div class="ui-settings-row"><span>Keyboard shortcuts</span><button class="ui-toggle on" data-setting="keyboardShortcuts" aria-label="Toggle keyboard shortcuts" aria-pressed="true"></button></div>
           </div>
         </div>
       </div>

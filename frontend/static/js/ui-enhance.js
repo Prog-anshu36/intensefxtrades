@@ -136,14 +136,29 @@ const UI = (() => {
         modal.querySelector(`.ui-settings-panel[data-panel="${tab.dataset.tab}"]`)?.classList.add("active");
       });
     });
-    modal.querySelectorAll(".ui-toggle").forEach((tg) => {
-      tg.addEventListener("click", () => tg.classList.toggle("on"));
+    modal.querySelectorAll(".ui-toggle[data-setting]").forEach((toggle) => {
+      const key = toggle.dataset.setting;
+      const enabled = !!getAppSettings()[key];
+      toggle.classList.toggle("on", enabled);
+      toggle.setAttribute("aria-pressed", String(enabled));
+      toggle.addEventListener("click", async () => {
+        const next = !toggle.classList.contains("on");
+        if (key === "desktopNotifications" && next) {
+          if (!("Notification" in window)) return;
+          const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+          if (permission !== "granted") return;
+        }
+        setAppSetting(key, next);
+        toggle.classList.toggle("on", next);
+        toggle.setAttribute("aria-pressed", String(next));
+      });
     });
   }
 
   /* ---------------- Keyboard shortcuts modal ---------------- */
   function initShortcuts() {
     document.addEventListener("keydown", (e) => {
+      if (!getAppSettings().keyboardShortcuts) return;
       const tag = (e.target.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       if (e.key === "?" || (e.shiftKey && e.key === "/")) {
@@ -281,6 +296,7 @@ const UI = (() => {
   }
   function initFullscreenShortcut() {
     document.addEventListener("keydown", (e) => {
+      if (!getAppSettings().keyboardShortcuts) return;
       if (e.key === "F11") {
         e.preventDefault();
         toggleFullscreenChart();
@@ -429,6 +445,56 @@ const UI = (() => {
     accent: "#3d7fff", fontScale: 1, sidebarW: 248, compact: false,
     cardDensity: 1, radiusScale: 1, animScale: 1, chartBgOpacity: 1, gridOpacity: 1,
   };
+  const APP_SETTINGS_KEY = "tfb_app_settings_v1";
+  const APP_SETTINGS_DEFAULTS = {
+    darkTheme: true, glassEffects: true, chartGrid: true, crosshairOhlc: true,
+    chartWatermark: true, autoPauseOnTrade: false, soundOnBarClose: false,
+    confirmBeforeOrder: true, showPips: false, desktopNotifications: false,
+    keyboardShortcuts: true,
+  };
+  function getAppSettings() {
+    try { return { ...APP_SETTINGS_DEFAULTS, ...JSON.parse(localStorage.getItem(APP_SETTINGS_KEY) || "{}") }; }
+    catch { return { ...APP_SETTINGS_DEFAULTS }; }
+  }
+  function applyAppSettings(settings) {
+    const body = document.body;
+    body.classList.toggle("settings-glass-off", !settings.glassEffects);
+    body.classList.toggle("settings-chart-grid-off", !settings.chartGrid);
+    body.classList.toggle("settings-crosshair-ohlc-off", !settings.crosshairOhlc);
+    body.classList.toggle("settings-watermark-off", !settings.chartWatermark);
+    body.classList.toggle("settings-shortcuts-off", !settings.keyboardShortcuts);
+    body.classList.toggle("settings-show-pips", !!settings.showPips);
+    window.dispatchEvent(new CustomEvent("tfb:settings-change", { detail: { ...settings } }));
+    window.PageBacktesting?.scheduleDraw?.();
+  }
+  function setAppSetting(key, value) {
+    const settings = getAppSettings();
+    if (!(key in APP_SETTINGS_DEFAULTS)) return settings;
+    settings[key] = value;
+    localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(settings));
+    applyAppSettings(settings);
+    syncSettingsControls(settings);
+    if (key === "darkTheme") {
+      document.body.classList.toggle("light-mode", !value);
+      if (typeof Store !== "undefined" && Store.state) {
+        Store.state.settings = { ...(Store.state.settings || {}), theme: value ? "dark" : "light" };
+        Store.notify?.();
+      }
+      if (typeof API !== "undefined") Promise.resolve(API.updateSettings({ theme: value ? "dark" : "light" })).catch((error) => console.warn("Theme could not be saved", error));
+    }
+    return settings;
+  }
+  function syncSettingsControls(settings = getAppSettings()) {
+    const modal = document.getElementById("settingsModal");
+    if (!modal) return;
+    modal.querySelectorAll(".ui-toggle[data-setting]").forEach((toggle) => {
+      const enabled = !!settings[toggle.dataset.setting];
+      toggle.classList.toggle("on", enabled);
+      toggle.setAttribute("aria-pressed", String(enabled));
+    });
+    const compact = modal.querySelector("#compactModeToggle");
+    if (compact) compact.classList.toggle("on", !!loadThemePrefs().compact);
+  }
   function loadThemePrefs() {
     try { return { ...THEME_DEFAULTS, ...JSON.parse(localStorage.getItem(THEME_KEY) || "{}") }; }
     catch { return { ...THEME_DEFAULTS }; }
@@ -451,6 +517,10 @@ const UI = (() => {
   function initThemeCustomization() {
     const prefs = loadThemePrefs();
     applyThemePrefs(prefs);
+    const appSettings = getAppSettings();
+    if (typeof Store !== "undefined" && Store.state?.settings?.theme) appSettings.darkTheme = Store.state.settings.theme !== "light";
+    applyAppSettings(appSettings);
+    syncSettingsControls(appSettings);
 
     const modal = document.getElementById("settingsModal");
     if (!modal) return;
@@ -494,9 +564,12 @@ const UI = (() => {
     const compactToggle = modal.querySelector("#compactModeToggle");
     if (compactToggle) {
       compactToggle.classList.toggle("on", prefs.compact);
+      compactToggle.setAttribute("aria-pressed", String(!!prefs.compact));
       compactToggle.addEventListener("click", () => {
-        prefs.compact = compactToggle.classList.contains("on");
+        prefs.compact = !compactToggle.classList.contains("on");
+        compactToggle.classList.toggle("on", prefs.compact);
         applyThemePrefs(prefs); saveThemePrefs(prefs);
+        compactToggle.setAttribute("aria-pressed", String(!!prefs.compact));
       });
     }
 
@@ -504,9 +577,23 @@ const UI = (() => {
     if (resetBtn) resetBtn.addEventListener("click", () => {
       Object.assign(prefs, THEME_DEFAULTS);
       applyThemePrefs(prefs); saveThemePrefs(prefs);
+      const defaults = { ...APP_SETTINGS_DEFAULTS };
+      localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(defaults));
+      applyAppSettings(defaults);
+      syncSettingsControls(defaults);
+      document.body.classList.remove("light-mode");
+      if (typeof Store !== "undefined" && Store.state) {
+        Store.state.settings = { ...(Store.state.settings || {}), theme: "dark" };
+        Store.notify?.();
+      }
+      if (typeof API !== "undefined") Promise.resolve(API.updateSettings({ theme: "dark" })).catch((error) => console.warn("Default theme could not be saved", error));
+      ranges.forEach(([id, key, fmt]) => {
+        const input = modal.querySelector(`#${id}`), label = modal.querySelector(`#${id}Val`);
+        if (input) input.value = THEME_DEFAULTS[key];
+        if (label) label.textContent = fmt(THEME_DEFAULTS[key]);
+      });
+      modal.querySelectorAll(".ui-color-swatch").forEach((sw) => sw.classList.toggle("active", sw.dataset.color === THEME_DEFAULTS.accent));
       showToast("Appearance reset to defaults.", "info");
-      openModal("settingsModal"); // keep open, just refresh visually via reload of controls
-      closeModal("settingsModal"); openModal("settingsModal");
     });
   }
 
@@ -739,6 +826,7 @@ const UI = (() => {
 
   return {
     toast: showToast, openModal, closeModal, toggleFullscreenChart, takeChartScreenshot,
+    getSetting: (key) => getAppSettings()[key], setSetting: setAppSetting,
     showContextMenu, hideContextMenu, animateNumber, updateStatusBar,
     getFavoriteTools, getRecentTools, trackToolUse,
   };

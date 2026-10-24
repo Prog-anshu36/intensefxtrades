@@ -126,7 +126,7 @@ const PageTrades = {
               <td class="mono">${t.lots}</td>
               <td class="mono dim">${t.sl ? Fmt.price(t.sl, decimals) : "—"}</td>
               <td class="mono dim">${t.tp ? Fmt.price(t.tp, decimals) : "—"}</td>
-              <td class="mono ${Fmt.cls(t.floating_pnl || 0)}">${Fmt.money(t.floating_pnl || 0)}</td>
+              <td class="mono ${Fmt.cls(t.floating_pnl || 0)}">${this.formatPnl(t, true)}</td>
               <td><button class="btn btn-ghost" data-close-id="${t.id}" style="color:var(--red)">Close</button></td>
             </tr>`;
           }).join("")}
@@ -157,7 +157,7 @@ const PageTrades = {
               <td class="mono">${Fmt.price(t.entry, decimals)}</td>
               <td class="mono">${Fmt.price(t.exit, decimals)}</td>
               <td class="mono">${t.lots}</td>
-              <td class="mono ${Fmt.cls(t.pnl)}">${Fmt.money(t.pnl)}</td>
+              <td class="mono ${Fmt.cls(t.pnl)}">${this.formatPnl(t)}</td>
               <td><span class="result-pill ${t.result === "WIN" ? "win" : "loss"}">${this.escape(t.result)}</span></td>
               <td>${this.escape(t.strategy)} ${this.escape((t.tags || []).join(', '))}</td>
               <td><button class="btn btn-ghost" data-review-trade="${t.id}">Review</button><button class="btn btn-ghost" data-edit-trade="${t.id}">Edit</button><button class="btn btn-ghost" data-delete-trade="${t.id}">Delete</button></td>
@@ -167,6 +167,19 @@ const PageTrades = {
       </table>
       <div class="trade-toolbar"><span>${filtered.length} matching trades · Page ${this.page + 1} of ${Math.max(1, Math.ceil(filtered.length / this.pageSize))}</span><div><button class="btn btn-ghost" id="tradePagePrev" ${this.page === 0 ? 'disabled' : ''}>Previous</button><button class="btn btn-ghost" id="tradePageNext" ${(this.page + 1) * this.pageSize >= filtered.length ? 'disabled' : ''}>Next</button></div></div>
     `;
+  },
+
+  formatPnl(trade, floating = false) {
+    if (typeof UI === "undefined" || !UI.getSetting?.("showPips")) return Fmt.money(floating ? trade.floating_pnl || 0 : trade.pnl || 0);
+    const pip = MarketData.getMeta(trade.symbol).pip || 1;
+    let pips;
+    if (floating) {
+      const contract = ({ EURUSD: 100000, GBPUSD: 100000, USDJPY: 100000, XAUUSD: 100, GOLD: 100, SILVER: 5000, BTCUSD: 1, ETHUSD: 1 })[trade.symbol] || 100000;
+      pips = (Number(trade.floating_pnl) || 0) / (Math.max(Number(trade.lots) || 0, 1e-12) * contract * pip);
+    } else {
+      pips = ((Number(trade.exit) - Number(trade.entry)) * (trade.type === "SELL" ? -1 : 1)) / pip;
+    }
+    return `${pips >= 0 ? "+" : ""}${pips.toFixed(1)} pips`;
   },
 
   renderReview() {

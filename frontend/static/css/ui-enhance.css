@@ -945,6 +945,15 @@ body[data-density="spacious"] .journal-entry {
   transition: opacity .22s var(--ease-out), transform .22s var(--ease-out);
   pointer-events: auto;
 }
+body.settings-glass-off .ui-modal,
+body.settings-glass-off .ui-context-menu,
+body.settings-glass-off .ui-tooltip,
+body.settings-glass-off .desktop-floating-panel,
+body.settings-glass-off .tv-crosshair-tip {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+body.settings-glass-off .tv-crosshair-tip { background: #111318; }
 .ui-toast.visible { opacity: 1; transform: translateX(0) scale(1); }
 .ui-toast.leaving { opacity: 0; transform: translateX(18px) scale(.98); }
 .ui-toast.success { border-left-color: var(--green, #1ec98b); }

@@ -599,6 +599,10 @@ const WorkspaceEngine = (() => {
   function notify(message, kind = "info") {
     if (!state.notificationSettings.enabled) return;
     UI?.toast?.(message, kind);
+    if (UI?.getSetting?.("desktopNotifications") && "Notification" in window && Notification.permission === "granted") {
+      try { new Notification("intensefxTRADES", { body: String(message), tag: `tfb-${kind}` }); }
+      catch (error) { console.warn("Desktop notification could not be shown", error); }
+    }
     window.dispatchEvent(new CustomEvent("tfb:notification", { detail: { message, kind, at: Date.now() } }));
   }
 
@@ -737,6 +741,7 @@ const WorkspaceEngine = (() => {
     });
 
     document.addEventListener("keydown", (e) => {
+      if (UI?.getSetting?.("keyboardShortcuts") === false) return;
       if (isTextField(e.target)) return;
       if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "k" || (e.shiftKey && e.key.toLowerCase() === "p"))) {
         e.preventDefault(); openCommandPalette(); return;
