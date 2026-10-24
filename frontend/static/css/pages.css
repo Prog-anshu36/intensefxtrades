@@ -1173,6 +1173,23 @@ body.settings-watermark-off .tv-chart-watermark { display: none !important; }
   font-size: 11px;
   font-family: var(--font-mono);
 }
+.tv-fullscreen-session-nav { display:none; }
+.tv-shell.fullscreen-mode .tv-fullscreen-session-nav {
+  position:absolute; top:12px; left:12px; z-index:8;
+  display:grid; grid-template-columns:repeat(2,max-content); gap:6px 8px;
+  padding:8px; border:1px solid #252c38; border-radius:8px;
+  background:rgba(16,19,25,.92); box-shadow:0 8px 24px rgba(0,0,0,.28);
+  backdrop-filter:blur(10px);
+}
+.tv-fullscreen-session-nav .replay-btn {
+  min-width:116px; height:36px; border:1px solid #2a303b;
+  border-radius:7px; background:#151a23; color:#d1d4dc;
+  font-weight:650; cursor:pointer;
+}
+.tv-fullscreen-session-nav .replay-btn.active,
+.tv-fullscreen-session-nav .replay-btn:hover { border-color:#3d7fff; color:#fff; background:#18243a; }
+.tv-fullscreen-session-nav [data-fullscreen-session-nav="next"] { grid-column:1; }
+.tv-shell.fullscreen-mode .tv-chart-controls { left:290px; right:90px; }
 .tv-drawing-toolbar-favorites,
 .tv-drawing-tool-categories,
 .tv-drawing-tool-category > div {
@@ -2034,5 +2051,17 @@ body.settings-watermark-off .tv-chart-watermark { display: none !important; }
 .tv-tool-help input {width:100%;box-sizing:border-box;margin-bottom:12px;}
 .tv-tool-help button,.tv-tool-help input {background:#1d2430;color:#d1d4dc;border:1px solid #343b48;border-radius:4px;padding:8px;}
 .tv-tool-help details {border-bottom:1px solid #29303b;padding:12px 0;font-size:13px;}
-.tv-tool-help summary {cursor:pointer;}
+.tv-tool-help summary {cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center;font-weight:600;}
+.tv-tool-help summary small {font-size:10px;color:#8f9bb0;text-transform:uppercase;}
 .tv-tool-help p {line-height:1.5;color:#aeb8c9;}
+.tv-tool-help details button {cursor:pointer;color:#fff;background:#2962ff;border-color:#2962ff;}
+.tv-tool-help-empty {color:#aeb8c9;text-align:center;padding:20px 0;}
+.tv-drawing-opacity-control {display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;color:#aeb8c9;font-size:10px;white-space:nowrap;}
+.tv-drawing-opacity-control input {width:64px;accent-color:#3d7fff;}
+.tv-drawing-opacity-control output,.tv-opacity-field output {min-width:32px;color:#d1d4dc;font:10px var(--font-mono, monospace);text-align:right;}
+.tv-opacity-field {display:inline-flex;align-items:center;gap:7px;}
+.tv-opacity-field input {width:min(170px,48vw);accent-color:#3d7fff;}
+@media (max-width:760px) {
+  .tv-shell.fullscreen-mode .tv-chart-controls { left:12px; right:12px; top:112px; }
+  .tv-shell.fullscreen-mode .tv-fullscreen-session-nav { top:8px; left:8px; }
+}

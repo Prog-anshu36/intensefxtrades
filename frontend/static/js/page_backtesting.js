@@ -336,8 +336,13 @@ const PageBacktesting = {
             <option value="rsi" ${this.indicator === "rsi" ? "selected" : ""}>RSI 14</option>
           </select>
           <button class="tv-action" id="layoutBtn" title="Show or hide the analysis panel">Layout</button>
-          <button type="button" class="tv-action" id="drawingHelpBtn">Tool help</button>
+          <button type="button" class="tv-action" id="drawingHelpBtn" aria-expanded="${!!this.drawingHelpOpen}" aria-controls="drawingToolHelp">Tool help</button>
           <button type="button" class="tv-action" id="drawingObjectsBtn">Objects</button>
+          <label class="tv-drawing-opacity-control" title="Set opacity for the selected drawing or the next drawing">
+            <span>Opacity</span>
+            <input type="range" id="chartDrawingOpacityInput" min="5" max="100" step="5" value="${Math.round((this.drawings.find(d => this.selectedDrawingIds.includes(d.id))?.style?.opacity ?? this.drawingDefaults.opacity ?? 1) * 100)}" aria-label="Drawing opacity">
+            <output id="chartDrawingOpacityValue">${Math.round((this.drawings.find(d => this.selectedDrawingIds.includes(d.id))?.style?.opacity ?? this.drawingDefaults.opacity ?? 1) * 100)}%</output>
+          </label>
           <input id="drawingToolSearchInput" class="tv-command-select" placeholder="Search tools" list="drawingToolOptions" aria-label="Search drawing tools">
           <datalist id="drawingToolOptions">${(this.drawingEngine?.toolRegistry?.getTools?.() || []).map(tool => `<option value="${this.escapeHtml(tool.name)}"></option>`).join('')}</datalist>
           <button class="tv-action tv-order-command" id="placeOrderBtn" title="Open the simulated order ticket">+ Place Order</button>
@@ -807,9 +812,33 @@ const PageBacktesting = {
   },
 
   renderDrawingHelp() {
-    if(!this.drawingHelpOpen)return '';
-    const tools=(this.drawingEngine?.toolRegistry.getTools() || []).filter(t=>t.requiredAnchors>0 && !t.id.startsWith('test-'));
-    return `<aside class="tv-tool-help" aria-label="Drawing tool help"><header><b>TradeFXBook drawing tools</b><button id="closeDrawingHelpBtn" aria-label="Close tool help">×</button></header><input id="drawingHelpSearch" placeholder="Search tools or categories" aria-label="Search tool help">${tools.map(t=>`<details data-help-search="${this.escapeHtml((t.name+' '+t.category).toLowerCase())}"><summary>${this.escapeHtml(t.name)}</summary><p>${this.escapeHtml(t.description || (t.category+' drawing'))}</p><p>${t.creationMode==='freehand'?'Hold the mouse button and move to draw; release to finish.':t.creationMode==='polygon'?'Click each point. Press Enter or double-click to finish.':`Place ${t.requiredAnchors} anchor${t.requiredAnchors===1?'':'s'} with chart clicks. Move between clicks to preview.`}</p><p>Click the object to select it. Drag its body to move it; drag a handle to edit an anchor. Double-click to edit appearance and exact UTC time/price coordinates. Esc cancels creation. Delete removes the selected object. Ctrl+Z undoes; Ctrl+Y redoes.</p><p>Anchors use timestamps and prices, so zoom and pan change their screen positions without changing stored values.</p><button data-help-activate="${t.id}">Use ${this.escapeHtml(t.name)}</button></details>`).join('')}</aside>`;
+    if (!this.drawingHelpOpen) return '';
+    const tools = (this.drawingEngine?.toolRegistry?.getAllTools?.() || [])
+      .filter((tool) => Number(tool.requiredAnchors) > 0 && !String(tool.id).startsWith("test-"))
+      .sort((a, b) => String(a.category).localeCompare(String(b.category)) || String(a.name).localeCompare(String(b.name)));
+    const instructionsFor = (tool) => {
+      if (tool.creationMode === "freehand") return "Press and hold the left mouse button, move across the chart, then release to finish.";
+      if (tool.creationMode === "polygon") return "Click each chart point, then double-click or press Enter to finish.";
+      if (Number(tool.requiredAnchors) === 1) return "Click the chart once to place this tool.";
+      return `Click ${tool.requiredAnchors} chart points. Move between clicks to preview; double-click or press Enter to finish multi-point tools.`;
+    };
+    return `<aside class="tv-tool-help" id="drawingToolHelp" aria-label="Drawing tool help">
+      <header><b>TradeFXBook drawing tools</b><button type="button" id="closeDrawingHelpBtn" aria-label="Close tool help">×</button></header>
+      <input id="drawingHelpSearch" placeholder="Search tools or categories" aria-label="Search tool help">
+      <div class="tv-tool-help-list">${tools.map((tool) => {
+        const name = tool.name || tool.id;
+        const category = tool.category || "Drawing";
+        const searchText = `${name} ${category} ${tool.description || ""}`.toLowerCase();
+        return `<details data-help-search="${this.escapeHtml(searchText)}">
+          <summary><span>${this.escapeHtml(name)}</span><small>${this.escapeHtml(category)}</small></summary>
+          <p>${this.escapeHtml(tool.description || `${category} chart tool.`)}</p>
+          <p>${this.escapeHtml(instructionsFor(tool))}</p>
+          <p>To edit later, click the drawing to select it, drag its body to move it, or drag a handle to edit an anchor. Double-click it for appearance and timestamp/price settings. Use Delete to remove it, Esc to cancel, Ctrl+Z to undo, and Ctrl+Y to redo.</p>
+          <p>Opacity is available in the chart toolbar and object settings. Drawings stay anchored to chart time and price while zooming or panning.</p>
+          <button type="button" data-help-activate="${this.escapeHtml(tool.id)}">Use ${this.escapeHtml(name)}</button>
+        </details>`;
+      }).join("") || `<p class="tv-tool-help-empty">No drawing tools are available yet.</p>`}</div>
+    </aside>`;
   },
 
   renderRailBtn(tool) {
@@ -830,6 +859,18 @@ const PageBacktesting = {
     return `<button class="tv-rail-btn svg-tool-btn ${isActive ? "active" : ""}" data-tool="${tool}" title="${this.escapeHtml(title)}" aria-label="${this.escapeHtml(t.name)}" ${isDisabled ? "disabled" : ""}>
       ${this.toolSvg(tool)}
     </button>`;
+  },
+
+  renderFullscreenSessionNavigation() {
+    const sessionType = this.selectedSessionType();
+    const definition = this.sessionEngine?.getConfig?.().definitions?.[sessionType];
+    const short = this.sessionShortLabel(definition);
+    const name = definition?.name || "Session";
+    return `<div class="tv-fullscreen-session-nav" aria-label="${this.escapeHtml(name)} navigation">
+      <button type="button" class="replay-btn" data-fullscreen-session-nav="previous" title="Go to the previous ${this.escapeHtml(name)}">Previous ${this.escapeHtml(short)}</button>
+      <button type="button" class="replay-btn active" data-fullscreen-session-nav="go" title="Go to the selected ${this.escapeHtml(name)} date">GO TO ${this.escapeHtml(short)}</button>
+      <button type="button" class="replay-btn" data-fullscreen-session-nav="next" title="Go to the next ${this.escapeHtml(name)}">Next ${this.escapeHtml(short)}</button>
+    </div>`;
   },
 
   renderProfessionalDrawingToolbar() {
@@ -1050,6 +1091,7 @@ const PageBacktesting = {
       <canvas id="tvCanvas" class="tv-canvas"></canvas>
       <canvas id="tvDrawingCanvas" class="tv-drawing-canvas" aria-hidden="true"></canvas>
       <canvas id="tvInteractionCanvas" class="tv-interaction-canvas" aria-hidden="true"></canvas>
+      ${this.renderFullscreenSessionNavigation()}
       ${this.renderProfessionalDrawingToolbar()}
       <div class="tv-chart-controls">
         <div class="tv-control-group">
@@ -1149,7 +1191,7 @@ const PageBacktesting = {
       <div class="tv-drawing-style">
         <label>Color <input type="color" id="drawingColorInput" value="${style.color || "#d1d4dc"}" ${selected ? "" : "disabled"}></label>
         <label>Width <input type="range" id="drawingWidthInput" min="1" max="6" step="0.5" value="${style.width || 1.5}" ${selected ? "" : "disabled"}></label>
-        <label>Opacity <input type="range" id="drawingOpacityInput" min="0.15" max="1" step="0.05" value="${style.opacity ?? 1}" ${selected ? "" : "disabled"}></label>
+        <label>Opacity <span class="tv-opacity-field"><input type="range" id="drawingOpacityInput" min="0.05" max="1" step="0.05" value="${style.opacity ?? 1}"><output id="drawingOpacityValue">${Math.round((style.opacity ?? 1) * 100)}%</output></span></label>
         <label>Line <select id="drawingLineStyleInput" ${selected ? "" : "disabled"}>
           ${["solid", "dashed", "dotted"].map((value) => `<option value="${value}" ${style.lineStyle === value ? "selected" : ""}>${value}</option>`).join("")}
         </select></label>
@@ -2743,7 +2785,7 @@ const PageBacktesting = {
       const right = properties.extendRight ? (this._chartFrame?.metrics.chartWidth || this._canvasW || 1000) : Math.max(a.x,b.x);
       const w = right-x, h = Math.abs(a.y-b.y);
       ctx.fillStyle = style.fillColor || style.color || "#3d7fff";
-      ctx.globalAlpha = preview ? 0.2 : Math.max(0, Math.min(1, style.fillOpacity ?? 0.16));
+      ctx.globalAlpha = preview ? 0.2 : Math.max(0, Math.min(1, (style.fillOpacity ?? 0.16) * (style.opacity ?? 1)));
       ctx.fillRect(x, y, w, h);
       ctx.globalAlpha = preview ? 0.78 : style.opacity ?? 1;
       ctx.strokeRect(x, y, w, h);
@@ -2816,7 +2858,7 @@ const PageBacktesting = {
     if (!a || !b) return;
     const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y), w = Math.abs(a.x - b.x), h = Math.abs(a.y - b.y);
     ctx.fillStyle = style.fillColor || style.color || "#3d7fff";
-    ctx.globalAlpha = preview ? 0.2 : Math.max(0, Math.min(1, style.fillOpacity ?? 0.12));
+    ctx.globalAlpha = preview ? 0.2 : Math.max(0, Math.min(1, (style.fillOpacity ?? 0.12) * (style.opacity ?? 1)));
     ctx.beginPath();
     ctx.ellipse(x + w / 2, y + h / 2, Math.max(1, w / 2), Math.max(1, h / 2), 0, 0, Math.PI * 2);
     ctx.fill();
@@ -2832,7 +2874,7 @@ const PageBacktesting = {
     if (close && points.length > 2) ctx.closePath();
     if (close && points.length > 2) {
       ctx.fillStyle = style.fillColor || style.color || "#3d7fff";
-      ctx.globalAlpha = preview ? 0.18 : Math.max(0, Math.min(1, style.fillOpacity ?? 0.12));
+      ctx.globalAlpha = preview ? 0.18 : Math.max(0, Math.min(1, (style.fillOpacity ?? 0.12) * (style.opacity ?? 1)));
       ctx.fill();
       ctx.globalAlpha = preview ? 0.78 : style.opacity ?? 1;
     }
@@ -2941,14 +2983,14 @@ const PageBacktesting = {
     const riskHeight = Math.max(1, Math.abs(stop.y - entry.y));
     const profitTop = Math.min(entry.y, target.y);
     const profitHeight = Math.max(1, Math.abs(target.y - entry.y));
-    const alpha = preview ? 0.22 : Math.max(0, Math.min(1, style.fillOpacity ?? 0.35));
+    const alpha = preview ? 0.22 : Math.max(0, Math.min(1, (style.fillOpacity ?? 0.35) * (style.opacity ?? 1)));
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = style.riskColor || "#ff3b4f";
     ctx.fillRect(left, riskTop, width, riskHeight);
     ctx.fillStyle = style.profitColor || "#00b894";
     ctx.fillRect(left, profitTop, width, profitHeight);
-    ctx.globalAlpha = preview ? 0.84 : 1;
+    ctx.globalAlpha = preview ? 0.84 : (style.opacity ?? 1);
     const drawLevel = (y, color, dash = []) => {
       ctx.save();
       ctx.strokeStyle = color;
@@ -3705,6 +3747,11 @@ const PageBacktesting = {
     } else {
       const normalized = this.drawingEngine?.propertyEngine?.normalizeStyle?.("trend-line", { ...this.drawingDefaults, ...patch }) || { ...this.drawingDefaults, ...patch };
       this.drawingDefaults = normalized;
+      if (Object.hasOwn(patch, "opacity")) {
+        this.drawingOpacityOverride = normalized.opacity;
+        const activeTool = this.drawingEngine?.toolRegistry?.getActiveTool?.();
+        if (activeTool) activeTool.defaultStyle = { ...(activeTool.defaultStyle || {}), opacity: normalized.opacity };
+      }
       this.scheduleDraw();
     }
   },
@@ -3845,6 +3892,7 @@ const PageBacktesting = {
     const color = root.querySelector("#drawingColorInput");
     const width = root.querySelector("#drawingWidthInput");
     const opacity = root.querySelector("#drawingOpacityInput");
+    const opacityValue = root.querySelector("#drawingOpacityValue");
     const lineStyle = root.querySelector("#drawingLineStyleInput");
     const fillColor = root.querySelector("#drawingFillColorInput");
     const fillOpacity = root.querySelector("#drawingFillOpacityInput");
@@ -3853,10 +3901,16 @@ const PageBacktesting = {
     const textColor = root.querySelector("#drawingTextColorInput");
     const fontSize = root.querySelector("#drawingFontSizeInput");
     const fontWeight = root.querySelector("#drawingFontWeightInput");
-    [color, width, opacity, lineStyle, fillColor, fillOpacity, extendLeft, extendRight, textColor, fontSize, fontWeight].forEach((input) => { if (input) input.disabled = !selected; });
+    [color, width, lineStyle, fillColor, fillOpacity, extendLeft, extendRight, textColor, fontSize, fontWeight].forEach((input) => { if (input) input.disabled = !selected; });
+    if (opacity) opacity.disabled = false;
     if (color) color.value = style.color || "#d1d4dc";
     if (width) width.value = String(style.width || 1.5);
     if (opacity) opacity.value = String(style.opacity ?? 1);
+    if (opacityValue) opacityValue.value = `${Math.round((style.opacity ?? 1) * 100)}%`;
+    const chartOpacity = this.container?.querySelector("#chartDrawingOpacityInput");
+    const chartOpacityValue = this.container?.querySelector("#chartDrawingOpacityValue");
+    if (chartOpacity) chartOpacity.value = String(Math.round((style.opacity ?? 1) * 100));
+    if (chartOpacityValue) chartOpacityValue.value = `${Math.round((style.opacity ?? 1) * 100)}%`;
     if (lineStyle) lineStyle.value = style.lineStyle || "solid";
     if (fillColor) fillColor.value = style.fillColor || "#3d7fff";
     if (fillOpacity) fillOpacity.value = String(style.fillOpacity ?? 0.16);
@@ -4109,7 +4163,13 @@ const PageBacktesting = {
     container.querySelector('#drawingHelpBtn')?.addEventListener('click',()=>{this.drawingHelpOpen=!this.drawingHelpOpen;this.rerender();});
     container.querySelector('#closeDrawingHelpBtn')?.addEventListener('click',()=>{this.drawingHelpOpen=false;this.rerender();});
     container.querySelector('#drawingHelpSearch')?.addEventListener('input',event=>{const query=event.target.value.toLowerCase().trim();container.querySelectorAll('[data-help-search]').forEach(row=>row.hidden=!row.dataset.helpSearch.includes(query));});
-    container.querySelectorAll('[data-help-activate]').forEach(button=>button.addEventListener('click',()=>{this.drawingHelpOpen=false;this.selectTool(button.dataset.helpActivate);this.rerender();}));
+    container.querySelectorAll('[data-help-activate]').forEach((button) => button.addEventListener("click", () => {
+      const tool = this.drawingEngine?.toolRegistry?.getTool?.(button.dataset.helpActivate);
+      if (!tool) return;
+      this.TOOL_META[tool.id] ||= { name: tool.name || tool.id, group: tool.category || "draw" };
+      this.drawingHelpOpen = false;
+      this.selectTool(tool.id);
+    }));
     container.querySelector('#closeDrawingSettingsBtn')?.addEventListener('click',()=>{this.drawingSettingsOpen=false;this.rerender();});
     this.syncOrderPrices();
     this.drawChart();
@@ -4287,6 +4347,12 @@ const PageBacktesting = {
     container.querySelector("#btnGoSession")?.addEventListener("click", () => this.jumpToSelectedSession());
     container.querySelector("#btnNextSession")?.addEventListener("click", () => this.jumpRelativeSession(1));
     container.querySelector("#btnPrevSession")?.addEventListener("click", () => this.jumpRelativeSession(-1));
+    container.querySelectorAll("[data-fullscreen-session-nav]").forEach((button) => button.addEventListener("click", () => {
+      const action = button.dataset.fullscreenSessionNav;
+      if (action === "previous") this.jumpRelativeSession(-1);
+      else if (action === "next") this.jumpRelativeSession(1);
+      else this.jumpToSelectedSession();
+    }));
     container.querySelectorAll("[data-session-quick]").forEach((btn) => btn.addEventListener("click", () => this.jumpQuickSession(btn.dataset.sessionQuick)));
     const lotsInput = container.querySelector("#lotsInput");
     const refreshRisk = () => {
@@ -4369,7 +4435,18 @@ const PageBacktesting = {
     container.querySelectorAll("[data-group-action]").forEach((btn) => btn.addEventListener("click", () => this.groupAction(btn.dataset.groupId, btn.dataset.groupAction)));
     container.querySelector("#drawingColorInput")?.addEventListener("input", (e) => this.applyDrawingStylePatch({ color: e.target.value }));
     container.querySelector("#drawingWidthInput")?.addEventListener("input", (e) => this.applyDrawingStylePatch({ width: parseFloat(e.target.value) || 1.5 }));
-    container.querySelector("#drawingOpacityInput")?.addEventListener("input", (e) => this.applyDrawingStylePatch({ opacity: parseFloat(e.target.value) || 1 }));
+    container.querySelector("#drawingOpacityInput")?.addEventListener("input", (e) => {
+      const opacity = Math.max(0.05, Math.min(1, parseFloat(e.target.value) || 0.05));
+      const value = container.querySelector("#drawingOpacityValue");
+      if (value) value.value = `${Math.round(opacity * 100)}%`;
+      this.applyDrawingStylePatch({ opacity });
+    });
+    container.querySelector("#chartDrawingOpacityInput")?.addEventListener("input", (e) => {
+      const opacity = Math.max(0.05, Math.min(1, (Number(e.target.value) || 5) / 100));
+      const value = container.querySelector("#chartDrawingOpacityValue");
+      if (value) value.value = `${Math.round(opacity * 100)}%`;
+      this.applyDrawingStylePatch({ opacity });
+    });
     container.querySelector("#drawingLineStyleInput")?.addEventListener("change", (e) => this.applyDrawingStylePatch({ lineStyle: e.target.value }));
     container.querySelector("#drawingFillColorInput")?.addEventListener("input", (e) => this.applyDrawingStylePatch({ fillColor: e.target.value }));
     container.querySelector("#drawingFillOpacityInput")?.addEventListener("input", (e) => this.applyDrawingStylePatch({ fillOpacity: parseFloat(e.target.value) || 0 }));
@@ -4488,6 +4565,10 @@ const PageBacktesting = {
       });
     } else if (this.drawingEngine?.toolController) {
       this.drawingEngine.toolController.clearActiveTool();
+    }
+    if (engineTool && this.drawingOpacityOverride != null) {
+      const activeTool = this.drawingEngine?.toolRegistry?.getTool?.(engineTool);
+      if (activeTool) activeTool.defaultStyle = { ...(activeTool.defaultStyle || {}), opacity: this.drawingOpacityOverride };
     }
     this.tool = tool;
     this.drawingWorkspaceUX?.setActiveTool?.(tool);
@@ -5642,9 +5723,19 @@ const PageBacktesting = {
   jumpRelativeSession(direction) {
     const ts = this.candles[this.idx]?.date?.getTime() || Date.now();
     const sessionType = this.selectedSessionType();
-    const session = direction > 0
-      ? this.sessionEngine?.getNextSessionOfType?.(ts, sessionType)
-      : this.sessionEngine?.getPreviousSessionOfType?.(ts, sessionType);
+    const dateKey = this.sessionDateValue(ts, sessionType);
+    const current = this.fxnSessionOnIstDate(dateKey, sessionType);
+    const cutoff = direction < 0 && current && current.start <= ts && ts < current.end ? current.start : ts;
+    let session = null;
+    const date = new Date(`${dateKey}T12:00:00.000Z`);
+    for (let offset = 0; offset <= 30 && !session; offset += 1) {
+      const candidateDate = new Date(date);
+      candidateDate.setUTCDate(candidateDate.getUTCDate() + (direction > 0 ? offset : -offset));
+      const candidateKey = candidateDate.toISOString().slice(0, 10);
+      const candidate = this.fxnSessionOnIstDate(candidateKey, sessionType);
+      if (!candidate || !this.sessionHasLoadedCandles(candidate)) continue;
+      if (direction > 0 ? candidate.start > ts : candidate.start < cutoff) session = candidate;
+    }
     if (!this.sessionHasLoadedCandles(session)) {
       const label = this.sessionShortLabel(sessionType);
       toast(direction > 0 ? `No additional ${label} session available.` : `No previous ${label} session available.`, "error");
