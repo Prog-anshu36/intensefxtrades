@@ -2044,7 +2044,8 @@ const PageBacktesting = {
     if (this._sessionStatsCache?.key === key) return this._sessionStatsCache.value;
     const value = this.sessionEngine.getSessionsInRange(first - 86400000, last + 86400000)
       .map((session) => this.sessionEngine.calculateSessionStats(session, this.candles, { replayActive: this.replayActive, replayLimit: this.getReplayLimit() }))
-      .filter(Boolean);
+      // Planned sessions without candle OHLC should not become full-height boxes in the future margin.
+      .filter((session) => session?.candleCount > 0 && Number.isFinite(session.high) && Number.isFinite(session.low));
     this._sessionStatsCache = { key, value };
     return value;
   },
@@ -2142,6 +2143,7 @@ const PageBacktesting = {
     const sessions = this.visibleSessionStats();
     const current = this.currentSessionStats();
     sessions.forEach((session, order) => {
+      if (!(session?.candleCount > 0) || !Number.isFinite(session.high) || !Number.isFinite(session.low)) return;
       const style = session.style || {};
       const x1 = this.xForTimestamp(session.start, windowState, metrics);
       const x2 = this.xForTimestamp(session.end, windowState, metrics);
