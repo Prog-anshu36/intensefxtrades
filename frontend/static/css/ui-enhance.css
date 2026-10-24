@@ -1667,3 +1667,44 @@ body { overflow-x: hidden; }
   .card, .kpi-card, .empty-state, .subscription-page, .subscription-comparison { min-width: 0; }
   .page-container img, .page-container svg, .page-container video { max-width: 100%; }
 }
+
+/* Drag splitters for the app navigation and backtesting chart/tables. */
+.app-sidebar-resize-handle {
+  position: relative; z-index: 40; flex: 0 0 6px; width: 6px; min-width: 6px;
+  cursor: col-resize; touch-action: none; user-select: none; background: transparent;
+}
+.app-sidebar-resize-handle::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 2px; width: 2px;
+  border-radius: 3px; background: #273142; transition: background .15s, box-shadow .15s;
+}
+.app-sidebar-resize-handle:hover::after,
+.app-sidebar-resize-handle:focus-visible::after,
+body.resizing-app-sidebar .app-sidebar-resize-handle::after { background: #4388ff; box-shadow: 0 0 9px #4388ff80; }
+body.resizing-app-sidebar, body.resizing-chart-bottom-panel { cursor: col-resize; user-select: none; }
+body.resizing-chart-bottom-panel { cursor: ns-resize; }
+.tv-bottom-resize-handle {
+  position: relative; z-index: 4; flex: 0 0 7px; height: 7px; min-height: 7px;
+  cursor: ns-resize; touch-action: none; user-select: none; background: #0b0d10;
+}
+.tv-bottom-resize-handle::after {
+  content: ""; position: absolute; top: 3px; left: 0; right: 0; height: 1px;
+  background: #2a303b; transition: height .12s, top .12s, background .12s, box-shadow .12s;
+}
+.tv-bottom-resize-handle:hover::after,
+.tv-bottom-resize-handle:focus-visible::after,
+body.resizing-chart-bottom-panel .tv-bottom-resize-handle::after {
+  top: 2px; height: 3px; background: #4388ff; box-shadow: 0 0 8px #4388ff75;
+}
+.tv-chart-area { min-height: 0; }
+.tv-chart-area > .tv-chart-card { flex: 1 1 0; min-height: 220px; }
+.tv-chart-area > .bt-bottom-tabs {
+  box-sizing: border-box; flex: 0 0 var(--bt-bottom-panel-height,145px);
+  height: var(--bt-bottom-panel-height,145px); min-height: 88px; max-height: 52vh;
+}
+.tv-chart-area > .bt-bottom-tabs .bt-tabs-body { box-sizing: border-box; height: calc(100% - 40px); max-height: none; overflow: auto; }
+.tv-shell.fullscreen-mode .bt-bottom-tabs { flex: 0 0 var(--bt-bottom-panel-height,145px); max-height: 52vh; }
+@media(max-width:640px) {
+  .app-sidebar-resize-handle { display: none; }
+  .tv-chart-area > .tv-bottom-resize-handle { flex-basis: 10px; height: 10px; min-height: 10px; }
+  .tv-chart-area > .bt-bottom-tabs { max-height: 44dvh; }
+}
