@@ -40,6 +40,54 @@ function initSidebarCollapse() {
   btn.addEventListener("click", () => sidebar.classList.toggle("collapsed"));
 }
 
+function initSidebarResize() {
+  const sidebar = document.getElementById("sidebar");
+  const handle = document.getElementById("sidebarResizeHandle");
+  if (!sidebar || !handle) return;
+  const root = document.documentElement;
+  const min = 190, max = 360;
+  handle.setAttribute("aria-valuenow", String(Math.round(sidebar.getBoundingClientRect().width)));
+  const setWidth = (width, persist = false) => {
+    const next = Math.max(min, Math.min(max, Math.round(width)));
+    sidebar.classList.remove("collapsed");
+    root.style.setProperty("--sidebar-w", `${next}px`);
+    handle.setAttribute("aria-valuenow", String(next));
+    if (persist) {
+      try { localStorage.setItem("tfb_sidebar_width", String(next)); } catch (_) { /* storage may be disabled */ }
+    }
+  };
+  try {
+    const saved = Number(localStorage.getItem("tfb_sidebar_width"));
+    if (Number.isFinite(saved) && saved >= min && saved <= max) setWidth(saved);
+  } catch (_) { /* keep the default width */ }
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || window.innerWidth <= 640) return;
+    event.preventDefault();
+    handle.setPointerCapture?.(event.pointerId);
+    document.body.classList.add("resizing-app-sidebar");
+    setWidth(event.clientX - document.querySelector(".app-shell").getBoundingClientRect().left);
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (!handle.hasPointerCapture?.(event.pointerId)) return;
+    setWidth(event.clientX - document.querySelector(".app-shell").getBoundingClientRect().left);
+  });
+  const finish = (event) => {
+    if (!handle.hasPointerCapture?.(event.pointerId)) return;
+    handle.releasePointerCapture?.(event.pointerId);
+    document.body.classList.remove("resizing-app-sidebar");
+    setWidth(sidebar.getBoundingClientRect().width, true);
+  };
+  handle.addEventListener("pointerup", finish);
+  handle.addEventListener("pointercancel", finish);
+  handle.addEventListener("keydown", (event) => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    const delta = event.key === "ArrowRight" ? 12 : -12;
+    setWidth(sidebar.getBoundingClientRect().width + delta, true);
+  });
+}
+
+
 function initThemeToggle() {
   const btn = document.getElementById("themeToggle");
   document.body.classList.toggle("light-mode", Store.state.settings?.theme === "light");
@@ -238,6 +286,7 @@ async function boot() {
   setPageDate();
   buildTicker();
   initSidebarCollapse();
+  initSidebarResize();
   initThemeToggle();
   initNewTradeButton();
   const auth = window.IntenseFXAuth;
