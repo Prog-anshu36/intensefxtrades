@@ -4475,6 +4475,9 @@ const PageBacktesting = {
       toast(this.magnetMode ? "Magnet snapping enabled." : "Magnet snapping disabled.", "info");
       return;
     }
+    // Tool selection is separate from object selection. Clear the old
+    // handles, but keep the drawing so it can be selected and edited later.
+    this.selectDrawing(null);
     const engineTool = this.engineToolForUiTool(tool);
     if (engineTool && this.drawingEngine?.activateTool) {
       // Keep the selected drawing tool active like TradingView. The engine
@@ -4830,9 +4833,14 @@ const PageBacktesting = {
           this.scheduleDraw();return;
         }
       }
+      const lastCreatedBeforePointerDown = this.drawingEngine?.state?.lastCreatedDrawingId;
       if (zone === "chart" && event.button === 0 && !this._spacePan && this.drawingToolType() && this.engineToolForUiTool(this.tool) && this.drawingEngine?.handlePointerDown?.(event)) {
         pointer = { id: event.pointerId, mode: "tool", startX: event.clientX, startY: event.clientY, moved: false };
         this.syncToolControllerResult();
+        // Starting a new drawing releases old selection handles without
+        // deleting the previously-created object. Preserve selection if this
+        // pointer-down itself completed a one-anchor drawing.
+        if (this.drawingEngine?.state?.lastCreatedDrawingId === lastCreatedBeforePointerDown) this.selectDrawing(null);
         this.scheduleDrawingDraw();
         return;
       }
@@ -4948,6 +4956,23 @@ const PageBacktesting = {
       }
       pointer = null;
       if (wasMoved) return;
+      // In crosshair mode the chart uses pan as its pointer mode, so an empty
+      // stationary click used to bypass the selection-clearing path below.
+      // Keep the drawing stored and only clear its selected state.
+      if (
+        event.button === 0 &&
+        !this._spacePan &&
+        axisAt(event) === "chart" &&
+        !this.drawingToolType() &&
+        this.tool !== "scissors" &&
+        this.cursorMode !== "eraser"
+      ) {
+        const hit = this.crosshair ? this.hitTestDrawing(this.crosshair) : null;
+        if (!hit) {
+          this.selectDrawing(null);
+          return;
+        }
+      }
       if (this.drawingToolType() && this.crosshair) {
         this.createDrawingFromPoint(this.crosshair);
         return;
