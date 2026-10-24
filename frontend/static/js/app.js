@@ -97,43 +97,6 @@ function renderAccountControls() {
   avatar.textContent = accountInitials(active.name);
 }
 
-function renderUser() {
-  const avatar = document.getElementById("userAvatar");
-  if (!avatar) return;
-  avatar.textContent = accountInitials(Store.state.user?.name || Store.state.user?.email || "Local User");
-}
-
-function initAuthControls() {
-  const pill = document.getElementById("userPill");
-  if (!pill) return;
-  Store.subscribe(renderUser);
-  renderUser();
-  pill.addEventListener("click", async () => {
-    const action = (prompt("User action: login, signup, or forgot", "login") || "").toLowerCase();
-    if (!["login", "signup", "forgot"].includes(action)) return;
-    const email = prompt("Email", Store.state.user?.email || "");
-    if (!email) return;
-    if (action === "forgot") {
-      await API.forgotPassword(email);
-      toast("Password reset request saved locally.", "success");
-      return;
-    }
-    const password = prompt("Password", "");
-    if (!password) return;
-    const payload = { email, password };
-    if (action === "signup") payload.name = prompt("Display name", email.split("@")[0]) || email.split("@")[0];
-    const data = action === "signup" ? await API.signup(payload) : await API.login(payload);
-    if (data.error) {
-      toast(data.error, "error");
-      return;
-    }
-    Store.state = data;
-    Store.notify();
-    refreshCurrentPage();
-    toast(action === "signup" ? "Signed up." : "Logged in.", "success");
-  });
-}
-
 function initAccountControls() {
   const select = document.getElementById("accountSelect");
   const addBtn = document.getElementById("addAccountBtn");
@@ -219,17 +182,15 @@ function initAccountControls() {
   });
 }
 
-async function boot() {
-  startClock();
-  setPageDate();
-  buildTicker();
-  initSidebarCollapse();
-  initThemeToggle();
-  initNewTradeButton();
+let workspaceStarted = false;
 
+async function startWorkspace() {
+  if (workspaceStarted) return;
+  workspaceStarted = true;
   try {
     await Store.init();
   } catch (error) {
+    workspaceStarted = false;
     const splash = document.getElementById("appSplash");
     if (splash) {
       splash.querySelector(".splash-label")?.replaceChildren(document.createTextNode(window.TradeFXBookPages ? "Browser workspace could not start: " + error.message + ". Check your connection and browser storage, then reload." : "Unable to connect to the local trading workspace."));
@@ -250,13 +211,29 @@ async function boot() {
   Router.init();
   if (window.TradeFXBookPages) document.getElementById("appSplash")?.classList.add("hidden");
   initAccountControls();
-  initAuthControls();
 
   // periodically refresh shared state in the background so KPIs across
   // pages stay in sync even if multiple actions happen (e.g. SL/TP hits).
   setInterval(() => {
     if (document.visibilityState === "visible") Store.refresh().catch((error) => console.warn("Workspace refresh failed", error));
   }, 8000);
+}
+
+document.addEventListener("intensefx:authenticated", startWorkspace);
+
+async function boot() {
+  startClock();
+  setPageDate();
+  buildTicker();
+  initSidebarCollapse();
+  initThemeToggle();
+  initNewTradeButton();
+  const auth = window.IntenseFXAuth;
+  if (auth) {
+    const result = await auth.initialize();
+    if (result.configured && !result.session) return;
+  }
+  await startWorkspace();
 }
 
 document.addEventListener("DOMContentLoaded", boot);

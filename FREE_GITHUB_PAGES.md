@@ -14,14 +14,21 @@ most 5,000 real candles and is SHA-256 verified. The complete multi-year dataset
 is never loaded into browser memory. Available bid/ask data and original prices
 are preserved; derived intervals use the existing provider.
 
-## Visitor data
+## Visitor data and sign-in
 
 Trades/accounts/journal are saved in IndexedDB on this device/browser, scoped to
-this site. Drawings/settings keep existing localStorage persistence. Download
-backups using the sidebar. Clearing browser site data or using private browsing
-can remove data. No cloud identity, recovery email, cross-device sync or shared
-journal is provided. Local profile login is only for the local workspace.
-Screenshot attachments remain subject to browser storage quotas.
+this site. Drawings/settings use localStorage. When Supabase is configured,
+email/Google authentication is handled by Supabase and browser workspaces and
+`tfb_` preferences are isolated by the signed-in user's ID. Trading data still
+stays in that browser and is not synced to Supabase or another device. Without
+Supabase configuration, the app continues in device-local mode and does not
+show a fake login. Download backups using the sidebar. Clearing browser site
+data or using private browsing can remove data. Screenshot attachments remain
+subject to browser storage quotas.
+
+Authentication setup and the profile/Blue-plan migration are documented in
+`SUPABASE_AUTH_SETUP.md`. This does not add cloud trade sync, paid-plan
+authorization, payment processing, or protected market-data delivery.
 
 Requests are serialized; Web Locks coordinate tabs where supported. Storage
 write failures are reported and the failed state change is rolled back.

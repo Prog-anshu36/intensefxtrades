@@ -61,5 +61,5 @@
     box.querySelector('#pagesRestore').onclick=()=>box.querySelector('input').click();
     box.querySelector('input').onchange=async event=>{const file=event.target.files[0];if(!file)return;if(!confirm('Replace this device’s current workspace with the selected backup?'))return;try{const text=await file.text(),backup=JSON.parse(text);await request('/browser/restore',{method:'POST',body:text});for(const key of Object.keys(localStorage))if(key.startsWith('tfb_'))localStorage.removeItem(key);for(const [key,value] of Object.entries(backup.preferences||{}))if(key.startsWith('tfb_')&&typeof value==='string')localStorage.setItem(key,value);location.reload();}catch(error){box.querySelector('[role=status]').textContent=error.message;}};
   });
-  window.TradeFXBookPages={request,worker};
+  window.TradeFXBookPages={request,worker,setUserScope(userId){if(!/^[a-f0-9-]{36}$/i.test(String(userId||'')))return false;worker.postMessage({type:'workspace-scope',scope:String(userId).toLowerCase()});return true;}};
 })();

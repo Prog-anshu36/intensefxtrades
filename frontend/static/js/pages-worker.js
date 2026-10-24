@@ -2,9 +2,9 @@
 await import(new URL('./pages-history.js'+new URL(import.meta.url).search,import.meta.url));
 const base=new URL('../../',import.meta.url);
 const history=new globalThis.PagesHistory(base);
-let python,ready,db,lastSaved=null;
+let python,ready,db,lastSaved=null,workspaceScope='';
 const status=text=>postMessage({type:'status',text});
-function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open('intensefxtrades-browser-v1:'+base.pathname,1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();resolve(r.result);};r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('Browser storage is blocked by another tab. Close older app tabs and retry.'));});}
+function openDatabase(){return new Promise((resolve,reject)=>{const scope=workspaceScope?':user:'+workspaceScope:':device';const r=indexedDB.open('intensefxtrades-browser-v1:'+base.pathname+scope,1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();resolve(r.result);};r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('Browser storage is blocked by another tab. Close older app tabs and retry.'));});}
 function readState(){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readonly'),r=tx.objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}
 function saveState(value){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readwrite');tx.objectStore('workspace').put(value,'state');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error || Error('Browser storage write failed'));});}
 async function initialize(){
@@ -50,13 +50,14 @@ async function handle(data){
   delete result.state;return result;
 }
 let queue=Promise.resolve();
-self.onmessage=event=>{queue=queue.then(async()=>{
+self.onmessage=event=>{if(event.data?.type==='workspace-scope'){if(ready||db){console.warn('Workspace scope must be set before the first API call.');return;}if(/^[a-f0-9-]{36}$/i.test(String(event.data.scope||'')))workspaceScope=String(event.data.scope).toLowerCase();return;}queue=queue.then(async()=>{
   const {id,...request}=event.data;
   try{
     // Runtime downloads must not hold the cross-tab state lock. A slow or
     // background tab should never prevent another tab from starting.
     await (ready ||= initialize());
-    const result=navigator.locks?await navigator.locks.request('intensefxtrades-state:'+base.pathname,{signal:AbortSignal.timeout(15000)},()=>handle(request)):await handle(request);
+    const scope=workspaceScope?':user:'+workspaceScope:':device';
+    const result=navigator.locks?await navigator.locks.request('intensefxtrades-state:'+base.pathname+scope,{signal:AbortSignal.timeout(15000)},()=>handle(request)):await handle(request);
     postMessage({id,result});
   }catch(error){console.error(error);postMessage({id,error:error.message || String(error)});}
 });};

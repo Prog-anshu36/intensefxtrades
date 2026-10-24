@@ -9,7 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/main.css?v=sidebar-polish-1">
 <link rel="stylesheet" href="/static/css/pages.css?v=researched-tools-1">
-<link rel="stylesheet" href="/static/css/ui-enhance.css?v=chart-interactions-10">
+<link rel="stylesheet" href="/static/css/ui-enhance.css?v=auth-1">
+<script src="/static/js/auth-config.js?v=auth-1"></script>
 </head>
 <body>
 
@@ -19,6 +20,37 @@
   <div class="splash-spinner"></div>
   <div class="splash-label">Loading workspace…</div>
 </div>
+
+<!-- Hosted authentication screen. Enabled only when Supabase public config is set. -->
+<section class="auth-gate" id="authGate" aria-labelledby="authTitle" hidden>
+  <div class="auth-card">
+    <div class="auth-brand"><span class="brand-mark">I<span>F</span>T</span><span>intensefxTRADES</span></div>
+    <div class="auth-plan-badge"><span></span> BLUE · FREE</div>
+    <h1 id="authTitle">Sign in to your workspace</h1>
+    <p class="auth-lead">Your account gives you a secure sign-in. Your trading workspace remains saved in this browser.</p>
+    <div class="auth-notice" id="authNotice" role="status" aria-live="polite" hidden></div>
+    <form id="authForm" novalidate>
+      <label class="auth-field auth-name-field" hidden>Full name<input id="authName" name="name" autocomplete="name" maxlength="80"></label>
+      <label class="auth-field auth-email-field">Email address<input id="authEmail" name="email" type="email" autocomplete="email" required maxlength="254"></label>
+      <label class="auth-field auth-password-field">Password<div class="auth-password-wrap"><input id="authPassword" name="password" type="password" autocomplete="current-password" required minlength="8"><button type="button" class="auth-show-password" id="authShowPassword" aria-label="Show password">Show</button></div></label>
+      <label class="auth-field auth-confirm-field" hidden>Confirm password<input id="authConfirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8"></label>
+      <label class="auth-terms" id="authTermsRow" hidden><input id="authTerms" type="checkbox"><span>I accept the <a href="./static/legal.html#terms" target="_blank" rel="noopener">Terms of Service</a> and <a href="./static/legal.html#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+      <button class="auth-primary" id="authSubmit" type="submit">Sign in</button>
+    </form>
+    <div class="auth-divider"><span>or</span></div>
+    <button class="auth-google" id="authGoogle" type="button"><span class="google-g">G</span> Continue with Google</button>
+    <div class="auth-links" id="authLinks"><button type="button" data-auth-mode="forgot">Forgot password?</button><span>New here? <button type="button" data-auth-mode="signup">Create account</button></span></div>
+    <p class="auth-config-hint" id="authConfigHint" hidden>Authentication service configuration is incomplete. Contact the app administrator.</p>
+  </div>
+</section>
+
+<section class="auth-account-popover" id="authAccountPopover" hidden aria-label="Account menu">
+  <div class="auth-account-heading"><div class="auth-account-avatar" id="authAccountAvatar">U</div><div><strong id="authAccountName">Account</strong><small id="authAccountEmail"></small></div></div>
+  <div class="auth-account-plan"><span></span><div><strong id="authPlanName">Blue · Free</strong><small id="authPlanStatus">Free plan</small></div></div>
+  <label class="auth-field">Display name<input id="authProfileName" maxlength="80" autocomplete="name"></label>
+  <button class="auth-secondary" id="authProfileSave" type="button">Save profile</button>
+  <button class="auth-signout" id="authSignout" type="button">Sign out</button>
+</section>
 
 <div class="app-shell">
 
@@ -303,11 +335,12 @@
 <template id="tpl-tradingview"></template>
 
 <script src="/static/js/api.js?v=performance-1"></script>
+<script src="/static/js/supabase-auth.js?v=auth-1" defer></script>
 <script src="/static/js/marketdata.js?v=performance-1"></script>
 <script src="/static/js/analytics_engine.js?v=journal-financials-2"></script>
 <script src="/static/js/store.js?v=phase5-optimization-1"></script>
 <script src="/static/js/components.js?v=ist-settings-20261023"></script>
-<script src="/static/js/ui-enhance.js?v=chart-interactions-10"></script>
+<script src="/static/js/ui-enhance.js?v=auth-1"></script>
 <script src="/static/js/workspace_engine.js?v=phase5-optimization-1"></script>
 <script src="/static/js/page_dashboard.js?v=chart-drawing-phase4-1"></script>
 <script src="/static/js/page_performance.js?v=chart-drawing-phase4-1"></script>
@@ -340,7 +373,7 @@
 <script src="/static/js/page_backtesting.js?v=linked-ny-ist-20261023"></script>
 <script src="/static/js/page_tradingview.js?v=tradingview-polish-1"></script>
 <script src="/static/js/router.js?v=phase5-optimization-1"></script>
-<script src="/static/js/app.js?v=phase5-optimization-1"></script>
+<script src="/static/js/app.js?v=auth-1"></script>
 </body>
 </html>
 

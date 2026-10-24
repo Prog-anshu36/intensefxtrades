@@ -827,6 +827,7 @@ const UI = (() => {
   return {
     toast: showToast, openModal, closeModal, toggleFullscreenChart, takeChartScreenshot,
     getSetting: (key) => getAppSettings()[key], setSetting: setAppSetting,
+    refreshPreferences: () => { const prefs = loadThemePrefs(), settings = getAppSettings(); applyThemePrefs(prefs); applyAppSettings(settings); syncSettingsControls(settings); document.body.classList.toggle("light-mode", !settings.darkTheme); },
     showContextMenu, hideContextMenu, animateNumber, updateStatusBar,
     getFavoriteTools, getRecentTools, trackToolUse,
   };
