@@ -4,6 +4,7 @@ from contextlib import closing
 import gzip
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import sqlite3
@@ -53,8 +54,10 @@ def build(output=ROOT/'_site',provider=None,assets_only=False):
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     shutil.copytree(ROOT/'frontend/static',output/'static',dirs_exist_ok=True)
     text=(ROOT/'frontend/templates/index.html').read_text(encoding='utf-8').replace('"/static/','"./static/')
-    version=hashlib.sha256(b''.join((ROOT/'frontend/static/js'/name).read_bytes() for name in ('pages-bridge.js','pages-worker.js','pages-history.js'))).hexdigest()[:12]
+    version=hashlib.sha256(b''.join(p.relative_to(ROOT).as_posix().encode()+p.read_bytes() for p in sorted((ROOT/'frontend/static').rglob('*')) if p.is_file())).hexdigest()[:12]
     text=text.replace('<script src="./static/js/api.js', f'<script src="./static/js/pages-bridge.js?v={version}"></script>\n<script src="./static/js/api.js',1)
+    # Publish matching CSS/JS together; old browser cache must not mask fixes.
+    text=re.sub(r'((?:src|href)="\./static/[^"?]+)(?:\?[^\"]*)?"', lambda m:m[1]+'?v='+version+'"', text)
     text=text.replace('<title>intensefxTRADES</title>','<title>intensefxTRADES</title>\n<meta name="description" content="Free real-CSV XAUUSD backtesting. Trades and journals are saved on this device.">')
     (output/'index.html').write_text(text,encoding='utf-8')
     (output/'.nojekyll').write_text('',encoding='utf-8')

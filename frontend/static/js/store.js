@@ -29,7 +29,11 @@ const Store = {
     this.listeners.forEach((fn) => fn(this.state));
   },
 
-  async refresh() {
+  async refresh({ fresh = false } = {}) {
+    // A post-mutation read must not reuse a GET started before that mutation.
+    if (fresh && this._refreshInFlight) {
+      try { await this._refreshInFlight; } catch (_) { /* retry the latest state */ }
+    }
     if (this._refreshInFlight) return this._refreshInFlight;
     this._refreshInFlight = API.getState()
       .then((data) => {

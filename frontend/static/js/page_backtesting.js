@@ -2465,7 +2465,7 @@ const PageBacktesting = {
       const response=await fetch('/api/trades/protection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:Store.state.id,id:trade.id,sl:draft.sl,tp:draft.tp,mark:candle[trade.type==='BUY'?'bid':'ask']?.close ?? candle.close})});
       const result=await response.json();
       if(!response.ok)throw new Error(result.error || 'Could not save SL/TP.');
-      await Store.refresh();this.tradeProtectionDraft=null;this.syncOrderPrices();
+      await Store.refresh({fresh:true});this.tradeProtectionDraft=null;this.syncOrderPrices();
     } catch(error){draft.error=error.message;} finally{draft.saving=false;this.scheduleDraw();}
   },
 
@@ -5981,7 +5981,7 @@ const PageBacktesting = {
     try {
       const result = await API.updateFloating({ [this.symbol]: { ...c, closed_time: c.time + this.candleDuration() } });
       if (result.closed?.length) result.closed.forEach((t) => toast(`${t.symbol} closed ${t.reason}: ${Fmt.money(t.pnl)}`, t.pnl > 0 ? "success" : "error"));
-      await Store.refresh();
+      await Store.refresh({fresh:true});
     } finally {
       this._evaluatingCandle = false;
     }
@@ -6060,7 +6060,7 @@ const PageBacktesting = {
     }
     if (result?.error) throw new Error(result.error);
     this.orderDraft = null;
-    await Store.refresh();
+    await Store.refresh({fresh:true});
     toast(`${this.orderTab} ${type} ${this.lots} ${this.symbol} @ ${Fmt.price(entry, meta.decimals)}`, "success");
     } catch (error) {
       if (draft) draft.error = 'Order could not be placed. Please retry.';
@@ -6105,7 +6105,7 @@ const PageBacktesting = {
     const c = this.candles[this.idx];
     if (!trade || !c) return;
     await API.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL", closed_at: new Date(c.time + this.candleDuration()).toISOString() });
-    await Store.refresh();
+    await Store.refresh({fresh:true});
     toast("Position closed", "info");
     this.rerender();
   },
@@ -6115,7 +6115,7 @@ const PageBacktesting = {
     const trades = Store.state.active_trades.filter((t) => t.symbol === this.symbol);
     if (!c || !trades.length) return;
     await Promise.all(trades.map((trade) => API.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL_CLOSE_ALL", closed_at: new Date(c.time + this.candleDuration()).toISOString() })));
-    await Store.refresh();
+    await Store.refresh({fresh:true});
     toast(`${trades.length} position${trades.length === 1 ? "" : "s"} closed`, "info");
     this.rerender();
   },

@@ -22,7 +22,7 @@ const PageTrades = {
     try {
       const response = await fetch('/api/trades/archive', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:Store.state.id,id,restore})});
       const result = await response.json(); if (!response.ok) throw new Error(result.error);
-      this.reviewId = null; await Store.refresh(); this.rerender(container);
+      this.reviewId = null; await Store.refresh({fresh:true}); this.rerender(container);
     } catch (error) { container.querySelector('#tradeActionStatus').textContent = error.message; }
   },
   importState: null,
@@ -56,14 +56,19 @@ const PageTrades = {
       if (!response.ok) throw new Error(result.error || 'Import failed.');
       if (mode === 'inspect') { state.headers = result.headers; state.mapping = result.columns; state.report = null; state.message = 'Review column mapping, then validate.'; }
       else { state.report = result; state.message = mode === 'commit' ? `${result.imported} trades saved. Duplicates were skipped.` : 'Preview only. No trades have been saved.'; }
-      if (mode === 'commit') { await Store.refresh(); this.tab = 'closed'; }
+      if (mode === 'commit') { await Store.refresh({fresh:true}); this.tab = 'closed'; }
     } catch (error) { state.message = error.message; }
     finally { state.busy = false; this.rerender(container); }
   },
 
   render() {
     const s = Store.state;
+    if (!this._entered) {
+      this.tab = s.active_trades.length ? 'open' : s.history.length ? 'closed' : (s.pending_orders || []).length ? 'pending' : 'open';
+      this._entered = true;
+    }
     return `
+      <section class="trades-page">
       <div class="trade-toolbar">
         <div>
           <div class="section-title">Trade History</div>
@@ -72,26 +77,36 @@ const PageTrades = {
         <div class="trade-toolbar-actions">
           <button class="btn btn-primary" id="newTradeRecord">Record trade</button>
           <button class="btn btn-primary" id="openTradeImport">Import CSV</button>
+          <button class="btn btn-ghost" id="refreshTrades">Refresh</button>
           <a class="btn btn-ghost" href="/api/export/trades.csv">CSV</a>
           <a class="btn btn-ghost" href="/api/export/trades.xlsx">Excel</a>
         </div>
       </div>
       ${this.renderImporter()}
       ${this.renderEditor()}
-      <div class="trade-toolbar"><label>Search trades <input id="tradeSearch" type="search" value="${this.escape(this.search)}" placeholder="Symbol, side, strategy, notes or tag"></label></div>
-      <div class="trade-toolbar"><label>Direction<select id="tradeSideFilter"><option value="">All</option ${this.sideFilter === 'BUY' ? 'selected' : ''}>BUY</option><option ${this.sideFilter === 'SELL' ? 'selected' : ''}>SELL</option></select></label><label>Result<select id="tradeResultFilter"><option value="">All</option>${['WIN','LOSS','BREAKEVEN'].map(r=>`<option ${this.resultFilter === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label><label>Sort<select id="tradeSortOrder">${['newest','oldest','highest P&L','lowest P&L'].map(s=>`<option ${this.sortOrder === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label></div>
+      <div class="trade-stats"><span>Open <b>${s.active_trades.length}</b></span><span>Closed <b>${s.history.length}</b></span><span>Pending <b>${(s.pending_orders || []).length}</b></span></div>
+      ${typeof PageBacktesting !== 'undefined' && PageBacktesting.orderDraft ? '<p class="trade-draft-notice">An order is awaiting confirmation. Return to Backtesting to confirm or cancel it; it has not been submitted yet.</p>' : ''}
+      <div class="trade-filters"><label class="trade-search-field">Search trades <input id="tradeSearch" type="search" value="${this.escape(this.search)}" placeholder="Symbol, side, strategy, notes or tag"></label>
+      <label>Direction<select id="tradeSideFilter"><option value="">All directions</option>${['BUY','SELL'].map(side=>`<option value="${side}" ${this.sideFilter === side ? 'selected' : ''}>${side}</option>`).join('')}</select></label><label>Result<select id="tradeResultFilter"><option value="">All results</option>${['WIN','LOSS','BREAKEVEN'].map(r=>`<option ${this.resultFilter === r ? 'selected' : ''}>${r}</option>`).join('')}</select></label><label>Sort<select id="tradeSortOrder">${['newest','oldest','highest P&L','lowest P&L'].map(s=>`<option ${this.sortOrder === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label></div>
       <p id="tradeActionStatus" role="status"></p>
       ${this.renderReview()}
       <div class="bt-bottom-tabs" style="margin-bottom:0">
         <div class="bt-tabs-head">
-          ${["open", "closed"].map((t) => `<button class="bt-tab-btn ${this.tab === t ? "active" : ""}" data-tab="${t}">${t === "open" ? `Open (${s.active_trades.length})` : `Closed (${s.history.length})`}</button>`).join("")}
+          ${["open", "closed", "pending"].map((t) => `<button class="bt-tab-btn ${this.tab === t ? "active" : ""}" data-tab="${t}">${t === "open" ? `Open (${s.active_trades.length})` : t === "closed" ? `Closed (${s.history.length})` : `Pending (${(s.pending_orders || []).length})`}</button>`).join("")}
         </div>
         <div class="bt-tabs-body" style="max-height:none;padding:16px">
-          ${this.tab === "open" ? this.renderOpen() : this.renderClosed()}
+          ${this.tab === "open" ? this.renderOpen() : this.tab === "pending" ? this.renderPending() : this.renderClosed()}
         </div>
       </div>
       ${(s.deleted_trades || []).length ? `<details class="card" style="padding:12px;margin-top:16px"><summary>Deleted trades (${s.deleted_trades.length}) · Restore</summary>${s.deleted_trades.map(t=>`<div>Trade #${t.id} · ${this.escape(t.symbol)} · ${Fmt.money(t.pnl)} <button class="btn btn-ghost" data-restore-trade="${t.id}">Restore</button></div>`).join('')}</details>` : ''}
+      </section>
     `;
+  },
+
+  renderPending() {
+    const orders = Store.state.pending_orders || [];
+    if (!orders.length) return emptyState('No pending orders', 'Submitted limit and stop orders appear here until filled or cancelled.');
+    return `<table class="data-table"><thead><tr><th>Symbol</th><th>Side</th><th>Order type</th><th>Trigger price</th><th>Lots</th><th>Status</th></tr></thead><tbody>${orders.map(t=>`<tr><td>${this.escape(t.symbol)}</td><td>${this.escape(t.type)}</td><td>${this.escape(t.order_type)}</td><td class="mono">${Fmt.price(t.entry, MarketData.getMeta(t.symbol).decimals)}</td><td>${t.lots}</td><td>Awaiting fill</td></tr>`).join('')}</tbody></table>`;
   },
 
   renderOpen() {
@@ -168,6 +183,26 @@ const PageTrades = {
   },
 
   afterRender(container) {
+    this._unsubscribe?.();
+    this._tradeSignature = this.tradeSignature();
+    this._unsubscribe = Store.subscribe(() => {
+      if (!container.isConnected || Router.current !== 'trades') return;
+      const signature = this.tradeSignature();
+      if (signature === this._tradeSignature) return;
+      this.rerender(container);
+    });
+    container.querySelector('#refreshTrades')?.addEventListener('click', async event => {
+      event.target.disabled = true;
+      try { await Store.refresh({fresh:true}); }
+      catch(error) { container.querySelector('#tradeActionStatus').textContent = 'Trades could not be refreshed: ' + error.message; }
+      finally { container.querySelector('#refreshTrades').disabled = false; }
+    });
+    if (!this._entryRefresh) {
+      this._entryRefresh = true;
+      Store.refresh({fresh:true}).catch(error => {
+        if (container.isConnected && Router.current === 'trades') container.querySelector('#tradeActionStatus').textContent = 'Trades could not be loaded: ' + error.message;
+      });
+    }
     container.querySelector('#newTradeRecord')?.addEventListener('click', () => { this.editor = {accountId:Store.state.id,trade:{symbol:'XAUUSD',type:'BUY',commission:0,swap:0}}; this.rerender(container); });
     container.querySelector('#cancelTradeEditor')?.addEventListener('click', () => { this.editor = null; this.rerender(container); });
     container.querySelectorAll('[data-restore-trade]').forEach(button => button.addEventListener('click',()=>this.archiveTrade(container,Number(button.dataset.restoreTrade),true)));
@@ -179,7 +214,7 @@ const PageTrades = {
       try {
         const response = await fetch('/api/trades/record',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:editor.accountId,id:editor.id,trade})});
         const result = await response.json(); if (!response.ok) throw new Error(result.error);
-        this.editor=null;this.tab='closed';await Store.refresh();this.rerender(container);
+        this.editor=null;this.tab='closed';await Store.refresh({fresh:true});this.rerender(container);
       } catch(error) { container.querySelector('#tradeRecordError').textContent=error.message;event.target.querySelector('[type="submit"]').disabled=false; }
     });
     container.querySelector('#tradeSearch')?.addEventListener('input', event => {
@@ -195,7 +230,7 @@ const PageTrades = {
       try {
         const response = await fetch('/api/trades/review', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({account_id:accountId,id:this.reviewId,notes:container.querySelector('#reviewNotes').value,strategy:container.querySelector('#reviewStrategy').value,tags:container.querySelector('#reviewTags').value.split('|')}) });
         const result = await response.json(); if (!response.ok) throw new Error(result.error);
-        await Store.refresh(); this.rerender(container);
+        await Store.refresh({fresh:true}); this.rerender(container);
         container.querySelector('#tradeReviewStatus').textContent = 'Review saved.';
       } catch (error) { container.querySelector('#tradeReviewStatus').textContent = error.message || 'Review could not be saved.'; event.target.disabled = false; }
     });
@@ -229,14 +264,14 @@ const PageTrades = {
           const candle = page?.symbol === trade.symbol && page.dataSource === "local-csv" ? page.candles[page.idx] : null;
           if (!candle) { toast("Open this symbol in Backtesting to close at its replay price.", "error"); return; }
           await API.closeTrade({ id, exit: candle[trade.type === "BUY" ? "bid" : "ask"]?.close ?? candle.close, reason: "MANUAL", closed_at: new Date(candle.time + page.candleDuration()).toISOString() });
-          await Store.refresh();
+          await Store.refresh({fresh:true});
           this.rerender(container);
           return;
         }
         const candles = MarketData.generate(trade.symbol, Store.state.settings.timeframe, 600);
         const last = candles[candles.length - 1];
         await API.closeTrade({ id, exit: last.close, reason: "MANUAL" });
-        await Store.refresh();
+        await Store.refresh({fresh:true});
         toast("Position closed", "success");
         this.rerender(container);
       });
@@ -249,6 +284,16 @@ const PageTrades = {
     container.querySelectorAll('[data-review-trade]').forEach(button => button.addEventListener('click', () => { this.reviewId = Number(button.dataset.reviewTrade); this.rerender(container); }));
     container.querySelector('#tradePagePrev')?.addEventListener('click', () => { this.page--; this.rerender(container); });
     container.querySelector('#tradePageNext')?.addEventListener('click', () => { this.page++; this.rerender(container); });
+  },
+
+  tradeSignature() {
+    const s = Store.state;
+    return JSON.stringify([s.id, s.active_trades, s.history, s.pending_orders, s.deleted_trades]);
+  },
+
+  cleanup() {
+    this._unsubscribe?.(); this._unsubscribe = null;
+    this._entered = false; this._entryRefresh = false;
   },
 
   rerender(container) {

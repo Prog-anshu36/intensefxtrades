@@ -1,0 +1,32 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+(async()=>{
+  let finishOld,reads=0;
+  const initial={id:'demo',balance:10000,settings:{},active_trades:[],history:[],pending_orders:[]};
+  const saved={...initial,history:[{id:1,symbol:'XAUUSD',type:'BUY',entry:2650,exit:2670,lots:.1,pnl:200,result:'WIN',closed_at:'2025-01-01T12:00Z'}]};
+  const context={API:{getState(){reads++;return reads===1?new Promise(r=>finishOld=r):Promise.resolve(saved);}},console};
+  vm.createContext(context);vm.runInContext(fs.readFileSync('frontend/static/js/store.js','utf8')+'\nglobalThis.Store=Store;',context);
+  const Store=context.Store;
+  const background=Store.refresh();
+  const afterOrder=Store.refresh({fresh:true});
+  finishOld(initial);await background;await afterOrder;
+  assert.equal(reads,2,'Post-order refresh must read again after the old background response');
+  assert.equal(Store.state.history.length,1);
+  Object.assign(context,{Router:{current:'trades'},MarketData:{getMeta:()=>({decimals:2})},
+    Fmt:{price:n=>String(n),money:n=>String(n),cls:()=>''},SymbolUI:{colorFor:()=>''},emptyState:t=>t});
+  vm.runInContext(fs.readFileSync('frontend/static/js/page_trades.js','utf8')+'\nglobalThis.PageTrades=PageTrades;',context);
+  const page=context.PageTrades;
+  assert.match(page.render(),/data-tab="closed"[^>]*>Closed \(1\)/);
+  assert.equal(page.tab,'closed','Returning with only completed trades shows history immediately');
+  assert.match(page.render(),/value="BUY"/,'Direction filter has valid BUY option markup');
+  const container={isConnected:true,querySelector:()=>null,querySelectorAll:()=>[]};
+  let renders=0;page.rerender=()=>{renders++;};page._entryRefresh=true;
+  page.afterRender(container);page.afterRender(container);
+  assert.equal(Store.listeners.length,1,'Renders replace subscriptions, never accumulate them');
+  Store.notify();assert.equal(renders,0,'Unchanged polling does not rebuild controls');
+  Store.state={...saved,active_trades:[{id:2,symbol:'XAUUSD'}]};Store.notify();
+  assert.equal(renders,1,'Trades page reacts to new shared trade data');
+  page.cleanup();assert.equal(Store.listeners.length,0);
+  Store.state={...initial,pending_orders:[{id:3,symbol:'XAUUSD',type:'SELL',order_type:'limit',entry:2700,lots:.1}]};
+  assert.match(page.render(),/Awaiting fill/);assert.equal(page.tab,'pending');
+  console.log('trades_sync.test.js passed: fresh post-mutation reads, live history updates, cleanup, closed/pending default tabs');
+})().catch(e=>{console.error(e);process.exitCode=1;});
