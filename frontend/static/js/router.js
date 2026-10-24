@@ -15,7 +15,33 @@ const Router = {
   pageFeatures: { dashboard: "dashboard", trades: "trades", journal: "trades", performance: ["analysis", "performance"], "trade-analysis": "tradeAnalysis", "ai-coach": "aiCoach", backtesting: "backtesting", tradingview: "tradingView" },
   current: "dashboard",
 
+  updatePlanNavigation() {
+    const system = window.SubscriptionSystem;
+    document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
+      const requirements = this.pageFeatures[item.dataset.page];
+      const lockedFeature = Array.isArray(requirements)
+        ? requirements.find((feature) => !system?.canAccessFeature(feature))
+        : requirements && !system?.canAccessFeature(requirements) ? requirements : null;
+      const locked = Boolean(lockedFeature);
+      item.classList.toggle("plan-locked", locked);
+      if (locked) {
+        const plan = system?.requiredPlan(lockedFeature);
+        const label = plan ? plan.name + " · " + plan.tier : "Plan required";
+        item.dataset.lockedFeature = lockedFeature;
+        item.dataset.planLabel = label;
+        item.title = (system?.FEATURES?.[lockedFeature]?.label || item.dataset.page) + " · " + label;
+        item.setAttribute("aria-label", item.textContent.trim() + ", locked: " + label);
+      } else {
+        delete item.dataset.lockedFeature;
+        delete item.dataset.planLabel;
+        item.removeAttribute("aria-label");
+      }
+    });
+  },
+
   init() {
+    this.updatePlanNavigation();
+    document.addEventListener("intensefx:subscription-changed", () => this.updatePlanNavigation());
     document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
       item.setAttribute("role", "button");
       item.setAttribute("tabindex", item.classList.contains("disabled") ? "-1" : "0");
@@ -57,17 +83,18 @@ const Router = {
 
   go(page, options = {}) {
     if (!this.pages[page]) return;
+    this.updatePlanNavigation();
     const pageRequirement = this.pageFeatures[page];
     const feature = Array.isArray(pageRequirement)
-      ? pageRequirement.find((required) => window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature(required))
+      ? pageRequirement.find((required) => !window.SubscriptionSystem?.canAccessFeature(required))
       : pageRequirement;
     let subscriptionRedirect = false;
-    if (feature && window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature(feature)) {
+    if (feature && !window.SubscriptionSystem?.canAccessFeature(feature)) {
       const requested = page;
       page = "subscription";
-      PageSubscription.pendingFeature = feature;
+      if (window.PageSubscription) PageSubscription.pendingFeature = feature;
       subscriptionRedirect = true;
-      PageSubscription.message = `The ${requested.replaceAll("-", " ")} workspace is available on ${window.SubscriptionSystem.requiredPlan(feature).name} · ${window.SubscriptionSystem.requiredPlan(feature).tier}.`;
+      if (window.PageSubscription && window.SubscriptionSystem) PageSubscription.message = "The " + requested.replaceAll("-", " ") + " workspace is available on " + window.SubscriptionSystem.requiredPlan(feature).name + " · " + window.SubscriptionSystem.requiredPlan(feature).tier + ".";
     }
     // tear down previous page (stop timers etc.)
     const prevMod = this.pages[this.current] ? this.pages[this.current].mod() : null;
