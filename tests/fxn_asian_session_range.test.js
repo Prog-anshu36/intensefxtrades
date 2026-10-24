@@ -59,6 +59,8 @@ for(const session of csv.sessions.values()){
 }
 vm.runInContext(fs.readFileSync('frontend/static/js/page_backtesting.js','utf8'),sandbox);
 const page=sandbox.window.PageBacktesting;
+// The toolbar assertion models an account entitled to use chart indicators.
+sandbox.window.SubscriptionSystem={canAccessFeature:()=>true};
 page.fxnIndicator=fxn;
 const settings=page.renderFxnSettings();
 assert.ok(settings.includes('Previous week high / low'));
