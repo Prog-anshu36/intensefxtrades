@@ -1579,3 +1579,91 @@ body[data-auth-plan="red"] .auth-account-plan { border-color:rgba(255,83,100,.3)
 .vip-key-entry span[data-kind="error"] { color:#ff7884; }
 .sr-only { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
 @media(max-width:720px){.vip-key-panel{align-items:stretch;flex-direction:column;gap:12px}.vip-key-entry{grid-template-columns:minmax(0,1fr) auto}}
+
+/* Adaptive viewport sizing: keep the app and chart usable across screen shapes. */
+html, body { min-width: 0; min-height: 100%; }
+body { overflow-x: hidden; }
+.app-shell { width: 100%; height: 100vh; height: 100dvh; min-height: 0; }
+.main-area { height: 100vh; height: 100dvh; min-height: 0; }
+.page-container { min-width: 0; min-height: 0; overscroll-behavior: contain; }
+.tv-shell { width: 100%; height: min( calc(100vh - 94px), 1000px ); height: min( calc(100dvh - 94px), 1000px ); min-height: 420px; }
+.tv-workspace { grid-template-columns: 44px minmax(0, 1fr) 5px minmax(250px, clamp(250px, 23vw, 320px)); }
+.tv-chart-area, .tv-chart-card, .bt-chart-col, .bt-chart-card { min-width: 0; }
+.tv-chart-card { min-height: clamp(340px, 54dvh, 720px); }
+.tv-chart-commandbar { min-width: 0; max-width: 100%; }
+.tv-topbar, .tv-indicator-strip { min-width: 0; }
+.bt-layout { grid-template-columns: minmax(0, 1fr) minmax(250px, 300px); }
+.tv-shell.fullscreen-mode { height: 100vh; height: 100dvh; width: 100%; }
+.tv-shell.fullscreen-mode .tv-workspace { height: auto; flex: 1 1 auto; min-height: 0; grid-template-columns: 44px minmax(0, 1fr) 5px minmax(250px, clamp(250px, 23vw, 320px)) !important; }
+.tv-shell.fullscreen-mode .tv-right-panel { width: auto !important; min-width: 0 !important; max-width: none; }
+
+@media (max-width: 1120px) {
+  .tv-workspace { grid-template-columns: 42px minmax(0, 1fr) 4px minmax(230px, 270px); }
+  .tv-shell.fullscreen-mode .tv-workspace { grid-template-columns: 42px minmax(0, 1fr) 4px minmax(230px, 270px) !important; }
+  .tv-shell.fullscreen-mode .tv-right-panel { padding: 8px; }
+  .page-container { padding-inline: clamp(12px, 2vw, 22px); }
+}
+
+@media (max-width: 900px) {
+  .app-shell, .main-area { min-height: 100vh; min-height: 100dvh; height: auto; }
+  .tv-shell { height: auto; min-height: 0; }
+  .tv-workspace { grid-template-columns: minmax(0, 1fr); }
+  .tv-left-rail { display: none; }
+  .tv-chart-card { min-height: clamp(360px, 58dvh, 620px); }
+  .tv-external-chart-panel, .tv-external-chart-frame { min-height: clamp(380px, 62dvh, 640px); }
+  .bt-layout { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+  .bt-chart-card { min-height: clamp(360px, 58dvh, 620px); }
+  .tv-shell.fullscreen-mode { position: fixed; inset: 0; height: 100vh; height: 100dvh; width: 100%; overflow: hidden; }
+  .tv-shell.fullscreen-mode .tv-topbar { max-width: 100%; }
+  .tv-shell.fullscreen-mode .tv-workspace {
+    flex: 1 1 auto; min-height: 0; height: auto; overflow: auto;
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+    grid-template-rows: minmax(340px, 1fr) auto;
+    align-content: start;
+  }
+  .tv-shell.fullscreen-mode .tv-left-rail { display: flex; grid-column: 1; grid-row: 1; max-height: 100%; overflow-y: auto; }
+  .tv-shell.fullscreen-mode .tv-chart-area { grid-column: 2; grid-row: 1; min-height: 0; }
+  .tv-shell.fullscreen-mode .tv-chart-card { min-height: clamp(340px, 58dvh, 620px); }
+  .tv-shell.fullscreen-mode .tv-resize-handle { display: none !important; }
+  .tv-shell.fullscreen-mode .tv-right-panel {
+    display: flex !important; grid-column: 1 / -1; grid-row: 2;
+    width: auto !important; min-width: 0 !important; max-height: 38dvh;
+    overflow: auto; border-left: 0; border-top: 1px solid #202329;
+  }
+  .tv-shell.fullscreen-mode .tv-fullscreen-session-nav { left: 52px; top: 6px; }
+  .tv-shell.fullscreen-mode .tv-chart-controls { left: 12px; right: 12px; top: 100px; }
+}
+
+@media (max-width: 640px) {
+  .app-shell { align-items: stretch; }
+  .sidebar, .sidebar.collapsed { width: 58px; min-width: 58px; padding: 12px 5px; }
+  .sidebar:not(.collapsed) .brand-name, .sidebar:not(.collapsed) .badge-beta,
+  .sidebar:not(.collapsed) .account-info, .sidebar:not(.collapsed) .nav-item span,
+  .sidebar:not(.collapsed) .upgrade-card span:not(.tag-soon) { display: none; }
+  .sidebar:not(.collapsed) .nav-sub { display: none; }
+  .sidebar .nav-item { justify-content: center; padding-inline: 0; }
+  .sidebar-top { justify-content: center; padding: 0 0 12px; }
+  .sidebar-collapse { position: absolute; right: 3px; top: 48px; width: 18px; height: 18px; }
+  .topbar { height: auto; min-height: 56px; flex-wrap: wrap; overflow: visible; padding-block: 7px; gap: 6px; }
+  .topbar-left { flex: 1 1 100%; max-width: 100%; grid-template-columns: minmax(0, 1fr); }
+  .page-title { max-width: 100%; }
+  .page-container { padding: 12px 10px; }
+  .tv-topbar { flex-wrap: wrap; height: auto; min-height: 42px; padding: 6px; }
+  .tv-chart-commandbar { width: 100%; overflow-x: auto; }
+  .tv-chart-commandbar { padding-right: 112px; }
+  .tv-shell .tv-fullscreen-button { min-height: 28px; padding: 4px 7px; font-size: 10px; }
+  .tv-indicator-strip { overflow-x: auto; }
+  .tv-shell.fullscreen-mode .tv-workspace { grid-template-columns: 38px minmax(0, 1fr) !important; grid-template-rows: minmax(320px, 1fr) auto; }
+  .tv-shell.fullscreen-mode .tv-left-rail { padding: 6px 3px; gap: 4px; }
+  .tv-shell.fullscreen-mode .tv-chart-card { min-height: clamp(320px, 55dvh, 520px); }
+  .tv-shell.fullscreen-mode .tv-fullscreen-session-nav { left: 44px; top: 4px; transform: scale(.88); transform-origin: top left; }
+  .tv-shell.fullscreen-mode .tv-chart-controls { top: 90px; left: 8px; right: 8px; }
+  .tv-shell.fullscreen-mode .tv-fullscreen-replay { max-width: calc(100% - 16px); flex-wrap: wrap; bottom: 8px; }
+  .tv-fullscreen-session-nav .replay-btn { min-width: 92px; }
+  .tv-right-panel { grid-template-columns: minmax(0, 1fr) !important; }
+  .bt-tf-row { flex-wrap: wrap; margin-left: 0; }
+  .tv-drawing-manager { max-width: calc(100vw - 64px); }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  .card, .kpi-card, .empty-state, .subscription-page, .subscription-comparison { min-width: 0; }
+  .page-container img, .page-container svg, .page-container video { max-width: 100%; }
+}
