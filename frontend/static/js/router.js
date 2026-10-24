@@ -17,6 +17,14 @@ const Router = {
 
   updatePlanNavigation() {
     const system = window.SubscriptionSystem;
+    const plan = system?.getUserPlan?.();
+    const badge = document.getElementById("userPlanBadge");
+    if (badge && plan) {
+      badge.dataset.plan = plan.code;
+      badge.style.setProperty("--plan-color", plan.color);
+      const label = badge.querySelector("span");
+      if (label) label.textContent = plan.name + " · " + plan.tier;
+      badge.title = "Current plan: " + plan.name + " · " + plan.tier + ". Open plans and billing.";
     document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
       const requirements = this.pageFeatures[item.dataset.page];
       const lockedFeature = Array.isArray(requirements)
@@ -41,6 +49,7 @@ const Router = {
 
   init() {
     this.updatePlanNavigation();
+    document.getElementById("userPlanBadge")?.addEventListener("click", () => this.go("subscription"));
     document.addEventListener("intensefx:subscription-changed", () => this.updatePlanNavigation());
     document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
       item.setAttribute("role", "button");
