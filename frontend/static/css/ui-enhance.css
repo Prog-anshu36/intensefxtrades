@@ -1555,3 +1555,14 @@ body[data-auth-plan="red"] .auth-account-plan { border-color:rgba(255,83,100,.3)
 .ui-subscription-copy { max-width:560px; color:#8e9aaf; font-size:12px; line-height:1.6; }
 @media(max-width:1050px) { .subscription-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:620px) { .subscription-page { padding:14px; }.subscription-heading { align-items:stretch; flex-direction:column; }.subscription-current { min-width:0; }.subscription-cards { grid-template-columns:1fr; }.subscription-card { min-height:0; }.subscription-manage { align-items:stretch; flex-direction:column; } }
+
+.nav-item.plan-locked { position:relative; opacity:.72; }
+.nav-item.plan-locked::after { content:"LOCKED · " attr(data-plan-label); margin-left:auto; padding:2px 5px; border:1px solid rgba(128,145,170,.22); border-radius:5px; color:#8d9ab0; font-size:8px; font-weight:800; letter-spacing:.04em; white-space:nowrap; }
+.plan-feature-locked { border-color:rgba(139,153,177,.25)!important; color:#a8b2c2!important; }
+.plan-feature-locked::after { content:" · LOCKED"; color:#8d9ab0; font-size:9px; font-weight:800; }
+.user-plan-badge { display:inline-flex; align-items:center; gap:7px; margin-left:10px; padding:5px 9px; border:1px solid color-mix(in srgb,var(--plan-color,#4388ff) 36%,#253044); border-radius:999px; background:color-mix(in srgb,var(--plan-color,#4388ff) 9%,#111722); color:var(--plan-color,#4388ff); font:700 10px/1 Inter,sans-serif; cursor:pointer; white-space:nowrap; }
+.user-plan-badge i { width:7px; height:7px; border-radius:50%; background:var(--plan-color,#4388ff); box-shadow:0 0 9px color-mix(in srgb,var(--plan-color,#4388ff) 60%,transparent); }
+.user-plan-badge[data-plan="green"] { --plan-color:#31c48d; }
+.user-plan-badge[data-plan="purple"] { --plan-color:#a879ff; }
+.user-plan-badge[data-plan="red"] { --plan-color:#ff5364; }
+@media(max-width:620px){.user-plan-badge{margin-left:6px;padding:5px 7px;font-size:9px}.page-title{max-width:130px}}
