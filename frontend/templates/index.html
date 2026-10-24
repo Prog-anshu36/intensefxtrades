@@ -24,7 +24,13 @@
 <!-- Hosted authentication screen. Enabled only when Supabase public config is set. -->
 <section class="auth-gate" id="authGate" aria-labelledby="authTitle" hidden>
   <div class="auth-card">
-    <div class="auth-brand"><span class="brand-mark">I<span>F</span>T</span><span>intensefxTRADES</span></div>
+    <div class="auth-brand">
+      <span class="auth-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" fill="none"><path d="M7 29V12h4v17H7Zm8 0V19h4v10h-4Zm8 0V14h4v15h-4Zm8 0V9h4v20h-4Z" fill="currentColor"/><path d="m8 22 8-6 6 3 10-9" stroke="#8DE9D5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M27.5 10H32v4.5" stroke="#8DE9D5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="auth-brand-copy"><strong>intensefx<span>TRADES</span></strong><small>TRADE JOURNAL · BACKTEST · REVIEW</small></span>
+      <span class="auth-secure-tag"><i></i> PRIVATE WORKSPACE</span>
+    </div>
     <div class="auth-plan-badge"><span></span> BLUE · FREE</div>
     <h1 id="authTitle">Sign in to your workspace</h1>
     <p class="auth-lead">Your account gives you a secure sign-in. Your trading workspace remains saved in this browser.</p>
@@ -41,6 +47,7 @@
     <button class="auth-google" id="authGoogle" type="button"><span class="google-g">G</span> Continue with Google</button>
     <div class="auth-links" id="authLinks"><button type="button" data-auth-mode="forgot">Forgot password?</button><span>New here? <button type="button" data-auth-mode="signup">Create account</button></span></div>
     <p class="auth-config-hint" id="authConfigHint" hidden>Authentication service configuration is incomplete. Contact the app administrator.</p>
+    <div class="auth-signature"><span>IFT</span><i></i> Built for disciplined traders</div>
   </div>
 </section>
 
@@ -376,6 +383,7 @@
 <script src="/static/js/app.js?v=auth-1"></script>
 </body>
 </html>
+
 
 
 
