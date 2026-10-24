@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/main.css?v=sidebar-polish-1">
 <link rel="stylesheet" href="/static/css/pages.css?v=researched-tools-1">
-<link rel="stylesheet" href="/static/css/ui-enhance.css?v=subscription-1">
+<link rel="stylesheet" href="/static/css/ui-enhance.css?v=subscription-2">
 <script src="/static/js/auth-config.js?v=auth-1"></script>
 </head>
 <body>
@@ -181,6 +181,7 @@
     <header class="topbar">
       <div class="topbar-left">
         <h1 class="page-title" id="pageTitle">Dashboard</h1>
+        <button class="user-plan-badge" id="userPlanBadge" type="button" title="View subscription plan"><i></i><span>Blue · Free</span></button>
         <span class="page-date" id="pageDate"></span>
       </div>
       <div class="topbar-center">
@@ -229,7 +230,7 @@
         <div class="ui-settings-tabs">
           <div class="ui-settings-tab active" data-tab="appearance">Appearance</div>
           <div class="ui-settings-tab" data-tab="chart">Chart</div>
-          <div class="ui-settings-tab" data-tab="replay">Replay</div>
+          <div class="ui-settings-tab" data-tab="replay" data-plan-feature="replay">Replay</div>
           <div class="ui-settings-tab" data-tab="trading">Trading</div>
           <div class="ui-settings-tab" data-tab="general">General</div>
           <div class="ui-settings-tab" data-tab="subscription">Subscription</div>
@@ -352,8 +353,8 @@
 <template id="tpl-tradingview"></template>
 
 <script src="/static/js/api.js?v=performance-1"></script>
-<script src="/static/js/supabase-auth.js?v=subscription-1" defer></script>
-<script src="/static/js/subscription.js?v=subscription-1"></script>
+<script src="/static/js/supabase-auth.js?v=subscription-2" defer></script>
+<script src="/static/js/subscription.js?v=subscription-2"></script>
 <script src="/static/js/marketdata.js?v=performance-1"></script>
 <script src="/static/js/analytics_engine.js?v=journal-financials-2"></script>
 <script src="/static/js/store.js?v=phase5-optimization-1"></script>
@@ -390,8 +391,8 @@
 <script src="/static/js/fxn-asian-session-range.js?v=clean-session-overlays-20261023"></script>
 <script src="/static/js/page_backtesting.js?v=linked-ny-ist-20261023"></script>
 <script src="/static/js/page_tradingview.js?v=tradingview-polish-1"></script>
-<script src="/static/js/page_subscription.js?v=subscription-1"></script>
-<script src="/static/js/router.js?v=subscription-1"></script>
+<script src="/static/js/page_subscription.js?v=subscription-2"></script>
+<script src="/static/js/router.js?v=subscription-2"></script>
 <script src="/static/js/app.js?v=auth-1"></script>
 </body>
 </html>
