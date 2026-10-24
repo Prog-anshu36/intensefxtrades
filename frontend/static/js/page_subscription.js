@@ -1,6 +1,8 @@
 const PageSubscription = {
   pendingFeature: null,
   message: "",
+  vipMessage: "",
+  vipMessageKind: "",
   init() {},
   requestFeature(feature, message = "") {
     this.pendingFeature = feature;
@@ -13,10 +15,13 @@ const PageSubscription = {
     const current = sys.getUserPlan();
     const feature = this.pendingFeature && sys.FEATURES[this.pendingFeature];
     const required = feature ? sys.requiredPlan(this.pendingFeature) : null;
-    const status = window.IntenseFXAuth?.getSubscription?.()?.status || "Free plan · local workspace";
+    const verified = window.IntenseFXAuth?.getSubscription?.();
+    const usingVip = Boolean(sys.getVipPlanCode?.() && sys.normalizePlan(verified) === "blue");
+    const status = usingVip ? "VIP key active · this browser" : (verified?.status || "Free plan · local workspace");
     return `<section class="subscription-page">
       ${feature ? `<div class="subscription-gate" style="--plan-color:${required.color}"><span class="subscription-kicker">PLAN ACCESS</span><h2>${this.escape(feature.label)} is included with ${required.name} · ${required.tier}</h2><p>${this.escape(this.message || `Your current plan is ${current.name} · ${current.tier}. Upgrade options will appear here when checkout is connected.`)}</p><button class="subscription-secondary" id="subscriptionGateBack">Back to workspace</button></div>` : ""}
       <header class="subscription-heading"><div><span class="subscription-kicker">INTENSEFXTRADES PLANS</span><h2>Choose your trading workspace</h2><p>Permissions follow your verified plan. Prices for paid plans are configurable and have not been set.</p></div><div class="subscription-current" style="--plan-color:${current.color}"><i></i><span><small>CURRENT PLAN</small><b>${current.name} · ${current.tier}</b><em>${this.escape(status)}</em></span></div></header>
+      <section class="vip-key-panel" aria-label="Redeem VIP key"><div><span class="subscription-kicker">VIP ACCESS</span><h3>Have a VIP key?</h3><p>Enter your key to activate its plan in this browser.</p></div><div class="vip-key-entry"><label class="sr-only" for="vipKeyInput">VIP key</label><input id="vipKeyInput" type="password" autocomplete="off" placeholder="Enter VIP key"><button id="vipKeyRedeem" type="button">Redeem key</button><span id="vipKeyMessage" data-kind="${this.vipMessageKind}" role="status" aria-live="polite">${this.escape(this.vipMessage)}</span></div></section>
       <div class="subscription-cards">${sys.ORDER.map(code => this.card(sys.PLANS[code], current)).join("")}</div>
       ${this.renderComparison(sys)}
       <div class="subscription-manage"><div><b>Manage subscription</b><span>Billing is not connected yet, so there is no active renewal or cancellation to manage.</span></div><button disabled>Not connected</button></div>
@@ -41,6 +46,23 @@ const PageSubscription = {
   },
   afterRender(container) {
     container.querySelector("#subscriptionGateBack")?.addEventListener("click", () => { this.pendingFeature = null; Router.go("dashboard"); });
+    const keyInput = container.querySelector("#vipKeyInput");
+    container.querySelector("#vipKeyRedeem")?.addEventListener("click", () => {
+      const result = window.SubscriptionSystem.redeemVipKey(keyInput?.value);
+      if (!result.ok) {
+        this.vipMessage = result.storageUnavailable ? "Browser storage is unavailable. Enable site storage and try again." : "That VIP key was not recognized.";
+        this.vipMessageKind = "error";
+        const status = container.querySelector("#vipKeyMessage");
+        if (status) { status.textContent = this.vipMessage; status.dataset.kind = "error"; }
+        return;
+      }
+      this.vipMessage = result.plan.name + " · " + result.plan.tier + " activated in this browser.";
+      this.vipMessageKind = "success";
+      this.pendingFeature = null;
+      this.message = "";
+      Router.go("subscription");
+    });
+    keyInput?.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); container.querySelector("#vipKeyRedeem")?.click(); } });
     container.querySelectorAll("[data-subscription-plan]").forEach(button => button.addEventListener("click", () => {
       const code = button.dataset.subscriptionPlan;
       if (code === window.SubscriptionSystem.getUserPlan().code) return;
