@@ -497,12 +497,19 @@ def forgot_password():
 def create_account():
     payload = request.get_json(force=True) or {}
     name = (payload.get("name") or "New Account").strip()[:40] or "New Account"
-    account_type = payload.get("type") or "Demo"
+    # Until a trusted subscription backend is connected, this endpoint serves
+    # the Blue plan and its single demo account only. Never accept a client plan.
+    account_type = "Demo"
     starting_balance = payload.get("starting_balance") or 10000
     currency = payload.get("currency") or "USD"
     currency_symbol = payload.get("currency_symbol") or "$"
     with _lock:
         data = _load()
+        # Local/GitHub Pages workspaces have no trusted paid-plan session yet.
+        # Apply the Blue account limit server-side as well as in the UI; archived
+        # accounts remain in this collection and cannot be used to bypass it.
+        if len(data.get("accounts", [])) >= 1:
+            return jsonify({"error": "Blue Free includes one trading account. Archived accounts still count. Connect a paid subscription to add more accounts."}), 403
         account_id = f"acct_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
         data["accounts"].append(_new_account(account_id, name, account_type, starting_balance, currency, currency_symbol))
         data["active_account_id"] = account_id
@@ -537,6 +544,8 @@ def restore_account():
         account = next((a for a in data["accounts"] if a["id"] == account_id), None)
         if not account:
             return jsonify({"error": "account not found"}), 404
+        if account.get("archived") and sum(1 for item in data["accounts"] if not item.get("archived")) >= 1:
+            return jsonify({"error": "Blue Free allows one active trading account. Archive the current account before restoring another."}), 403
         account["archived"] = False
         account.pop("archived_at", None)
         data["active_account_id"] = account_id

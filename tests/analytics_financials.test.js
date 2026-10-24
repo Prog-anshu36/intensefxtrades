@@ -11,4 +11,3 @@ assert.equal(engine.normalizeTrades([{id:1,pnl:10,strategy:'NY',opened_at:'2025-
 assert.equal(engine.sessionForDate(new Date('2025-01-01T14:00:00Z')),'London','trade session analytics follow the configured FXN session window');
 assert.equal(engine.sessionForDate(new Date('2025-01-01T18:00:00Z')),'Off session','outside FXN windows is not forced into a legacy session');
 console.log('analytics_financials.test.js passed');
-

@@ -136,12 +136,20 @@ const UI = (() => {
         modal.querySelector(`.ui-settings-panel[data-panel="${tab.dataset.tab}"]`)?.classList.add("active");
       });
     });
+    document.getElementById("openSubscriptionFromSettings")?.addEventListener("click", () => {
+      closeModal("settingsModal");
+      Router.go("subscription");
+    });
     modal.querySelectorAll(".ui-toggle[data-setting]").forEach((toggle) => {
       const key = toggle.dataset.setting;
       const enabled = !!getAppSettings()[key];
       toggle.classList.toggle("on", enabled);
       toggle.setAttribute("aria-pressed", String(enabled));
       toggle.addEventListener("click", async () => {
+        if (key === "glassEffects" && window.SubscriptionSystem && !SubscriptionSystem.canAccessFeature("premiumAppearance")) {
+          PageSubscription.requestFeature("premiumAppearance", "Glass panel effects are included with Red · Elite.");
+          return;
+        }
         const next = !toggle.classList.contains("on");
         if (key === "desktopNotifications" && next) {
           if (!("Notification" in window)) return;
@@ -531,6 +539,10 @@ const UI = (() => {
       swatchHost.querySelectorAll(".ui-color-swatch").forEach((sw) => {
         if (sw.dataset.color === prefs.accent) sw.classList.add("active");
         sw.addEventListener("click", () => {
+          if (window.SubscriptionSystem && !SubscriptionSystem.canAccessFeature("premiumAppearance")) {
+            PageSubscription.requestFeature("premiumAppearance", "Accent customization is included with Red · Elite.");
+            return;
+          }
           swatchHost.querySelectorAll(".ui-color-swatch").forEach((s) => s.classList.remove("active"));
           sw.classList.add("active");
           prefs.accent = sw.dataset.color;
@@ -555,6 +567,11 @@ const UI = (() => {
       input.value = prefs[key];
       if (label) label.textContent = fmt(prefs[key]);
       input.addEventListener("input", () => {
+        if (key !== "gridOpacity" && window.SubscriptionSystem && !SubscriptionSystem.canAccessFeature("premiumAppearance")) {
+          PageSubscription.requestFeature("premiumAppearance", "Advanced appearance controls are included with Red · Elite.");
+          input.value = prefs[key];
+          return;
+        }
         prefs[key] = parseFloat(input.value);
         if (label) label.textContent = fmt(prefs[key]);
         applyThemePrefs(prefs); saveThemePrefs(prefs);
@@ -566,6 +583,10 @@ const UI = (() => {
       compactToggle.classList.toggle("on", prefs.compact);
       compactToggle.setAttribute("aria-pressed", String(!!prefs.compact));
       compactToggle.addEventListener("click", () => {
+        if (window.SubscriptionSystem && !SubscriptionSystem.canAccessFeature("premiumAppearance")) {
+          PageSubscription.requestFeature("premiumAppearance", "Interface density customization is included with Red · Elite.");
+          return;
+        }
         prefs.compact = !compactToggle.classList.contains("on");
         compactToggle.classList.toggle("on", prefs.compact);
         applyThemePrefs(prefs); saveThemePrefs(prefs);

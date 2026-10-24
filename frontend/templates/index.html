@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/main.css?v=sidebar-polish-1">
 <link rel="stylesheet" href="/static/css/pages.css?v=researched-tools-1">
-<link rel="stylesheet" href="/static/css/ui-enhance.css?v=auth-1">
+<link rel="stylesheet" href="/static/css/ui-enhance.css?v=subscription-1">
 <script src="/static/js/auth-config.js?v=auth-1"></script>
 </head>
 <body>
@@ -163,6 +163,10 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13.5a7.97 7.97 0 000-3l1.8-1.4-2-3.4-2.1.6a8 8 0 00-2.6-1.5L14 2h-4l-.5 2.2a8 8 0 00-2.6 1.5l-2.1-.6-2 3.4L4.6 10.5a7.97 7.97 0 000 3L2.8 15l2 3.4 2.1-.7a8 8 0 002.6 1.5L10 22h4l.5-2.2a8 8 0 002.6-1.5l2.1.7 2-3.4-1.8-1.6z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
         <span>Settings</span>
       </a>
+      <a class="nav-item" data-page="subscription" title="Plans and billing">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><path d="M4 7h16v13H4zM4 10h16M8 4v6M16 4v6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 15h3m2 0h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span>Plans &amp; Billing</span>
+      </a>
       <a class="nav-item" id="openShortcutsBtn" title="Keyboard shortcuts (?)">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M7 14h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         <span>Shortcuts</span>
@@ -228,6 +232,7 @@
           <div class="ui-settings-tab" data-tab="replay">Replay</div>
           <div class="ui-settings-tab" data-tab="trading">Trading</div>
           <div class="ui-settings-tab" data-tab="general">General</div>
+          <div class="ui-settings-tab" data-tab="subscription">Subscription</div>
         </div>
         <div class="ui-settings-panels">
           <div class="ui-settings-panel active" data-panel="appearance">
@@ -300,6 +305,11 @@
             <div class="ui-settings-row"><span>Desktop notifications</span><button class="ui-toggle" data-setting="desktopNotifications" aria-label="Toggle desktop notifications" aria-pressed="false"></button></div>
             <div class="ui-settings-row"><span>Keyboard shortcuts</span><button class="ui-toggle on" data-setting="keyboardShortcuts" aria-label="Toggle keyboard shortcuts" aria-pressed="true"></button></div>
           </div>
+          <div class="ui-settings-panel" data-panel="subscription">
+            <h4>Subscription</h4>
+            <p class="ui-subscription-copy">Review your current plan, included features, and future upgrade options.</p>
+            <button class="empty-action" id="openSubscriptionFromSettings" style="margin-top:8px">View plans &amp; billing</button>
+          </div>
         </div>
       </div>
     </div>
@@ -342,7 +352,8 @@
 <template id="tpl-tradingview"></template>
 
 <script src="/static/js/api.js?v=performance-1"></script>
-<script src="/static/js/supabase-auth.js?v=auth-1" defer></script>
+<script src="/static/js/supabase-auth.js?v=subscription-1" defer></script>
+<script src="/static/js/subscription.js?v=subscription-1"></script>
 <script src="/static/js/marketdata.js?v=performance-1"></script>
 <script src="/static/js/analytics_engine.js?v=journal-financials-2"></script>
 <script src="/static/js/store.js?v=phase5-optimization-1"></script>
@@ -379,11 +390,11 @@
 <script src="/static/js/fxn-asian-session-range.js?v=clean-session-overlays-20261023"></script>
 <script src="/static/js/page_backtesting.js?v=linked-ny-ist-20261023"></script>
 <script src="/static/js/page_tradingview.js?v=tradingview-polish-1"></script>
-<script src="/static/js/router.js?v=phase5-optimization-1"></script>
+<script src="/static/js/page_subscription.js?v=subscription-1"></script>
+<script src="/static/js/router.js?v=subscription-1"></script>
 <script src="/static/js/app.js?v=auth-1"></script>
 </body>
 </html>
-
 
 
 

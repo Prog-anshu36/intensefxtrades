@@ -117,9 +117,14 @@ function initAccountControls() {
   });
 
   addBtn.addEventListener("click", async () => {
+    if (window.SubscriptionSystem && !SubscriptionSystem.canCreateAccount(Store.state.accounts || [])) {
+      PageSubscription.requestFeature("additionalAccount", "Blue includes one account. Archived accounts still count toward this limit; upgrade options will be available after checkout is configured.");
+      return;
+    }
     const name = prompt("Account name", `Account ${(Store.state.accounts || []).length + 1}`);
     if (!name) return;
-    const type = prompt("Account type: Paper, Demo, or Real", "Demo") || "Demo";
+    const planCode = window.SubscriptionSystem?.getUserPlan?.().code || "blue";
+    const type = planCode === "blue" ? "Demo" : (prompt("Account type: Paper, Demo, or Real", "Demo") || "Demo");
     const starting = parseFloat(prompt("Starting balance", "10000") || "10000");
     const currency = prompt("Currency code", "USD") || "USD";
     const symbols = { USD: "$", EUR: "€", GBP: "£", INR: "₹", JPY: "¥", AED: "د.إ" };
@@ -131,6 +136,13 @@ function initAccountControls() {
       currency: currency.toUpperCase(),
       currency_symbol: currencySymbol,
     });
+    if (data.error) {
+      if (/account limit|one trading account/i.test(data.error)) {
+        PageSubscription.requestFeature("additionalAccount", data.error);
+        return;
+      }
+      throw new Error(data.error);
+    }
     Store.state = data;
     Store.notify();
     refreshCurrentPage();

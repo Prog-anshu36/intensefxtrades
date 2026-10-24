@@ -10,7 +10,9 @@ const Router = {
     "ai-coach": { title: "AI Coach", mod: () => PageAICoach },
     "backtesting": { title: "Backtesting", mod: () => PageBacktesting },
     "tradingview": { title: "TradingView", mod: () => PageTradingView },
+    "subscription": { title: "Plans & Billing", mod: () => PageSubscription },
   },
+  pageFeatures: { dashboard: "dashboard", trades: "trades", journal: "trades", performance: ["analysis", "performance"], "trade-analysis": "tradeAnalysis", "ai-coach": "aiCoach", backtesting: "backtesting", tradingview: "tradingView" },
   current: "dashboard",
 
   init() {
@@ -55,6 +57,18 @@ const Router = {
 
   go(page, options = {}) {
     if (!this.pages[page]) return;
+    const pageRequirement = this.pageFeatures[page];
+    const feature = Array.isArray(pageRequirement)
+      ? pageRequirement.find((required) => window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature(required))
+      : pageRequirement;
+    let subscriptionRedirect = false;
+    if (feature && window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature(feature)) {
+      const requested = page;
+      page = "subscription";
+      PageSubscription.pendingFeature = feature;
+      subscriptionRedirect = true;
+      PageSubscription.message = `The ${requested.replaceAll("-", " ")} workspace is available on ${window.SubscriptionSystem.requiredPlan(feature).name} · ${window.SubscriptionSystem.requiredPlan(feature).tier}.`;
+    }
     // tear down previous page (stop timers etc.)
     const prevMod = this.pages[this.current] ? this.pages[this.current].mod() : null;
     if (prevMod && prevMod.cleanup) prevMod.cleanup();
@@ -92,7 +106,7 @@ const Router = {
     container.innerHTML = pageMod.render();
     if (pageMod.afterRender) pageMod.afterRender(container);
 
-    if (!options.fromHash && window.location.hash !== `#${page}`) {
+    if ((!options.fromHash || subscriptionRedirect) && window.location.hash !== `#${page}`) {
       window.location.hash = page;
     }
   },

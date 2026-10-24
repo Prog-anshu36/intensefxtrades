@@ -99,4 +99,3 @@ for(const date of ['2026-01-23','2026-10-23']){
 }
 assert.equal(page.sessionEngine.getConfig().displayTimezone,'Asia/Kolkata');
 console.log('fxn_asian_session_range.test.js passed');
-
