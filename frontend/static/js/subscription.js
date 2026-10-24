@@ -87,10 +87,42 @@
     const to = timestampMillis(range.end);
     return Number.isFinite(from) && Number.isFinite(to) && from >= permitted.start && to <= permitted.end;
   }
-  function requestUpgrade(feature) {
-    if (window.PageSubscription?.requestFeature) window.PageSubscription.requestFeature(feature);
+  function requestUpgrade(feature, message) {
+    if (window.PageSubscription?.requestFeature) {
+      window.PageSubscription.requestFeature(feature, message);
+      return;
+    }
+    window.location.hash = "subscription";
   }
 
+  function protectFeatureControls(root = document) {
+    root.querySelectorAll?.("[data-plan-feature]").forEach((control) => {
+      const feature = control.dataset.planFeature;
+      if (!FEATURES[feature]) return;
+      const allowed = canAccessFeature(feature);
+      control.classList.toggle("plan-feature-locked", !allowed);
+      control.setAttribute("aria-disabled", String(!allowed));
+      if (!allowed) {
+        const required = requiredPlan(feature);
+        control.title = FEATURES[feature].label + " is included with " + required.name + " · " + required.tier;
+      }
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    const control = event.target.closest?.("[data-plan-feature]");
+    if (!control) return;
+    const feature = control.dataset.planFeature;
+    if (!FEATURES[feature] || canAccessFeature(feature)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    requestUpgrade(feature);
+  }, true);
+
+  document.addEventListener("intensefx:subscription-changed", () => protectFeatureControls());
+  document.addEventListener("DOMContentLoaded", () => protectFeatureControls());
+
   window.SubscriptionSystem = { PLANS, FEATURES, ORDER, normalizePlan, getUserPlan, getUserEntitlements,
-    canAccessFeature, requiredPlan, canCreateAccount, getPermittedReplayRange, canAccessHistoricalData, canAccessReplayRange, requestUpgrade };
+    canAccessFeature, requiredPlan, canCreateAccount, getPermittedReplayRange, canAccessHistoricalData, canAccessReplayRange,
+    protectFeatureControls, requestUpgrade };
 })();
