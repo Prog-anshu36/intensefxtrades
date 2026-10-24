@@ -145,10 +145,11 @@
     if (el("authAccountEmail")) el("authAccountEmail").textContent = user?.email || "";
     if (el("authProfileName")) el("authProfileName").value = state.profile?.full_name || user?.user_metadata?.full_name || "";
     if (el("authAccountAvatar")) el("authAccountAvatar").textContent = displayName[0]?.toUpperCase() || "U";
-    const plan = window.SubscriptionSystem?.normalizePlan?.(state.subscription) || "blue";
+    const trustedPlan = window.SubscriptionSystem?.normalizePlan?.(state.subscription) || "blue";
+    const plan = trustedPlan === "blue" ? (window.SubscriptionSystem?.getUserPlan?.().code || "blue") : trustedPlan;
     const planNames = { blue: "Blue · Free", green: "Green · Starter", purple: "Purple · Pro", red: "Red · Elite" };
     if (el("authPlanName")) el("authPlanName").textContent = planNames[plan] || "Blue · Free";
-    if (el("authPlanStatus")) el("authPlanStatus").textContent = state.subscription?.status || "Free plan";
+    if (el("authPlanStatus")) el("authPlanStatus").textContent = trustedPlan === "blue" && window.SubscriptionSystem?.getVipPlanCode?.() ? "VIP key · this browser" : (state.subscription?.status || "Free plan");
     document.body.dataset.authPlan = ["blue", "green", "purple", "red"].includes(plan) ? plan : "blue";
     window.dispatchEvent(new Event("intensefx:subscription-changed"));
   }
@@ -327,5 +328,5 @@
       return { configured: true, session: null, error };
     }
   }
-  window.IntenseFXAuth = { initialize, getUser: () => state.session?.user || null, getPlan: () => state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
+  window.IntenseFXAuth = { initialize, getUser: () => state.session?.user || null, getPlan: () => window.SubscriptionSystem?.getUserPlan?.().code || state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
 })();
