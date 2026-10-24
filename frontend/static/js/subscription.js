@@ -139,7 +139,7 @@
     requestUpgrade(feature);
   }, true);
 
-  document.addEventListener("intensefx:subscription-changed", () => protectFeatureControls());
+  window.addEventListener("intensefx:subscription-changed", () => protectFeatureControls());
   document.addEventListener("DOMContentLoaded", () => protectFeatureControls());
 
   window.SubscriptionSystem = { PLANS, FEATURES, ORDER, normalizePlan, getUserPlan, getUserEntitlements,
