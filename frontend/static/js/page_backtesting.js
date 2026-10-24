@@ -103,7 +103,7 @@ const PageBacktesting = {
     this.timeframe = settings.timeframe || "1m";
     this.speed = settings.replay_speed || this.speed;
     this.replayActive = !!settings.replay_active;
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("replay")) this.replayActive = false;
+    if (!window.SubscriptionSystem?.canAccessFeature("replay")) this.replayActive = false;
     this.replayTimestamp = this.replayActive ? (settings.replay_timestamp || null) : null;
     this.candles = MarketData.isLocal(this.symbol) ? [] : MarketData.generate(this.symbol, this.timeframe, this.historyCountForTimestamp(this.timeframe, this.replayTimestamp));
     this.idx = this.replayTimestamp ? this.snapIndexToTimestamp(this.replayTimestamp) : Math.min(settings.current_idx || this.candles.length - 1, this.candles.length - 1);
@@ -1044,7 +1044,7 @@ const PageBacktesting = {
 
   renderChartSurface() {
     const current = this.candles[this.idx];
-    const replayAllowed = !window.SubscriptionSystem || window.SubscriptionSystem.canAccessFeature("replay");
+    const replayAllowed = Boolean(window.SubscriptionSystem?.canAccessFeature("replay"));
     return `
       <canvas id="tvBgCanvas" class="tv-bg-canvas"></canvas>
       <canvas id="tvCanvas" class="tv-canvas"></canvas>
@@ -1190,8 +1190,8 @@ const PageBacktesting = {
 
   renderSessionToolbar() {
     const fxn = this.getFxnIndicator();
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("technicalIndicators")) {
-      return `<div class="tv-session-menu-wrap"><button class="tv-action" data-plan-feature="technicalIndicators">Indicators · Purple</button><button class="tv-action ${this.isVolumeVisible() ? 'active' : ''}" id="volumeToggleBtn" aria-pressed="${this.isVolumeVisible()}">Vol: ${this.isVolumeVisible() ? 'ON' : 'OFF'}</button></div>`;
+    if (!window.SubscriptionSystem?.canAccessFeature("technicalIndicators")) {
+      return `<div class="tv-session-menu-wrap"><button class="tv-action" data-plan-feature="technicalIndicators">Indicators · Purple</button><button class="tv-action" data-plan-feature="technicalIndicators">Volume · Purple</button></div>`;
     }
     return `<div class="tv-session-menu-wrap">
       <button class="tv-action ${fxn?.config.enabled ? 'active' : ''}" id="fxnToggleBtn" aria-pressed="${!!fxn?.config.enabled}" title="FXN - Asian Session Range by RobMinty">FXN - Asian Session Range: ${fxn?.config.enabled ? 'ON' : 'OFF'}</button>
@@ -1352,7 +1352,7 @@ const PageBacktesting = {
   },
 
   renderFullscreenReplayDock() {
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("replay")) return "";
+    if (!window.SubscriptionSystem?.canAccessFeature("replay")) return "";
     const hiddenCount = this.replayActive ? this.hiddenCandles.length : Math.max(0, this.candles.length - this.idx - 1);
     const progressMax = Math.max(0, this.candles.length - 1);
     const progressPct = progressMax > 0 ? Math.round((this.idx / progressMax) * 100) : 0;
@@ -1949,7 +1949,7 @@ const PageBacktesting = {
     ctx.clearRect(0, 0, width, height);
     this.drawSessionOverlays(ctx, windowState, metrics, xForIndex, yFor, chartWidth, height, bottomAxis);
     const fxn=this.getFxnIndicator();
-    if(fxn?.config.enabled && (!window.SubscriptionSystem || window.SubscriptionSystem.canAccessFeature("technicalIndicators"))){
+    if(fxn?.config.enabled && window.SubscriptionSystem?.canAccessFeature("technicalIndicators")){
       const coords=this.chartCoordinates(),context={metrics,windowState};
       ctx.save();ctx.beginPath();ctx.rect(0,topPad,chartWidth,height-bottomAxis-topPad);ctx.clip();
       fxn.render(ctx,{candles:this.candles,limit:this.getReplayLimit(),timeframeMs:(MarketData.TF_MINUTES[this.timeframe]||1)*60000,from:coords.xToTime(0,context),to:coords.xToTime(chartWidth,context),x:time=>this.xForTimestamp(time,windowState,metrics),y:yFor,width:chartWidth,tickSize:Math.pow(10,-meta.decimals)});
@@ -5447,8 +5447,7 @@ const PageBacktesting = {
 
   canReplayAt(index) {
     const system = window.SubscriptionSystem;
-    if (!system) return true;
-    if (!system.canAccessFeature("replay")) { system.requestUpgrade("replay"); return false; }
+    if (!system?.canAccessFeature("replay")) { system?.requestUpgrade("replay"); return false; }
     const candle = this.candles[Math.max(0, Math.min(this.candles.length - 1, Math.round(index ?? this.idx)))];
     const timestamp = Number(candle?.time ?? candle?.date?.getTime());
     if (!Number.isFinite(timestamp)) return true;
@@ -5476,7 +5475,7 @@ const PageBacktesting = {
   },
 
   toggleScissorsTool() {
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     this.tool = this.tool === "scissors" ? "crosshair" : "scissors";
     this.pendingDrawing = null;
     this.scheduleDraw();
@@ -5518,7 +5517,7 @@ const PageBacktesting = {
     if (!value) return;
     const ts = new Date(value).getTime();
     if (!Number.isFinite(ts)) return;
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     const permitted = window.SubscriptionSystem?.getPermittedReplayRange(this.symbol, this.replayAvailability());
     if (window.SubscriptionSystem && !permitted) {
       toast("Historical data availability has not loaded, so the replay date cannot be validated yet.", "error");
@@ -5759,7 +5758,7 @@ const PageBacktesting = {
   },
 
   async step(n) {
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     if (this._stepping || this._placingOrder) return;
     if (MarketData.isLocal(this.symbol) && (this.dataSource !== "local-csv" || this._historyError)) return;
     this._stepping = true;
@@ -5827,7 +5826,7 @@ const PageBacktesting = {
   },
 
   startPlay() {
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     if (MarketData.isLocal(this.symbol) && (!this.candles.length || this.dataSource !== "local-csv" || this._historyError)) return;
     const wasReplayActive = this.replayActive;
     if (!this.replayActive) {
@@ -5998,7 +5997,7 @@ const PageBacktesting = {
   },
 
   async goToReplayEnd() {
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     if (MarketData.isLocal(this.symbol)) {
       this.stopPlay();
       // Process each intervening candle so open positions cannot skip SL/TP.
@@ -6025,7 +6024,7 @@ const PageBacktesting = {
   },
 
   goToReplayStart() {
-    if (window.SubscriptionSystem && !window.SubscriptionSystem.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     this.pushReplayUndo();
     const cut = this.replayCutIndex ?? this.crosshair?.index ?? Math.max(0, this.idx);
     this.stopPlay();
