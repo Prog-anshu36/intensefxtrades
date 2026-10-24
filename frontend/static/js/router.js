@@ -25,6 +25,7 @@ const Router = {
       const label = badge.querySelector("span");
       if (label) label.textContent = plan.name + " · " + plan.tier;
       badge.title = "Current plan: " + plan.name + " · " + plan.tier + ". Open plans and billing.";
+    }
     document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
       const requirements = this.pageFeatures[item.dataset.page];
       const lockedFeature = Array.isArray(requirements)
