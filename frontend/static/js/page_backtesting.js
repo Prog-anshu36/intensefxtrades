@@ -334,7 +334,6 @@ const PageBacktesting = {
             <option value="vwap" ${this.indicator === "vwap" ? "selected" : ""}>Session VWAP</option>
             <option value="rsi" ${this.indicator === "rsi" ? "selected" : ""}>RSI 14</option>
           </select>
-          ${this.renderSessionToolbar()}
           <button class="tv-action" id="layoutBtn" title="Show or hide the analysis panel">Layout</button>
           <button type="button" class="tv-action" id="drawingHelpBtn">Tool help</button>
           <button type="button" class="tv-action" id="drawingObjectsBtn">Objects</button>
@@ -359,6 +358,7 @@ const PageBacktesting = {
           </div>
         </div>
 
+        <div class="tv-indicator-strip">${this.renderSessionToolbar()}</div>
         <div class="tv-workspace">
           <aside class="tv-left-rail">
             ${this.renderLeftRail()}
@@ -368,7 +368,7 @@ const PageBacktesting = {
               <div>
                 <b>${this.symbolName()}</b>
                 <span>${this.timeframe} · ${this.assetClass()} · intensefxTRADES</span>
-                ${MarketData.isLocal(this.symbol) ? `<span role="status">${this.dataLabel()}</span>` : ""}
+                ${this._historyError ? `<span role="status">XAUUSD historical dataset could not be loaded.</span>` : ""}
               </div>
               ${current ? `<div class="tv-ohlc">
                 O <b>${Fmt.price(current.open, meta.decimals)}</b>
@@ -432,16 +432,16 @@ const PageBacktesting = {
 
   tradingViewSymbol(symbol = this.symbol) {
     const map = {
-      EURUSD: "OANDA:EURUSD",
-      GBPUSD: "OANDA:GBPUSD",
-      USDJPY: "OANDA:USDJPY",
-      XAUUSD: "OANDA:XAUUSD",
-      GOLD: "OANDA:XAUUSD",
-      SILVER: "OANDA:XAGUSD",
+      EURUSD: "FX_IDC:EURUSD",
+      GBPUSD: "FX_IDC:GBPUSD",
+      USDJPY: "FX_IDC:USDJPY",
+      XAUUSD: "FX_IDC:XAUUSD",
+      GOLD: "FX_IDC:XAUUSD",
+      SILVER: "FX_IDC:XAGUSD",
       BTCUSD: "BITSTAMP:BTCUSD",
       ETHUSD: "BITSTAMP:ETHUSD",
     };
-    return map[symbol] || `OANDA:${symbol}`;
+    return map[symbol] || `FX_IDC:${symbol}`;
   },
 
   tradingViewInterval(timeframe = this.timeframe) {
@@ -522,14 +522,9 @@ const PageBacktesting = {
     if (MarketData.isLocal(this.symbol)) {
       if (this._historyError || this.dataSource === "unavailable") return "XAUUSD historical dataset could not be loaded.";
       if (this.dataSource === "loading") return "Loading local CSV dataset…";
-      const info = this.datasetInfo;
-      const range = info?.first_timestamp != null ? `${new Date(info.first_timestamp).toISOString().slice(0, 10)} → ${new Date(info.last_timestamp).toISOString().slice(0, 10)}` : "No candles in this range";
-      return `DATA SOURCE: LOCAL CSV · SYMBOL: ${this.symbol} · TIMEFRAME: ${this.timeframe.toUpperCase()} · AVAILABLE DATA: ${range}`;
+      return "Local CSV";
     }
     if (this.dataSource === "loading") return "Loading real data...";
-    if (this.dataSource === "oanda") return "OANDA candles";
-    if (this.dataSource === "oanda-cache") return "OANDA candles - cached";
-    if (this.dataSource === "oanda-stale-cache") return "OANDA candles - stale";
     if (this.dataSource === "yahoo-cache") return "Real data - Yahoo cached";
     if (this.dataSource === "yahoo-stale-cache") return "Real data - Yahoo stale";
     if (this.dataSource === "cache") return "Real data · cached";
@@ -1223,6 +1218,13 @@ const PageBacktesting = {
           localStorage.setItem('tfb_fxn_hide_yellow_levels_v2','true');
         }
       }catch{Object.assign(config,{showPreviousDayHiLo:false,showLastWeeklyHiLo:false,showAsianMidpoint:false,showRangeBreaks:false});}
+      try {
+        if (localStorage.getItem('tfb_fxn_ist_boundary_v1') !== 'true') {
+          config.dailyUtcOffset = 5.5;
+          localStorage.setItem('tfb_fxn_asian_range_v1', JSON.stringify(config));
+          localStorage.setItem('tfb_fxn_ist_boundary_v1','true');
+        }
+      } catch { config.dailyUtcOffset = 5.5; }
       this.fxnIndicator=new window.FXNAsianSessionRange(config);
     }
     return this.fxnIndicator;
@@ -1258,16 +1260,16 @@ const PageBacktesting = {
   renderFxnSettings() {
     const indicator=this.getFxnIndicator();if(!indicator)return '';
     const c=indicator.clockSettings(this.candles[this.idx]?.time ?? this.candles[this.idx]?.date?.getTime() ?? Date.now()).values,defaults=window.FXNAsianSessionRange.defaults;
-    const labels={sessionTimezone:'Session timezone (DST automatic)',enabled:'Enable indicator',user_ssth:'Asia start hour (New York time)',user_sstm:'Asia start minute',user_esth:'Asia end hour (New York time)',user_estm:'Asia end minute',user_elth:'Extend Asia levels until hour (New York time)',user_eltm:'Extension minute',show_london_session:'Show London box',show_london_session_rng:'Show London range',london_ssth:'London start hour (New York time)',london_sstm:'London start minute',london_esth:'London end hour (New York time)',london_estm:'London end minute',show_ny_session:'Show New York box',show_ny_session_rng:'Show New York range',ny_ssth:'New York start hour (New York time)',ny_sstm:'New York start minute',ny_esth:'New York end hour (New York time)',ny_estm:'New York end minute',showADR:'Show Average Daily Range',is_forex_pips:'ADR in forex pips (10 ticks)',daily_adr_user:'Show ADR for recent N days',daily_adr_length:'ADR length (completed days)',showPreviousDayHiLo:'Previous day high / low',previousDayHiLoColor:'Previous day line color',supportLineWidth:'Previous day line width',previousDayHiLoLineStyle:'Previous day line style',showHiLoPriceRange:'Show previous day range',showHiLoPriceLabel:'Show YH / YL labels',showLastWeeklyHiLo:'Previous week high / low',lastWeeklyHiLoColor:'Previous week color',supportLastWeekLineWidth:'Previous week width',lastWeeklyHiLoStyle:'Previous week style',lastWeeklyHiLoShowLabel:'Show PWH / PWL labels',showWeeklyHiLo:'Developing current week high / low',weeklyHiLoColor:'Current week color',supportWeekLineWidth:'Current week width',weeklyHiLoStyle:'Current week style',weeklyHiLoShowLabel:'Show WH / WL labels',showHiLoTime:'Show high / low time (New York time)',fillOpacity:'Box fill opacity',dailyUtcOffset:'Daily candle UTC offset (hours)',dailyStartHour:'Daily candle boundary hour'};
+    const labels={displayTimezone:'Display timezone (UTC+05:30)',sessionTimezone:'Session timezone (DST automatic)',enabled:'Enable indicator',user_ssth:'Asia start hour (New York time)',user_sstm:'Asia start minute',user_esth:'Asia end hour (New York time)',user_estm:'Asia end minute',user_elth:'Extend Asia levels until hour (New York time)',user_eltm:'Extension minute',show_london_session:'Show London box',show_london_session_rng:'Show London range',london_ssth:'London start hour (New York time)',london_sstm:'London start minute',london_esth:'London end hour (New York time)',london_estm:'London end minute',show_ny_session:'Show New York box',show_ny_session_rng:'Show New York range',ny_ssth:'New York start hour (New York time)',ny_sstm:'New York start minute',ny_esth:'New York end hour (New York time)',ny_estm:'New York end minute',showADR:'Show Average Daily Range',is_forex_pips:'ADR in forex pips (10 ticks)',daily_adr_user:'Show ADR for recent N days',daily_adr_length:'ADR length (completed days)',showPreviousDayHiLo:'Previous day high / low',previousDayHiLoColor:'Previous day line color',supportLineWidth:'Previous day line width',previousDayHiLoLineStyle:'Previous day line style',showHiLoPriceRange:'Show previous day range',showHiLoPriceLabel:'Show YH / YL labels',showLastWeeklyHiLo:'Previous week high / low',lastWeeklyHiLoColor:'Previous week color',supportLastWeekLineWidth:'Previous week width',lastWeeklyHiLoStyle:'Previous week style',lastWeeklyHiLoShowLabel:'Show PWH / PWL labels',showWeeklyHiLo:'Developing current week high / low',weeklyHiLoColor:'Current week color',supportWeekLineWidth:'Current week width',weeklyHiLoStyle:'Current week style',weeklyHiLoShowLabel:'Show WH / WL labels',showHiLoTime:'Show high / low time (New York time)',fillOpacity:'Box fill opacity',dailyUtcOffset:'Daily candle UTC offset (hours)',dailyStartHour:'Daily candle boundary hour'};
     const styleLabels={user_box_line_color:'border color',boxLineWidth:'border width',user_box_line_style:'border style',sessionLineWidth:'high / low / mid width',user_upperlower_line_style:'high / low style',user_midline_color:'midpoint color',user_middle_line_style:'midpoint style',user_text_color:'text color',user_label_size:'text size'};
     Object.assign(labels,{showAsianMidpoint:'Show Asian midpoint line',showRangeBreaks:'Show Asian Range Break labels'});
     for(const prefix of ['', 'l','n'])for(const [key,label] of Object.entries(styleLabels))labels[prefix+key]=`${prefix==='l'?'London':prefix==='n'?'New York':'Asia'} ${label}`;
     const fields=Object.keys(defaults).map(key=>{
       const value=c[key],type=typeof defaults[key];
-      let options=key==='sessionTimezone'?['America/New_York','Etc/GMT+5']:key.toLowerCase().includes('color')?Object.keys(window.FXNAsianSessionRange.colors):key.toLowerCase().includes('style')?['solid','dashed','dotted']:key.includes('label_size')?['tiny','small','normal','large']:null;
+      let options=key==='displayTimezone'?['Asia/Kolkata']:key==='sessionTimezone'?['America/New_York','Etc/GMT+5']:key.toLowerCase().includes('color')?Object.keys(window.FXNAsianSessionRange.colors):key.toLowerCase().includes('style')?['solid','dashed','dotted']:key.includes('label_size')?['tiny','small','normal','large']:null;
       if(/(ssth|esth|elth)$/.test(key))options=Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
       if(/(sstm|estm|eltm)$/.test(key))options=['00','15','30','45'];
-      const input=type==='boolean'?`<input type="checkbox" data-fxn-setting="${key}" ${value?'checked':''}>`:options?`<select data-fxn-setting="${key}">${options.map(v=>`<option ${v===value?'selected':''}>${v}</option>`).join('')}</select>`:`<input type="number" style="width:75px" data-fxn-setting="${key}" value="${value}" step="${key==='fillOpacity'?'.05':'1'}">`;
+      const input=type==='boolean'?`<input type="checkbox" data-fxn-setting="${key}" ${value?'checked':''}>`:options?`<select data-fxn-setting="${key}">${options.map(v=>`<option ${v===value?'selected':''}>${v}</option>`).join('')}</select>`:`<input type="number" style="width:75px" data-fxn-setting="${key}" value="${value}" step="${key==='fillOpacity'?'.05':key==='dailyUtcOffset'?'.5':'1'}">`;
       return `<label style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0">${labels[key].replaceAll('(New York time)','(IST)').replace('Session timezone (DST automatic)','Market session reference timezone')} ${input}</label>`;
     }).join('');
     return `<div class="tv-session-menu" style="width:min(440px,85vw);max-height:65vh;overflow-y:auto;z-index:150"><b>FXN - Asian Session Range · IST</b><p>All session times are shown and edited in IST (UTC+05:30) for the selected replay date. New York daylight saving is converted automatically.</p><p>Daily/weekly levels use the daily boundary below. Missing lookback data is omitted. Range breaks are chart markers; no popups.</p>${fields}<button class="tv-action" id="fxnResetBtn">Reset defaults</button><button class="tv-action" id="fxnSettingsCloseBtn">Close</button></div>`;

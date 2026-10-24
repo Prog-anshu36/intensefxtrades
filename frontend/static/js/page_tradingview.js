@@ -62,7 +62,7 @@ const TradingViewWidgetLoader = (() => {
 })();
 
 const PageTradingView = {
-  TRADINGVIEW_DEFAULT_SYMBOL: "OANDA:XAUUSD",
+  TRADINGVIEW_DEFAULT_SYMBOL: "FX_IDC:XAUUSD",
   TRADINGVIEW_DEFAULT_INTERVAL: "1",
   TRADINGVIEW_DEFAULT_RANGE: "YTD",
   TRADINGVIEW_DEFAULT_GO_TO_DATE: "2026-01-01",
@@ -80,7 +80,6 @@ const PageTradingView = {
         <div class="tradingview-page-head">
           <div>
             <h2>TradingView</h2>
-            <p>Online chart powered by the official TradingView Advanced Chart Widget. Data history depends on the selected TradingView feed.</p>
           </div>
           <div class="tradingview-page-actions">
             <label class="tradingview-date-jump">
@@ -100,9 +99,7 @@ const PageTradingView = {
             <span class="tradingview-online-pill">Online</span>
           </div>
         </div>
-        <div class="tradingview-page-note" id="tradingViewDateNote">
-          Default is ${this.TRADINGVIEW_DEFAULT_SYMBOL} · 1m · YTD. TradingView controls whether 1-minute candles are available back to 1 Jan 2026.
-        </div>
+        <div class="tradingview-page-note" id="tradingViewDateNote" role="status" hidden></div>
         <div class="tradingview-widget-shell">
           <div class="tradingview-state tradingview-loading" id="tradingViewLoading">
             <div class="tradingview-spinner"></div>
@@ -209,6 +206,7 @@ const PageTradingView = {
 
   goToDate(dateValue) {
     const note = this.container?.querySelector("#tradingViewDateNote");
+    if (note) note.hidden = false;
     const date = new Date(`${dateValue}T00:00:00Z`);
     if (!Number.isFinite(date.getTime())) {
       if (note) note.textContent = "Choose a valid date first.";
@@ -276,7 +274,7 @@ const PageTradingView = {
       symbol: this.TRADINGVIEW_DEFAULT_SYMBOL,
       interval: this.TRADINGVIEW_DEFAULT_INTERVAL,
       range: this.TRADINGVIEW_DEFAULT_RANGE,
-      timezone: "Etc/UTC",
+      timezone: "Asia/Kolkata",
       theme: "dark",
       style: "1",
       locale: "en",

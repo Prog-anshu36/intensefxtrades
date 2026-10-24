@@ -33,11 +33,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
 DATA_FILE = os.environ.get("TRADEFXBOOK_STATE_FILE") or os.path.join(BASE_DIR, "store.json")
 MARKET_CACHE_DIR = os.path.join(BASE_DIR, "market_cache")
-OANDA_API_URL = os.environ.get("OANDA_API_URL") or (
-    "https://api-fxtrade.oanda.com" if os.environ.get("OANDA_API_ENV", "practice").lower() == "live"
-    else "https://api-fxpractice.oanda.com"
-)
-OANDA_API_TOKEN = os.environ.get("OANDA_API_TOKEN") or os.environ.get("OANDA_TOKEN")
 
 app = Flask(
     __name__,
@@ -92,29 +87,7 @@ YAHOO_INTERVALS = {
     "1d": "3y",
 }
 
-OANDA_SYMBOLS = {
-    "EURUSD": "EUR_USD",
-    "GBPUSD": "GBP_USD",
-    "USDJPY": "USD_JPY",
-    "XAUUSD": "XAU_USD",
-    "GOLD": "XAU_USD",
-    "SILVER": "XAG_USD",
-    "BTCUSD": "BTC_USD",
-    "ETHUSD": "ETH_USD",
-}
 
-OANDA_GRANULARITIES = {
-    "1m": ("M1", 1),
-    "3m": ("M1", 3),
-    "5m": ("M5", 1),
-    "15m": ("M15", 1),
-    "30m": ("M30", 1),
-    "1h": ("H1", 1),
-    "4h": ("H4", 1),
-    "1d": ("D", 1),
-    "1w": ("W", 1),
-    "1M": ("M", 1),
-}
 
 TIMEFRAME_MINUTES = {
     "1m": 1,
@@ -144,72 +117,8 @@ def _legacy_cache_file(symbol, timeframe):
     return os.path.join(MARKET_CACHE_DIR, f"{safe}.json")
 
 
-def _parse_oanda_time(value):
-    return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp() * 1000)
 
 
-def _download_oanda_history(symbol, timeframe, count=5000):
-    if symbol.upper() in ("XAUUSD", "GOLD"):
-        raise ValueError("XAUUSD history is local CSV only")
-    if not OANDA_API_TOKEN:
-        raise ValueError("OANDA_API_TOKEN is not configured")
-    instrument = OANDA_SYMBOLS.get(symbol)
-    granularity, resample_group = OANDA_GRANULARITIES.get(timeframe, ("D", 1))
-    if not instrument:
-        raise ValueError(f"OANDA instrument not mapped for {symbol}")
-
-    target_count = max(100, min(int(count or 5000) * resample_group, 60000))
-    rows = []
-    to_time = None
-    while len(rows) < target_count:
-        batch_count = min(5000, target_count - len(rows))
-        query = {
-            "price": "M",
-            "granularity": granularity,
-            "count": str(batch_count),
-            "smooth": "false",
-            "includeFirst": "true",
-            "dailyAlignment": "17",
-            "alignmentTimezone": "America/New_York",
-            "weeklyAlignment": "Friday",
-        }
-        if to_time is not None:
-            query["to"] = datetime.utcfromtimestamp(to_time / 1000).isoformat(timespec="seconds") + "Z"
-        url = f"{OANDA_API_URL.rstrip('/')}/v3/instruments/{urllib.parse.quote(instrument)}/candles?{urllib.parse.urlencode(query)}"
-        req = urllib.request.Request(url, headers={
-            "Authorization": f"Bearer {OANDA_API_TOKEN}",
-            "Accept-Datetime-Format": "RFC3339",
-            "User-Agent": "intensefxTRADES/1.0",
-        })
-        with urllib.request.urlopen(req, timeout=20) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        candles = payload.get("candles", [])
-        batch = []
-        for candle in candles:
-            mid = candle.get("mid") or {}
-            if not candle.get("complete", True) or not all(k in mid for k in ("o", "h", "l", "c")):
-                continue
-            batch.append({
-                "time": _parse_oanda_time(candle["time"]),
-                "open": float(mid["o"]),
-                "high": float(mid["h"]),
-                "low": float(mid["l"]),
-                "close": float(mid["c"]),
-                "volume": int(candle.get("volume") or 0),
-            })
-        if not batch:
-            break
-        rows = batch + rows
-        oldest = batch[0]["time"]
-        if to_time is not None and oldest >= to_time:
-            break
-        to_time = oldest - 1
-        if len(batch) < batch_count:
-            break
-    rows = sorted({row["time"]: row for row in rows}.values(), key=lambda row: row["time"])
-    if resample_group > 1:
-        rows = _resample_rows(rows, resample_group)
-    return rows[-int(count or 5000):]
 
 
 def _download_yahoo_history(symbol, timeframe):
@@ -294,7 +203,6 @@ def _resample_rows_to_minutes(rows, source_minutes, target_minutes):
 
 def _read_cached_history(symbol, timeframe):
     candidates = [
-        ("oanda-cache", _cache_file(symbol, timeframe, "oanda")),
         ("yahoo-cache", _cache_file(symbol, timeframe, "yahoo")),
         ("legacy-cache", _legacy_cache_file(symbol, timeframe)),
     ]
@@ -728,61 +636,15 @@ def market_history():
         count = max(100, min(int(count), 60000))
     except Exception:
         count = 5000
-    oanda_cache_path = _cache_file(symbol, timeframe, "oanda")
-    yahoo_cache_path = _cache_file(symbol, timeframe, "yahoo")
-    source = "oanda"
-    rows = None
-
-    derived_source, derived_rows = _derive_history_from_lower_timeframe(symbol, timeframe, count)
-    if derived_rows and timeframe not in ("1m", "3m", "5m"):
-        return jsonify({
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "source": derived_source,
-            "candles": derived_rows[-count:],
-            "years_requested": 3,
-        })
-
-    if os.path.exists(oanda_cache_path):
-        age = datetime.now(timezone.utc) - datetime.fromtimestamp(os.path.getmtime(oanda_cache_path), timezone.utc)
-        if age < timedelta(hours=12):
-            with open(oanda_cache_path, "r") as f:
-                rows = json.load(f)
-            source = "oanda-cache"
-
-    if rows is None:
-        try:
-            rows = _download_oanda_history(symbol, timeframe, count)
-            with open(oanda_cache_path, "w") as f:
-                json.dump(rows, f)
-            source = "oanda"
-        except Exception as exc:
-            if os.path.exists(oanda_cache_path):
-                with open(oanda_cache_path, "r") as f:
-                    rows = json.load(f)
-                source = "oanda-stale-cache"
-            else:
-                source = "yahoo"
-                try:
-                    if os.path.exists(yahoo_cache_path):
-                        age = datetime.now(timezone.utc) - datetime.fromtimestamp(os.path.getmtime(yahoo_cache_path), timezone.utc)
-                        if age < timedelta(hours=12):
-                            with open(yahoo_cache_path, "r") as f:
-                                rows = json.load(f)
-                            source = "yahoo-cache"
-                    if rows is None:
-                        rows = _download_yahoo_history(symbol, timeframe)
-                        with open(yahoo_cache_path, "w") as f:
-                            json.dump(rows, f)
-                except Exception as yahoo_exc:
-                    if os.path.exists(yahoo_cache_path):
-                        with open(yahoo_cache_path, "r") as f:
-                            rows = json.load(f)
-                        source = "yahoo-stale-cache"
-                    else:
-                        source, rows = _derive_history_from_lower_timeframe(symbol, timeframe, count)
-                        if rows is None:
-                            return jsonify({"error": f"OANDA: {exc}; Yahoo: {yahoo_exc}", "candles": [], "source": "unavailable"}), 503
+    # Additional demo symbols may use already available local caches only.
+    # No broker connection or remote download is needed by the backtester.
+    source, rows = _read_cached_history(symbol, timeframe)
+    if not rows:
+        source, rows = _derive_history_from_lower_timeframe(symbol, timeframe, count)
+    if not rows:
+        return jsonify({"symbol": symbol, "timeframe": timeframe,
+                        "error": "No local historical dataset is configured for this symbol.",
+                        "candles": [], "source": "unavailable"}), 503
 
     return jsonify({
         "symbol": symbol,

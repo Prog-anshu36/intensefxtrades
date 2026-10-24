@@ -33,6 +33,7 @@ jobs:
           node tests/pages_history.test.js
           node tests/pages_startup.test.js
           node tests/trades_sync.test.js
+          node tests/fxn_asian_session_range.test.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

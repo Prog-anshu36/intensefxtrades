@@ -5,10 +5,11 @@
 (function(){
   const DAY=86400000, HOUR=3600000, EST=5*HOUR;
   const colors={aqua:'#00bcd4',black:'#363a45',blue:'#2196f3',fuchsia:'#e040fb',gray:'#787b86',green:'#4caf50',lime:'#00e676',maroon:'#880e4f',navy:'#311b92',olive:'#808000',orange:'#ff9800',purple:'#9c27b0',red:'#f23645',silver:'#b2b5be',teal:'#089981',white:'#ffffff',yellow:'#ffeb3b'};
-  const defaults={enabled:false,user_ssth:'20',user_sstm:'00',user_esth:'02',user_estm:'00',user_elth:'11',user_eltm:'30',user_box_line_color:'blue',boxLineWidth:1,user_box_line_style:'solid',sessionLineWidth:2,user_upperlower_line_style:'dotted',user_midline_color:'orange',user_middle_line_style:'dotted',user_text_color:'blue',user_label_size:'normal',show_london_session:true,show_london_session_rng:true,london_ssth:'03',london_sstm:'00',london_esth:'07',london_estm:'00',show_ny_session:true,show_ny_session_rng:true,ny_ssth:'08',ny_sstm:'00',ny_esth:'12',ny_estm:'00',showADR:true,is_forex_pips:true,daily_adr_user:1,daily_adr_length:21,showPreviousDayHiLo:true,previousDayHiLoColor:'yellow',supportLineWidth:1,previousDayHiLoLineStyle:'dashed',showHiLoPriceRange:false,showHiLoPriceLabel:false,showLastWeeklyHiLo:true,lastWeeklyHiLoColor:'orange',supportLastWeekLineWidth:1,lastWeeklyHiLoStyle:'dashed',lastWeeklyHiLoShowLabel:true,showWeeklyHiLo:false,weeklyHiLoColor:'olive',supportWeekLineWidth:1,weeklyHiLoStyle:'dashed',weeklyHiLoShowLabel:false,showHiLoTime:false,fillOpacity:.1,dailyUtcOffset:0,dailyStartHour:0};
+  const defaults={enabled:false,user_ssth:'20',user_sstm:'00',user_esth:'02',user_estm:'00',user_elth:'11',user_eltm:'30',user_box_line_color:'blue',boxLineWidth:1,user_box_line_style:'solid',sessionLineWidth:2,user_upperlower_line_style:'dotted',user_midline_color:'orange',user_middle_line_style:'dotted',user_text_color:'blue',user_label_size:'normal',show_london_session:true,show_london_session_rng:true,london_ssth:'03',london_sstm:'00',london_esth:'07',london_estm:'00',show_ny_session:true,show_ny_session_rng:true,ny_ssth:'08',ny_sstm:'00',ny_esth:'12',ny_estm:'00',showADR:true,is_forex_pips:true,daily_adr_user:1,daily_adr_length:21,showPreviousDayHiLo:true,previousDayHiLoColor:'yellow',supportLineWidth:1,previousDayHiLoLineStyle:'dashed',showHiLoPriceRange:false,showHiLoPriceLabel:false,showLastWeeklyHiLo:true,lastWeeklyHiLoColor:'orange',supportLastWeekLineWidth:1,lastWeeklyHiLoStyle:'dashed',lastWeeklyHiLoShowLabel:true,showWeeklyHiLo:false,weeklyHiLoColor:'olive',supportWeekLineWidth:1,weeklyHiLoStyle:'dashed',weeklyHiLoShowLabel:false,showHiLoTime:false,fillOpacity:.1,dailyUtcOffset:5.5,dailyStartHour:0};
   for(const [prefix,color] of [['l','teal'],['n','silver']])Object.assign(defaults,{[prefix+'user_box_line_color']:color,[prefix+'boxLineWidth']:1,[prefix+'user_box_line_style']:'solid',[prefix+'sessionLineWidth']:2,[prefix+'user_upperlower_line_style']:'dotted',[prefix+'user_midline_color']:color,[prefix+'user_middle_line_style']:'dotted',[prefix+'user_text_color']:color,[prefix+'user_label_size']:'normal'});
   const times=['user_ssth','user_sstm','user_esth','user_estm','user_elth','user_eltm','london_ssth','london_sstm','london_esth','london_estm','ny_ssth','ny_sstm','ny_esth','ny_estm'];
   defaults.sessionTimezone='America/New_York';
+  defaults.displayTimezone='Asia/Kolkata';
   defaults.showPreviousDayHiLo=false;
   defaults.showLastWeeklyHiLo=false;
   defaults.showAsianMidpoint=false;
@@ -28,6 +29,8 @@
           const min=key==='dailyUtcOffset'?-12:0,max=key==='dailyUtcOffset'?14:key==='dailyStartHour'?23:key==='fillOpacity'?1:key.includes('Width')?20:500;
           value=Math.max(min,Math.min(max,value));
           if(key!=='fillOpacity' && key!=='dailyUtcOffset')value=Math.round(value);
+        }else if(key==='displayTimezone'){
+          if(value!=='Asia/Kolkata')continue;
         }else if(key==='sessionTimezone'){
           if(!['America/New_York','Etc/GMT+5'].includes(value))continue;
         }else if(times.includes(key)){
@@ -40,7 +43,7 @@
       this.config=next;this.reset();return {...next};
     }
     reset(){this.candles=null;this.processed=-1;this.sessions=new Map();this.days=new Map();this.weeks=new Map();this.breaks=[];this.extremaTimes=[];this.boundaryCache=new Map();}
-    clockSettings(time,zone='Asia/Kolkata'){
+    clockSettings(time,zone=this.config.displayTimezone){
       const parts=window.IntenseSessions.partsInZone;
       const source=parts(time,this.config.sessionTimezone),target=parts(time,zone);
       const shift=(target.hour-source.hour)*60+target.minute-source.minute;

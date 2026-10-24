@@ -1379,6 +1379,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 /* Remove existing notification stacks as well as newly disabled notifications. */
 #toastHost, .ui-toast, .toast-container { display:none !important; }
 
+/* Keep indicator/session controls in their own measured flex space. */
+.tv-chart-commandbar { flex-wrap:nowrap !important; }
+.tv-chart-commandbar .tv-session-menu-wrap { flex:0 0 auto; width:max-content; white-space:nowrap; }
+.tv-session-menu-wrap > .tv-action { flex:0 0 auto; min-width:max-content; white-space:nowrap; }
+.tv-indicator-strip { flex:0 0 auto; padding:5px 10px; background:#101114; border-bottom:1px solid #202329; }
+.tv-indicator-strip .tv-session-menu-wrap { display:flex; flex-wrap:wrap; width:auto; gap:6px; }
+.tv-chart-head > div:first-child > span { white-space:nowrap; }
+#desktopWorkspaceBar { display:none; }
+
 /* Fullscreen gives execution controls priority over market browsing. */
 .tv-shell.fullscreen-mode .tv-right-panel { display:flex !important; flex-direction:column; gap:10px; }
 .tv-shell.fullscreen-mode .tv-right-panel > :not(.tv-order-card):not(.tv-replay-panel) { display:none !important; }

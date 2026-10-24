@@ -61,7 +61,6 @@ const WorkspaceEngine = (() => {
         journal: { visible: true, dock: "floating", rect: { x: 96, y: 96, w: 520, h: 520 }, minimized: false },
         analytics: { visible: true, dock: "floating", rect: { x: 140, y: 120, w: 620, h: 520 }, minimized: false },
         ai: { visible: false, dock: "floating", rect: { x: 180, y: 150, w: 560, h: 520 }, minimized: false },
-        oanda: { visible: false, dock: "floating", rect: { x: 220, y: 160, w: 420, h: 420 }, minimized: false },
       },
       tabs: [{ id: `${id}-main`, title: name, page }],
       activeTabId: `${id}-main`,
@@ -74,6 +73,7 @@ const WorkspaceEngine = (() => {
   }
 
   function initState() {
+    try { localStorage.removeItem('tfb_broker_connections_v1'); } catch {}
     state.workspaces = safeJsonGet(KEY, {});
     if (!Object.keys(state.workspaces).length) {
       DEFAULT_WORKSPACES.forEach(([id, name, page]) => { state.workspaces[id] = defaultWorkspace(id, name, page); });
@@ -150,6 +150,8 @@ const WorkspaceEngine = (() => {
 
   function apply(ws = active()) {
     if (!ws) return;
+    const supported = ['sidebar','main','watchlist','tradePanel','journal','analytics','ai'];
+    ws.panels = Object.fromEntries(Object.entries(ws.panels || {}).filter(([id])=>supported.includes(id)));
     document.body.classList.toggle("desktop-focus-mode", !!ws.layout?.focusMode);
     document.body.classList.toggle("desktop-chart-only", !!ws.layout?.chartOnly);
     document.body.dataset.density = ws.layout?.density || "comfortable";
@@ -180,22 +182,7 @@ const WorkspaceEngine = (() => {
   }
 
   function renderShell() {
-    let bar = document.getElementById("desktopWorkspaceBar");
-    if (!bar) {
-      bar = document.createElement("div");
-      bar.id = "desktopWorkspaceBar";
-      bar.className = "desktop-workspace-bar";
-      document.querySelector(".topbar-left")?.appendChild(bar);
-    }
-    const ws = active();
-    bar.innerHTML = `
-      <button class="desktop-ws-icon" id="desktopBackBtn" title="Go back">Back</button>
-      <button class="desktop-ws-btn" id="desktopWorkspaceMenuBtn">${escapeHtml(ws?.name || "Workspace")}</button>
-      <button class="desktop-ws-icon" data-command="panel-ai" title="Open AI Coach panel">Coach</button>
-      <button class="desktop-ws-icon" data-command="panel-oanda" title="Open OANDA connector">OANDA</button>
-      <button class="desktop-ws-icon" id="desktopFocusBtn" title="Focus mode">Focus</button>
-      <button class="desktop-ws-icon" id="desktopCommandBtn" title="Command palette">Ctrl K</button>
-    `;
+    document.getElementById("desktopWorkspaceBar")?.remove();
   }
 
   function goPage(page) {
@@ -243,7 +230,6 @@ const WorkspaceEngine = (() => {
       if (panel.dock !== "floating" || panel.visible === false) return;
       createFloatingPanel(id, panel);
     });
-    BrokerIntegrationEngine?.bind?.(document);
   }
 
   function renderDockedPanels() {
@@ -271,7 +257,6 @@ const WorkspaceEngine = (() => {
       </section>
     `).join("");
     document.body.appendChild(host);
-    BrokerIntegrationEngine?.bind?.(host);
   }
 
   function createFloatingPanel(id, panel) {
@@ -312,13 +297,12 @@ const WorkspaceEngine = (() => {
     if (id === "journal") return `<button class="btn btn-primary" data-open-page="journal">Open Journal</button><p>Keep journal review available while charting.</p>`;
     if (id === "analytics") return `<button class="btn btn-primary" data-open-page="performance">Open Analytics</button><p>Performance, risk, session, and psychology analytics.</p>`;
     if (id === "ai") return renderAiCoachPanel();
-    if (id === "oanda") return BrokerIntegrationEngine?.renderOandaPanel?.() || `<p>OANDA connector unavailable.</p>`;
     if (id === "tradePanel") return `<button class="btn btn-primary" data-command="place-buy">Buy</button><button class="btn" data-command="place-sell">Sell</button>`;
     return `<p>${panelTitle(id)}</p>`;
   }
 
   function panelTitle(id) {
-    return ({ journal: "Journal", analytics: "Analytics", ai: "AI Coach", oanda: "OANDA Connector", tradePanel: "Trade Manager", watchlist: "Watchlist" })[id] || id;
+    return ({journal:"Journal",analytics:"Analytics",ai:"AI Coach",tradePanel:"Trade Manager",watchlist:"Watchlist"})[id] || id;
   }
 
   function renderAiCoachPanel() {
@@ -358,11 +342,9 @@ const WorkspaceEngine = (() => {
       { label: "Import Workspace", action: "workspace-import" },
       "sep",
       { label: "Open AI Coach Panel", action: "panel-ai" },
-      { label: "Open OANDA Connector", action: "panel-oanda" },
       { label: "Open Journal Panel", action: "panel-journal" },
       { label: "Open Analytics Panel", action: "panel-analytics" },
       { label: "Dock AI Coach Right", action: "dock-ai" },
-      { label: "Dock OANDA Right", action: "dock-oanda" },
       "sep",
       { label: "Density: Compact", action: "density-compact" },
       { label: "Density: Comfortable", action: "density-comfortable" },
@@ -381,12 +363,10 @@ const WorkspaceEngine = (() => {
       ["open-ai-coach", "Open AI Coach", () => goPage("ai-coach")],
       ["open-trades", "Open Trades", () => goPage("trades")],
       ["panel-ai", "Open AI Coach Panel", () => openPanel("ai")],
-      ["panel-oanda", "Open OANDA Connector", () => openPanel("oanda")],
       ["panel-journal", "Open Journal Floating Panel", () => openPanel("journal")],
       ["panel-analytics", "Open Analytics Floating Panel", () => openPanel("analytics")],
       ["panel-trade", "Open Trade Manager Panel", () => openPanel("tradePanel")],
       ["dock-ai", "Dock AI Coach Right", () => dockPanel("ai")],
-      ["dock-oanda", "Dock OANDA Connector Right", () => dockPanel("oanda")],
       ["dock-journal", "Dock Journal Right", () => dockPanel("journal")],
       ["dock-analytics", "Dock Analytics Right", () => dockPanel("analytics")],
       ["start-replay", "Start / Pause Replay", () => PageBacktesting?.togglePlay?.()],
@@ -421,7 +401,6 @@ const WorkspaceEngine = (() => {
     save();
     renderDockedPanels();
     renderFloatingPanels();
-    setTimeout(() => BrokerIntegrationEngine?.bind?.(document), 0);
   }
 
   function dockPanel(id, dock = "right") {
@@ -773,16 +752,6 @@ const WorkspaceEngine = (() => {
 
     window.addEventListener("ui:context-action", (e) => handleContextAction(e.detail?.action));
     window.addEventListener("tfb:route-change", (e) => syncRoute(e.detail?.page));
-    window.addEventListener("tfb:broker-updated", () => {
-      document.querySelectorAll("[data-floating-panel='oanda']").forEach((el) => {
-        el.querySelector(".desktop-floating-body").innerHTML = floatingContent("oanda");
-        BrokerIntegrationEngine?.bind?.(el);
-      });
-      document.querySelectorAll("[data-dock-panel='oanda']").forEach((el) => {
-        el.querySelector(".desktop-dock-body").innerHTML = floatingContent("oanda");
-        BrokerIntegrationEngine?.bind?.(el);
-      });
-    });
     window.addEventListener("beforeunload", () => { capture(); markCleanShutdown(); });
     window.addEventListener("tfb:ReplayFinished", () => notify("Replay finished", "info"));
   }
