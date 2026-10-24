@@ -51,7 +51,7 @@ const Router = {
   init() {
     this.updatePlanNavigation();
     document.getElementById("userPlanBadge")?.addEventListener("click", () => this.go("subscription"));
-    document.addEventListener("intensefx:subscription-changed", () => this.updatePlanNavigation());
+    window.addEventListener("intensefx:subscription-changed", () => this.updatePlanNavigation());
     document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
       item.setAttribute("role", "button");
       item.setAttribute("tabindex", item.classList.contains("disabled") ? "-1" : "0");
