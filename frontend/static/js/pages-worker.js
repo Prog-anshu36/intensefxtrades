@@ -4,7 +4,7 @@ const base=new URL('../../',import.meta.url);
 const history=new globalThis.PagesHistory(base);
 let python,ready,db,lastSaved=null;
 const status=text=>postMessage({type:'status',text});
-function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open('intensefxtrades-browser-v1:'+base.pathname,1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
+function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open('intensefxtrades-browser-v1:'+base.pathname,1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();resolve(r.result);};r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('Browser storage is blocked by another tab. Close older app tabs and retry.'));});}
 function readState(){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readonly'),r=tx.objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}
 function saveState(value){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readwrite');tx.objectStore('workspace').put(value,'state');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error || Error('Browser storage write failed'));});}
 async function initialize(){
@@ -53,7 +53,13 @@ let queue=Promise.resolve();
 self.onmessage=event=>{queue=queue.then(async()=>{
   const {id,...request}=event.data;
   try{
-    const result=navigator.locks?await navigator.locks.request('intensefxtrades-state:'+base.pathname,()=>handle(request)):await handle(request);
+    // Runtime downloads must not hold the cross-tab state lock. A slow or
+    // background tab should never prevent another tab from starting.
+    await (ready ||= initialize());
+    const result=navigator.locks?await navigator.locks.request('intensefxtrades-state:'+base.pathname,{signal:AbortSignal.timeout(15000)},()=>handle(request)):await handle(request);
     postMessage({id,result});
   }catch(error){console.error(error);postMessage({id,error:error.message || String(error)});}
 });};
+// The module's awaited import is complete and the receiver is installed.
+// The page must wait for this before posting its first request.
+postMessage({type:'worker-ready'});

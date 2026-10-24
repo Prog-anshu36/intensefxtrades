@@ -29,7 +29,9 @@ jobs:
       - name: Build browser application and bounded history chunks
         run: python scripts/build_static_pages.py
       - name: Test browser history against the original CSV provider
-        run: node tests/pages_history.test.js
+        run: |
+          node tests/pages_history.test.js
+          node tests/pages_startup.test.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

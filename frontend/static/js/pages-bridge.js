@@ -4,17 +4,35 @@
   const workerUrl=new URL('static/js/pages-worker.js',base);workerUrl.search=new URL(script.src).search;
   const worker=new Worker(workerUrl,{type:'module'});
   const pending=new Map();let nextId=0;
+  let workerFailure,resolveWorker,rejectWorker;
+  const workerReady=new Promise((resolve,reject)=>{resolveWorker=resolve;rejectWorker=reject;});
+  // Attach immediately: a module import failure can precede the first API call.
+  workerReady.catch(()=>{});
+  const workerTimer=setTimeout(()=>failWorker(Error('The workspace worker did not start. Please retry.')),30000);
   const setStatus=text=>{const el=document.querySelector('#appSplash .splash-label');if(el)el.textContent=text;};
+  function failWorker(error){
+    workerFailure=error;clearTimeout(workerTimer);rejectWorker(error);
+    for(const item of pending.values()){clearTimeout(item.timer);item.reject(error);}pending.clear();
+    setStatus(error.message);
+  }
   worker.onmessage=({data})=>{
+    if(data.type==='worker-ready'){clearTimeout(workerTimer);resolveWorker();return;}
     if(data.type==='status'){setStatus(data.text);return;}
-    const item=pending.get(data.id);if(!item)return;pending.delete(data.id);
+    const item=pending.get(data.id);if(!item)return;pending.delete(data.id);clearTimeout(item.timer);
     if(data.error){const status=document.getElementById('pagesStorageStatus');if(status)status.textContent=data.error;console.error('Browser API:',data.error);item.reject(Error(data.error));}else item.resolve(data.result);
   };
-  worker.onerror=event=>{const error=Error(event.message || 'Browser trading engine failed to start.');for(const item of pending.values())item.reject(error);pending.clear();setStatus(error.message);};
+  worker.onerror=event=>failWorker(Error(event.message || 'Browser trading engine failed to start.'));
+  worker.onmessageerror=()=>failWorker(Error('The browser could not read a workspace response. Please retry.'));
   async function request(path,options={}){
+    await workerReady;
+    if(workerFailure)throw workerFailure;
     if(options.signal?.aborted)throw new DOMException('Aborted','AbortError');
     const id=++nextId;
-    const result=await new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});worker.postMessage({id,path,method:options.method||'GET',body:options.body||null,contentType:new Headers(options.headers).get('Content-Type')||'application/json'});});
+    const result=await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{pending.delete(id);reject(Error('Workspace startup or request timed out. Check your connection and retry.'));},180000);
+      pending.set(id,{resolve,reject,timer});
+      worker.postMessage({id,path,method:options.method||'GET',body:options.body||null,contentType:new Headers(options.headers).get('Content-Type')||'application/json'});
+    });
     if(options.signal?.aborted)throw new DOMException('Aborted','AbortError');
     if(path==='/browser/backup' && result.text){
       const backup=JSON.parse(result.text);backup.preferences={};
