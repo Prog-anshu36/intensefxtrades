@@ -145,11 +145,12 @@
     if (el("authAccountEmail")) el("authAccountEmail").textContent = user?.email || "";
     if (el("authProfileName")) el("authProfileName").value = state.profile?.full_name || user?.user_metadata?.full_name || "";
     if (el("authAccountAvatar")) el("authAccountAvatar").textContent = displayName[0]?.toUpperCase() || "U";
-    const plan = String(state.subscription?.plan_code || "blue").toLowerCase();
+    const plan = window.SubscriptionSystem?.normalizePlan?.(state.subscription) || "blue";
     const planNames = { blue: "Blue · Free", green: "Green · Starter", purple: "Purple · Pro", red: "Red · Elite" };
     if (el("authPlanName")) el("authPlanName").textContent = planNames[plan] || "Blue · Free";
     if (el("authPlanStatus")) el("authPlanStatus").textContent = state.subscription?.status || "Free plan";
     document.body.dataset.authPlan = ["blue", "green", "purple", "red"].includes(plan) ? plan : "blue";
+    window.dispatchEvent(new Event("intensefx:subscription-changed"));
   }
   function completeSignIn() {
     hideGate();
