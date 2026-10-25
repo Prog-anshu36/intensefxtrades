@@ -111,7 +111,9 @@ button:active, .icon-btn:active, .tv-action:active, .tv-tool-btn:active,
 .tv-rail-collapse-btn:hover, .tv-panel-collapse-btn:hover { background: #1c2030; color: #fff; }
 
 /* full-screen chart mode */
-.tv-shell.fullscreen-chart .bt-bottom-tabs,
+.tv-shell.fullscreen-chart .bt-bottom-tabs { display:flex !important; flex-direction:column; }
+.tv-shell.fullscreen-chart .bt-bottom-tabs > .bt-tabs-head { flex:0 0 auto; }
+.tv-shell.fullscreen-chart .bt-bottom-tabs > .bt-tabs-body { flex:1 1 auto; min-height:0; }
 .tv-shell.fullscreen-chart .tv-range-row { display:flex !important; }
 .tv-shell.fullscreen-chart .tv-right-panel .tv-panel,
 .tv-shell.fullscreen-chart .tv-order-card { display:block !important; }
@@ -138,7 +140,7 @@ button:active, .icon-btn:active, .tv-action:active, .tv-tool-btn:active,
   min-height: 0;
 }
 .tv-shell.fullscreen-mode .tv-resize-handle {
-  display: none !important;
+  display: block !important;
 }
 .tv-shell.fullscreen-mode .tv-right-panel {
   display: block !important;
