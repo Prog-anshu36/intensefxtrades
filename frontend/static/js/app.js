@@ -90,11 +90,22 @@ function initSidebarResize() {
 
 function initThemeToggle() {
   const btn = document.getElementById("themeToggle");
-  document.body.classList.toggle("light-mode", Store.state.settings?.theme === "light");
+  const applyTheme = (settings = Store.state.settings) => {
+    const light = settings?.theme === "light";
+    document.body.classList.toggle("light-mode", light);
+    if (btn) {
+      btn.title = light ? "Switch to dark theme" : "Switch to white theme";
+      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("aria-pressed", String(light));
+    }
+  };
+  applyTheme();
+  Store.subscribe((state) => applyTheme(state?.settings));
   btn.addEventListener("click", () => {
     const next = document.body.classList.toggle("light-mode") ? "light" : "dark";
+    applyTheme({ theme: next });
     UI?.setSetting?.("darkTheme", next === "dark");
-    toast(`${next === "light" ? "Light" : "Dark"} mode enabled.`, "success");
+    toast(`${next === "light" ? "White" : "Dark"} theme enabled.`, "success");
   });
 }
 
