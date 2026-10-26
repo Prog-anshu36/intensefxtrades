@@ -1900,9 +1900,10 @@ const PageBacktesting = {
     const xFor = (i) => (frame.window.start + i - frame.window.logicalStart) * frame.metrics.candleW + frame.metrics.candleW * 0.5;
     const gridOpacity = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--user-grid-opacity")) || 1;
     const showGridLines = !document.body.classList.contains("settings-chart-grid-off");
+    const lightTheme = document.body.classList.contains("light-mode");
 
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#0b0d10";
+    ctx.fillStyle = lightTheme ? "#f9fbfe" : "#0b0d10";
     ctx.fillRect(0, 0, width, height);
     ctx.lineWidth = 1;
     ctx.font = "11px JetBrains Mono, monospace";
@@ -1911,7 +1912,7 @@ const PageBacktesting = {
     if (showGridLines) {
       ctx.save();
       ctx.globalAlpha = 0.4 * gridOpacity;
-      ctx.strokeStyle = "#141619";
+      ctx.strokeStyle = lightTheme ? "#e9eef5" : "#141619";
       for (let g = 0; g <= 32; g++) {
         if (g % 4 === 0) continue;
         const y = px(topPad + ((priceHeight - topPad) / 32) * g);
@@ -1922,7 +1923,7 @@ const PageBacktesting = {
 
     ctx.save();
     ctx.globalAlpha = gridOpacity;
-    ctx.strokeStyle = "#1d1f24";
+    ctx.strokeStyle = lightTheme ? "#dce3ed" : "#1d1f24";
     for (let g = 0; g <= 8; g++) {
       const y = px(topPad + ((priceHeight - topPad) / 8) * g);
       const p = hi - (g / 8) * range;
@@ -1932,14 +1933,14 @@ const PageBacktesting = {
         ctx.lineTo(chartWidth, y);
         ctx.stroke();
       }
-      ctx.fillStyle = "#787B86";
+      ctx.fillStyle = lightTheme ? "#65738a" : "#787B86";
       ctx.fillText(Fmt.price(p, meta.decimals), chartWidth + 8, y);
     }
     ctx.restore();
 
     ctx.save();
     ctx.globalAlpha = gridOpacity;
-    ctx.strokeStyle = "#15181f";
+    ctx.strokeStyle = lightTheme ? "#e4eaf2" : "#15181f";
     const labelStep = Math.max(4, Math.round(frame.metrics.totalSlots / 8));
     for (let i = 0; i < frame.metrics.totalSlots; i += labelStep) {
       const logicalIndex = Math.floor(frame.window.logicalStart) + i;
@@ -1954,7 +1955,7 @@ const PageBacktesting = {
         ctx.lineTo(x, height - bottomAxis);
         ctx.stroke();
       }
-      ctx.fillStyle = "#787B86";
+      ctx.fillStyle = lightTheme ? "#65738a" : "#787B86";
       ctx.textAlign = "center";
       ctx.fillText(this.timeAxisLabel(axisDate), x, height - 10);
       ctx.textAlign = "left";
@@ -4036,6 +4037,7 @@ const PageBacktesting = {
   },
 
   drawCrosshair(ctx, point, visible, xFor, yFor, priceForY, candleW, chartWidth, height, bottomAxis, meta) {
+    const lightTheme = document.body.classList.contains("light-mode");
     const localIndex = Math.max(0, Math.min(visible.length - 1, Math.round(point.localIndex)));
     const candle = point.emptyTime ? null : visible[localIndex];
     const x = point.emptyTime ? point.x : xFor(localIndex);
@@ -4047,21 +4049,21 @@ const PageBacktesting = {
       ctx.font = "11px JetBrains Mono, monospace";
       const labelWidth = Math.min(chartWidth, ctx.measureText(label).width + 16);
       const left = Math.max(0, Math.min(chartWidth - labelWidth, x - labelWidth / 2));
-      ctx.fillStyle = "#363a45";
+      ctx.fillStyle = lightTheme ? "#e4eaf2" : "#363a45";
       ctx.fillRect(left, height - bottomAxis, labelWidth, bottomAxis);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = lightTheme ? "#334155" : "#fff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label, left + labelWidth / 2, height - bottomAxis / 2);
       ctx.restore();
     }
     if (this.cursorMode === "crosshair") {
-      this.dashedLine(ctx, x, 0, x, height - bottomAxis, "#d1d4dc", [4, 4], 0.65);
-      this.dashedLine(ctx, 0, y, chartWidth, y, "#d1d4dc", [4, 4], 0.65);
+      this.dashedLine(ctx, x, 0, x, height - bottomAxis, lightTheme ? "#64748b" : "#d1d4dc", [4, 4], 0.65);
+      this.dashedLine(ctx, 0, y, chartWidth, y, lightTheme ? "#64748b" : "#d1d4dc", [4, 4], 0.65);
       this.priceBadge(ctx, chartWidth, y, Fmt.price(cursorPrice, meta.decimals), "#787B86");
     } else if (this.cursorMode === "dot") {
       ctx.save();
-      ctx.fillStyle = "#d1d4dc";
+      ctx.fillStyle = lightTheme ? "#334155" : "#d1d4dc";
       ctx.strokeStyle = "rgba(0,0,0,.75)";
       ctx.lineWidth = 2;
       ctx.beginPath();
