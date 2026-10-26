@@ -1,6 +1,6 @@
 /* Chart and desktop persistence is owned by a trading account, never a tab. */
 (function () {
-  const chart = window.PageBacktesting;
+  const chart = typeof PageBacktesting !== 'undefined' ? PageBacktesting : window.PageBacktesting;
   const clone = value => typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
   const defaults = Object.fromEntries(Object.entries(chart || {}).filter(([, value]) => typeof value !== 'function').map(([key, value]) => [key, clone(value)]));
   const adapters = new Map();
