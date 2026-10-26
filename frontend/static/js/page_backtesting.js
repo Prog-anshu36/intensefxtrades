@@ -6517,8 +6517,11 @@ const PageBacktesting = {
     const trade = Store.state.active_trades.find((t) => t.symbol === this.symbol);
     const c = this.candles[this.idx];
     if (!trade || !c) return;
+    const practiceCheck = window.PropFirmSession?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
     await API.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL", closed_at: new Date(c.time + this.candleDuration()).toISOString() });
     await Store.refresh({fresh:true});
+    window.PropFirmSession?.onMarketCandle?.(c.time + this.candleDuration(), Store.state);
     toast("Position closed", "info");
     this.rerender();
   },
@@ -6527,8 +6530,11 @@ const PageBacktesting = {
     const c = this.candles[this.idx];
     const trades = Store.state.active_trades.filter((t) => t.symbol === this.symbol);
     if (!c || !trades.length) return;
+    const practiceCheck = window.PropFirmSession?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
     await Promise.all(trades.map((trade) => API.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL_CLOSE_ALL", closed_at: new Date(c.time + this.candleDuration()).toISOString() })));
     await Store.refresh({fresh:true});
+    window.PropFirmSession?.onMarketCandle?.(c.time + this.candleDuration(), Store.state);
     toast(`${trades.length} position${trades.length === 1 ? "" : "s"} closed`, "info");
     this.rerender();
   },

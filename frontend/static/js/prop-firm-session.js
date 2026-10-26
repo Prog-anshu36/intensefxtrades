@@ -196,9 +196,7 @@
     },
     sync() {
       if (this._scope !== accountScope()) this.load();
-      const attempt = this.practiceAttempt();
-      if (attempt?.status === "active") this.evaluate(attempt);
-      else this.syncChartBadge();
+      this.syncChartBadge();
     },
     syncChartBadge() {
       const node = document.querySelector("#propFirmChartBadge");

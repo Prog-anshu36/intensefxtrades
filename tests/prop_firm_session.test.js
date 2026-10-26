@@ -66,6 +66,20 @@ assert.equal(pro.status, 'failed', 'floating equity breaches the Pro daily loss 
 assert.equal(breach.failed, true);
 assert.equal(breach.liquidate.length, 1);
 
+sandbox.Store.state.active_account_id = 'account-c';
+page.load();
+const rollover = page.create('pro', 5000).attempt;
+page.onMarketCandle(day(8), sandbox.Store.state);
+sandbox.Store.state.active_trades = [{ id: 88, symbol: 'XAUUSD', type: 'BUY', entry: 2000,
+  opened_at: new Date(day(8)).toISOString(), floating_pnl: -149 }];
+page.onMarketCandle(day(8) + 60_000, sandbox.Store.state);
+sandbox.Store.state.active_trades[0].floating_pnl = -160;
+page.sync();
+assert.equal(rollover.status, 'active', 'store refresh does not evaluate against a stale prior-day loss baseline');
+const nextDay = page.onMarketCandle(day(9), sandbox.Store.state);
+assert.equal(rollover.status, 'active', 'the UTC+3 rollover captures a fresh daily baseline before loss checks');
+assert.equal(nextDay.failed, false);
+
 pro.status = 'active';
 pro.deadlineAt = new Date(Date.now() - 1).toISOString();
 page.evaluate(pro);
