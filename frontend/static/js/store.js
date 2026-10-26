@@ -35,8 +35,10 @@ const Store = {
       try { await this._refreshInFlight; } catch (_) { /* retry the latest state */ }
     }
     if (this._refreshInFlight) return this._refreshInFlight;
+    const accountAtStart = this.state.active_account_id;
     this._refreshInFlight = API.getState()
       .then((data) => {
+        if (accountAtStart && (this.state.active_account_id !== accountAtStart || data.active_account_id !== accountAtStart)) return this.state;
         this.state = data;
         this.notify();
         return data;
