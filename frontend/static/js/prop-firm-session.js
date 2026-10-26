@@ -10,6 +10,7 @@
   };
 
   function timestamp(value) {
+    if (value == null || value === "") return null;
     if (Number.isFinite(Number(value))) {
       const n = Number(value);
       return n < 1e11 ? n * 1000 : n;
@@ -54,10 +55,12 @@
       const scope = accountScope();
       if (this._scope === scope) return;
       this._scope = scope;
+      this.currentMarketTime = null;
       try {
         const stored = JSON.parse(localStorage.getItem(this.storageKey()) || "{}");
         this.attempts = Array.isArray(stored.attempts) ? stored.attempts : [];
         this.selectedId = stored.selectedId || this.attempts.find(a => ["active", "phase-ready"].includes(a.status))?.id || this.attempts[0]?.id || null;
+        this.currentMarketTime = timestamp(this.attempts.find(a => a.id === this.selectedId)?.lastMarketTimestamp);
       } catch (_) { this.attempts = []; this.selectedId = null; }
     },
     save() {
@@ -70,12 +73,15 @@
     practiceAttempt() { return this.attempts.find(a => a.status === "active" || a.status === "phase-ready") || null; },
     baselineKeys(state) { return [...new Set(allTrades(state).map(tradeKey))]; },
     newTrades(attempt, state) {
-      const baseline = new Set(attempt.phaseBaselineKeys || []);
+      const baseline = new Set(state?.practice_workspace ? [] : (attempt.phaseBaselineKeys || []));
       const closed = (state?.history || []).filter(t => !baseline.has(tradeKey(t)));
       const open = (state?.active_trades || []).filter(t => !baseline.has(tradeKey(t)));
       return { closed, open };
     },
-    summary(attempt = this.selected(), state = window.Store?.state || {}) {
+    tradingState(attempt = this.selected()) {
+      return window.PropPracticeWorkspace ? window.PropPracticeWorkspace.stateForAttempt(attempt) : (window.Store?.state || {});
+    },
+    summary(attempt = this.selected(), state = this.tradingState(attempt)) {
       if (!attempt) return null;
       const { closed, open } = this.newTrades(attempt, state);
       const closedPnl = closed.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
@@ -106,7 +112,7 @@
       const rules = MODELS[model];
       const amount = Number(size);
       if (!rules || !rules.sizes.includes(amount)) return { ok: false, message: "Choose a supported account size." };
-      const state = window.Store?.state || {};
+      const state = window.PropPracticeWorkspace ? {} : (window.Store?.state || {});
       const now = Date.now();
       const attempt = { id: `practice-${now}-${Math.random().toString(36).slice(2, 8)}`, model, startingBalance: amount,
         phase: 1, status: "active", startedAt: new Date(now).toISOString(), phaseStartedAt: new Date(now).toISOString(),
@@ -131,15 +137,16 @@
         attempt.status = "active";
         attempt.phaseStartedAt = new Date().toISOString();
         attempt.deadlineAt = new Date(Date.now() + 14 * DAY_MS).toISOString();
-        attempt.phaseBaselineKeys = this.baselineKeys(window.Store?.state || {});
+        attempt.phaseBaselineKeys = window.PropPracticeWorkspace ? [] : this.baselineKeys(window.Store?.state || {});
         attempt.dailyBaselines = {};
         attempt.lastMarketTimestamp = null;
+        this.currentMarketTime = null;
       }
       this.save();
       return { ok: true, attempt };
     },
-    activate(attemptId) { this.selectedId = attemptId; this.save(); },
-    evaluate(attempt = this.practiceAttempt(), state = window.Store?.state || {}) {
+    activate(attemptId) { this.selectedId = attemptId; this.currentMarketTime = timestamp(this.selected()?.lastMarketTimestamp); this.save(); },
+    evaluate(attempt = this.selected() || this.practiceAttempt(), state = this.tradingState(attempt)) {
       if (!attempt || attempt.status !== "active") return { attempt, failed: false, liquidate: [] };
       const model = MODELS[attempt.model];
       const summary = this.summary(attempt, state);
@@ -153,7 +160,7 @@
       } else if (summary.dailyFloor != null && summary.equity <= summary.dailyFloor) {
         attempt.status = "failed";
         attempt.breachReason = `Daily loss limit breached at ${money(summary.equity)}.`;
-      } else if (summary.pnl >= summary.target && summary.tradingDaysNeeded === 0) {
+      } else if (summary.closedPnl >= summary.target && summary.open.length === 0 && !(state.pending_orders || []).length && summary.tradingDaysNeeded === 0) {
         attempt.status = "phase-ready";
         if (attempt.phase === 2) {
           attempt.status = "passed";
@@ -164,10 +171,10 @@
       this.save();
       return { attempt, failed, liquidate: failed ? this.summary(attempt, state).open : [], reason: attempt.breachReason };
     },
-    onMarketCandle(time, state = window.Store?.state || {}) {
-      this.currentMarketTime = Number(time) || timestamp(time);
+    onMarketCandle(time, state = this.tradingState()) {
       this.load();
-      const attempt = this.practiceAttempt();
+      this.currentMarketTime = timestamp(time);
+      const attempt = this.selected() || this.practiceAttempt();
       if (!attempt || attempt.status !== "active") { this.syncChartBadge(); return { attempt, failed: false, liquidate: [] }; }
       const candleTime = Number(this.currentMarketTime);
       if (!Number.isFinite(candleTime) || (attempt.lastMarketTimestamp && candleTime < attempt.lastMarketTimestamp)) {
@@ -182,11 +189,13 @@
         attempt.dailyBaselines[day] = { balance, equity: balance + floating, capturedAt: new Date(candleTime).toISOString() };
       }
       attempt.lastMarketTimestamp = Math.max(attempt.lastMarketTimestamp || 0, candleTime);
-      return this.evaluate(attempt, state);
+      const result = this.evaluate(attempt, state);
+      return result;
     },
     canTradeAt(time, symbol = "") {
-      const attempt = this.practiceAttempt();
-      if (!attempt) return { ok: true };
+      const attempt = this.selected() || this.practiceAttempt();
+      if (!attempt) return { ok: false, message: "Start a prop practice round first." };
+      if (symbol !== "XAUUSD") return { ok: false, message: "Prop practice uses XAUUSD only." };
       if (attempt.status !== "active") return { ok: false, message: attempt.status === "phase-ready" ? "This phase met its target. Start the next phase from Prop Firm Session." : `This round is ${attempt.status}. Start a new practice round to place more trades.` };
       const ms = timestamp(time);
       if (attempt.lastMarketTimestamp && ms != null && ms < attempt.lastMarketTimestamp) return { ok: false, message: "Practice trades must follow replay time. Move the replay forward before placing an order." };
@@ -199,9 +208,9 @@
       this.syncChartBadge();
     },
     syncChartBadge() {
-      const node = document.querySelector("#propFirmChartBadge");
+      const node = window.PropPracticeWorkspace ? window.PropPracticeWorkspace.activeChart()?.container?.querySelector("#propFirmChartBadge") : document.querySelector("#propFirmChartBadge");
       if (!node) return;
-      const attempt = this.practiceAttempt();
+      const attempt = this.selected() || this.practiceAttempt();
       if (!attempt) { node.hidden = true; return; }
       const summary = this.summary(attempt);
       node.hidden = false;
@@ -209,12 +218,42 @@
       node.textContent = `${MODELS[attempt.model].name} · Phase ${attempt.phase} · Equity ${money(summary.equity)}`;
       node.title = attempt.status === "phase-ready" ? "Phase objective met; advance from Prop Firm Session." : "Orders placed on the chart are scored in this practice round.";
     },
+    renderEquityChart(attempt, summary) {
+      const points = [{ time: timestamp(attempt.phaseStartedAt) || Date.now(), equity: attempt.startingBalance }];
+      let equity = attempt.startingBalance;
+      [...summary.closed].sort((a, b) => (timestamp(a.closed_at) || 0) - (timestamp(b.closed_at) || 0)).forEach(trade => {
+        equity += Number(trade.pnl) || 0;
+        points.push({ time: timestamp(trade.closed_at || trade.opened_at) || points.at(-1).time + 1, equity });
+      });
+      if (summary.open.length) points.push({ time: Date.now(), equity: summary.equity });
+      const low = Math.min(attempt.startingBalance, ...points.map(point => point.equity));
+      const span = Math.max(1, Math.max(attempt.startingBalance, ...points.map(point => point.equity)) - low);
+      const coords = points.map((point, index) => [24 + index * (552 / Math.max(1, points.length - 1)), 106 - ((point.equity - low) / span) * 82]);
+      const line = coords.map(([x, y], index) => `${index ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+      const fill = `${line} L${coords.at(-1)[0].toFixed(1)},114 L${coords[0][0].toFixed(1)},114 Z`;
+      return `<div class="propfirm-equity-chart"><div class="propfirm-chart-heading"><div><span>Account equity</span><b>${money(summary.equity)}</b></div><small>${summary.closed.length} closed · ${summary.open.length} open</small></div><svg viewBox="0 0 600 132" role="img" aria-label="Prop practice account equity history"><defs><linearGradient id="propEquityFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2f7cf6" stop-opacity=".28"/><stop offset="1" stop-color="#2f7cf6" stop-opacity="0"/></linearGradient></defs><path class="propfirm-equity-fill" d="${fill}"/><path class="propfirm-equity-line" d="${line}"/><line x1="24" x2="576" y1="114" y2="114"/><text x="24" y="129">Start ${money(attempt.startingBalance)}</text><text x="576" y="129" text-anchor="end">${summary.tradedDays.length} trading days</text></svg></div>`;
+    },
+    renderAccountDashboard(attempt, rules, summary) {
+      const today = dayKey(this.currentMarketTime || attempt.lastMarketTimestamp || Date.now());
+      const todayTrades = [...summary.closed, ...summary.open].filter(trade => dayKey(trade.closed_at || trade.opened_at) === today);
+      const todayPnl = todayTrades.reduce((total, trade) => total + (Number(trade.pnl ?? trade.floating_pnl) || 0), 0);
+      const deadline = attempt.deadlineAt ? new Date(attempt.deadlineAt) : null;
+      const title = `${rules.name} · ${money(attempt.startingBalance)}`;
+      const detailRows = summary.closed.slice().sort((a, b) => (timestamp(b.closed_at) || 0) - (timestamp(a.closed_at) || 0)).slice(0, 10);
+      return `<section class="propfirm-overview" aria-label="Selected practice account details">
+        <div class="propfirm-breadcrumb"><span>Prop Firm Accounts</span><b>›</b><strong>${escape(title)}</strong><span class="propfirm-status-tag" data-status="${escape(attempt.status)}">${escape(attempt.status === 'active' ? 'Ongoing' : attempt.status === 'phase-ready' ? 'Phase ready' : attempt.status)}</span></div>
+        <header class="propfirm-overview-head"><div><span class="propfirm-eyebrow">SELECTED PRACTICE ACCOUNT · XAUUSD</span><h2>${escape(title)}</h2><div class="propfirm-overview-tags"><span>Phase ${attempt.phase}</span><span>${escape(attempt.model === 'pro' ? '2 Step Pro' : '2 Step Standard')}</span><span>Simulation</span></div></div><button class="propfirm-primary" id="propFirmChart">${attempt.status === 'phase-ready' ? 'Manage phase →' : 'Open practice chart →'}</button></header>
+        <div class="propfirm-overview-stats"><article><span>Account size</span><b>${money(attempt.startingBalance)}</b></article><article><span>Today's profit</span><b class="${todayPnl >= 0 ? 'positive' : 'negative'}">${todayPnl >= 0 ? '+' : ''}${money(todayPnl)}</b></article><article><span>Start date</span><b>${new Date(attempt.phaseStartedAt || attempt.startedAt).toLocaleDateString()}</b></article><article><span>Phase end</span><b>${deadline && Number.isFinite(deadline.getTime()) ? deadline.toLocaleDateString() : '—'}</b></article></div>
+        <div class="propfirm-overview-grid"><div class="propfirm-overview-main">${this.renderEquityChart(attempt, summary)}<section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">TRADING HISTORY</span><h3>Closed positions <small>(${summary.closed.length})</small></h3></div><span class="propfirm-detail-caption">XAUUSD · Phase ${attempt.phase}</span></div>${detailRows.length ? `<div class="propfirm-trade-table-wrap"><table class="propfirm-trade-table"><thead><tr><th>Side</th><th>Open</th><th>Close</th><th>Size</th><th>Result</th></tr></thead><tbody>${detailRows.map(trade => `<tr><td class="${trade.type === 'BUY' ? 'positive' : 'negative'}">${escape(trade.type)}</td><td>${Number(trade.entry || 0).toFixed(2)}</td><td>${Number(trade.exit || 0).toFixed(2)}</td><td>${Number(trade.lots || 0).toFixed(2)}</td><td class="${Number(trade.pnl) >= 0 ? 'positive' : 'negative'}">${Number(trade.pnl) >= 0 ? '+' : ''}${money(trade.pnl)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="propfirm-empty-inline">No closed positions in this phase yet. Open the practice chart to place a simulated XAUUSD trade.</div>'}</section></div><aside class="propfirm-overview-side"><section class="propfirm-score-card"><div><span>Virtual balance</span><b>${money(attempt.startingBalance + summary.closedPnl)}</b></div><div class="propfirm-balance-track"><i style="width:${Math.max(0,Math.min(100,(summary.equity / (attempt.startingBalance * 1.1))*100))}%"></i></div><small>Equity ${money(summary.equity)} · starting ${money(attempt.startingBalance)}</small></section><section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">TRADING OBJECTIVES</span><h3>Phase ${attempt.phase} progress</h3></div></div><div class="propfirm-objective-row"><span>Minimum trading days</span><b>${summary.tradedDays.length} / ${rules.minDays}</b></div><div class="propfirm-mini-track"><i style="width:${Math.min(100,summary.tradedDays.length / Math.max(1,rules.minDays) * 100)}%"></i></div><div class="propfirm-objective-row"><span>Maximum daily loss</span><b>${rules.dailyLossPct}% · ${money(summary.dailyDrawdown)} used</b></div><div class="propfirm-objective-row"><span>Maximum loss</span><b>${rules.maxLossPct}% · ${money(summary.maxDrawdown)} used</b></div><div class="propfirm-objective-row"><span>Profit target</span><b>${money(Math.max(0,summary.pnl))} / ${money(summary.target)}</b></div><div class="propfirm-mini-track"><i style="width:${summary.targetProgress}%"></i></div><div class="propfirm-objective-row"><span>Phase deadline</span><b>${Math.ceil(summary.remainingMs / DAY_MS)} days left</b></div>${attempt.status === 'phase-ready' ? `<button class="propfirm-primary propfirm-wide" id="propFirmAdvance">${attempt.phase === 2 ? 'Complete round' : 'Start Phase 2 →'}</button>` : ''}</section><section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">OPEN POSITIONS</span><h3>Active · ${summary.open.length}</h3></div></div>${summary.open.length ? summary.open.map(trade => `<div class="propfirm-open-row"><span class="${trade.type === 'BUY' ? 'positive' : 'negative'}">${escape(trade.type)} XAUUSD</span><b class="${Number(trade.floating_pnl) >= 0 ? 'positive' : 'negative'}">${Number(trade.floating_pnl) >= 0 ? '+' : ''}${money(trade.floating_pnl)}</b></div>`).join('') : '<div class="propfirm-empty-inline">No open positions</div>'}</section></aside></div>
+        <div class="propfirm-detail-foot">Practice simulator only · Your ordinary TradeFXBook backtesting history remains separate from this account.</div>
+      </section>`;
+    },
     render() {
       this.load();
       const attempts = this.attempts;
       const selected = this.selected();
       const attempt = selected || this.practiceAttempt();
-      if (attempt?.status === "active") this.evaluate(attempt);
+      if (attempt?.status === "active" && (!window.PropPracticeWorkspace || window.PropPracticeWorkspace.hasState(attempt))) this.evaluate(attempt);
       const activeExists = Boolean(this.practiceAttempt());
       const rules = attempt ? MODELS[attempt.model] : MODELS[this.model];
       const summary = attempt ? this.summary(attempt) : null;
@@ -223,20 +262,35 @@
       const statusLabel = status => ({ active: "In progress", "phase-ready": "Phase objective met", passed: "Passed · practice only", failed: "Breached", expired: "Expired" }[status] || status);
       const progress = (value, max) => Math.max(0, Math.min(100, (value / max) * 100));
       return `<section class="propfirm-page">
-        <header class="propfirm-hero"><div><span class="propfirm-eyebrow">INTENSEFXTRADES · SIMULATED EVALUATION</span><h2>Prop Firm Session</h2><p>Practice evaluation rounds using the existing chart, replay, and simulated orders. Choose a model, trade by its published objectives, and review each attempt.</p></div><div class="propfirm-hero-mark"><b>PF</b><span>Practice mode</span></div></header>
+        <header class="propfirm-hero"><div><span class="propfirm-eyebrow">INTENSEFXTRADES · SIMULATED EVALUATION</span><h2>Prop Firm Session</h2><p>Practice evaluation rounds in a dedicated XAUUSD chart with its own replay, drawings, orders, and analysis. Choose a model, trade by its published objectives, and review each attempt.</p></div><div class="propfirm-hero-mark"><b>PF</b><span>Practice mode</span></div></header>
         <div class="propfirm-notice"><b>Independent practice simulator.</b> Rule values below reference the provider’s public Free Trial rules. Trade execution and market conditions come from TradeFXBook’s local replay engine; this does not create a provider account, copy live credentials, or guarantee identical spreads, leverage, commissions, or fills.</div>
-        ${!attempt || !["active", "phase-ready"].includes(attempt.status) ? `<section class="propfirm-card propfirm-create"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">START A ROUND</span><h3>Choose your practice challenge</h3><p>One active round at a time per TradeFXBook account. Completed attempts remain in your history.</p></div><span class="propfirm-badge">FREE PRACTICE</span></div><div class="propfirm-create-grid"><label>Challenge model<select id="propFirmModel"><option value="standard" ${this.model === "standard" ? "selected" : ""}>2 Step Standard</option><option value="pro" ${this.model === "pro" ? "selected" : ""}>2 Step Pro</option></select></label><label>Virtual starting balance<select id="propFirmSize">${MODELS[this.model].sizes.map(size => `<option value="${size}" ${Number(this.size) === size ? "selected" : ""}>${money(size)}</option>`).join("")}</select></label><button class="propfirm-primary" id="propFirmStart" ${activeExists ? "disabled" : ""}>Start practice round <span>→</span></button></div><div class="propfirm-rule-preview" id="propFirmRulePreview">${this.model === "standard" ? "Phase 1 target 8% · Phase 2 target 5% · Daily loss 5% · Max loss 10% · 3 minimum trading days per phase" : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · 2 minimum trading days per phase"} · 14 calendar days per phase</div></section>` : ""}
-        ${attempt && ["active", "phase-ready"].includes(attempt.status) ? `<section class="propfirm-active-card"><div class="propfirm-active-head"><div><span class="propfirm-eyebrow">${escape(rules.name.toUpperCase())} · $${(attempt.startingBalance / 1000).toLocaleString()}K PRACTICE</span><h3>${attempt.status === "phase-ready" ? "Phase objective reached" : `Phase ${attempt.phase} · ${attempt.phase === 1 ? "Evaluation" : "Verification"}`}</h3><div class="propfirm-status-pill" data-status="${attempt.status}"><i></i>${statusLabel(attempt.status)}</div></div><button class="propfirm-primary" id="propFirmChart">${attempt.status === "phase-ready" ? "Manage phase →" : "Practice on chart →"}</button></div><div class="propfirm-stats-grid"><article><span>Virtual equity</span><b>${money(summary.equity)}</b><small>Balance ${money(attempt.startingBalance + summary.closedPnl)} · Open P&amp;L ${money(summary.floating)}</small></article><article><span>Phase P&amp;L</span><b class="${summary.pnl >= 0 ? "positive" : "negative"}">${summary.pnl >= 0 ? "+" : ""}${money(summary.pnl)}</b><small>${summary.closed.length} closed · ${summary.open.length} open</small></article><article><span>Daily loss allowance</span><b>${money(Math.max(0, Math.max(summary.balanceAtDayStart, summary.dailyFloor == null ? summary.balanceAtDayStart : summary.dailyFloor + Math.max(summary.balanceAtDayStart, summary.dailyFloor) * rules.dailyLossPct / 100) * rules.dailyLossPct / 100 - summary.dailyDrawdown))}</b><small>${rules.dailyLossPct}% · reset 00:00 UTC+3</small></article><article><span>Phase time remaining</span><b>${daysLeft} days</b><small>${clock(summary.remainingMs)} · no pause or extension</small></article></div><div class="propfirm-progress-grid"><article><div class="propfirm-progress-label"><span>Profit target · ${rules.targets[attempt.phase]}%</span><b>${money(Math.max(0, summary.pnl))} / ${money(summary.target)}</b></div><div class="propfirm-progress-track"><i style="width:${summary.targetProgress}%"></i></div></article><article class="loss-progress"><div class="propfirm-progress-label"><span>Maximum total loss · ${rules.maxLossPct}%</span><b>${money(summary.maxDrawdown)} / ${money(attempt.startingBalance * rules.maxLossPct / 100)}</b></div><div class="propfirm-progress-track"><i style="width:${progress(summary.maxDrawdown, attempt.startingBalance * rules.maxLossPct / 100)}%"></i></div></article></div><div class="propfirm-objectives"><span>ROUND OBJECTIVES</span><div><i class="${summary.targetProgress >= 100 ? "done" : ""}">${summary.targetProgress >= 100 ? "✓" : "1"}</i><span>Reach ${rules.targets[attempt.phase]}% phase profit target</span></div><div><i class="${summary.tradingDaysNeeded === 0 ? "done" : ""}">${summary.tradingDaysNeeded === 0 ? "✓" : "2"}</i><span>${rules.minDays} minimum trading days <small>(${summary.tradedDays.length} completed)</small></span></div><div><i>3</i><span>Stay above the daily and max loss floors</span></div></div>${attempt.status === "phase-ready" ? `<div class="propfirm-phase-success"><div><b>${attempt.phase === 2 ? "Both practice phases passed" : "Phase 1 complete"}</b><span>${attempt.phase === 2 ? "Your simulated evaluation is complete. Practice only; no funded account is created." : "Start Phase 2 to continue this practice attempt."}</span></div><button class="propfirm-primary" id="propFirmAdvance">${attempt.phase === 2 ? "Finish round" : "Start Phase 2 →"}</button></div>` : ""}<div class="propfirm-active-foot">Started ${new Date(attempt.phaseStartedAt).toLocaleString()} · daily loss is measured against the higher of day-opening balance or equity · no automatic extension</div></section>` : ""}
+        ${!attempt || !["active", "phase-ready"].includes(attempt.status) ? `<section class="propfirm-card propfirm-create"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">START A ROUND</span><h3>Select your challenge account</h3><p>Pick an evaluation model, then choose a virtual account size. Your practice accounts stay separate from Backtesting.</p></div><span class="propfirm-badge">FREE PRACTICE</span></div><div class="propfirm-plan-grid">${Object.entries(MODELS).map(([code, model]) => `<button type="button" class="propfirm-plan-card ${code === "pro" ? "pro" : "standard"} ${this.model === code ? "selected" : ""}" data-select-model="${code}" aria-pressed="${this.model === code}"><span class="propfirm-plan-kicker">${code === "pro" ? "2 STEP PRO" : "2 STEP STANDARD"}</span><b class="propfirm-plan-title">${code === "pro" ? "Lean, Fast Efficient" : "Maximum Drawdown Space"}</b><span class="propfirm-plan-summary">${code === "pro" ? "Lower daily loss limit · built for focused traders" : "More breathing room · higher overall drawdown"}</span><span class="propfirm-plan-metrics"><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Daily loss limit <b>${model.dailyLossPct}%</b></span><span>Max drawdown <b>${model.maxLossPct}% static</b></span><span>Leverage reference <b>up to 1:100</b></span><span>Min. trading days <b>${model.minDays} / phase</b></span></span><span class="propfirm-plan-select">${this.model === code ? "Selected" : "Select this model"} <i>→</i></span></button>`).join("")}</div><div class="propfirm-create-grid"><label>Challenge model<select id="propFirmModel"><option value="standard" ${this.model === "standard" ? "selected" : ""}>2 Step Standard</option><option value="pro" ${this.model === "pro" ? "selected" : ""}>2 Step Pro</option></select></label><label>Virtual starting balance<select id="propFirmSize">${MODELS[this.model].sizes.map(size => `<option value="${size}" ${Number(this.size) === size ? "selected" : ""}>${money(size)}</option>`).join("")}</select></label><button class="propfirm-primary" id="propFirmStart" ${activeExists ? "disabled" : ""}>Start practice round <span>→</span></button></div><div class="propfirm-rule-preview" id="propFirmRulePreview">${this.model === "standard" ? "Phase 1 target 8% · Phase 2 target 5% · Daily loss 5% · Max loss 10% · 3 minimum trading days per phase" : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · 2 minimum trading days per phase"} · 14 calendar days per phase</div></section>` : ""}
+        ${attempt ? this.renderAccountDashboard(attempt, rules, summary) : ""}
         ${attempt && ["passed", "failed", "expired"].includes(attempt.status) ? `<section class="propfirm-result-card" data-status="${attempt.status}"><div><span class="propfirm-eyebrow">ROUND ${escape(statusLabel(attempt.status).toUpperCase())}</span><h3>${attempt.status === "passed" ? "Practice evaluation complete" : attempt.status === "expired" ? "Phase time limit reached" : "Loss rule breached"}</h3><p>${escape(attempt.breachReason || "Both phases met their objectives. This result is for practice only.")}</p><b>Final virtual equity · ${money(summary.equity)}</b></div><button class="propfirm-secondary" id="propFirmNewRound">Start another round</button></section>` : ""}
         <section class="propfirm-card"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">MODEL RULES</span><h3>Round objectives at a glance</h3><p>The selected model uses different drawdown and target thresholds.</p></div></div><div class="propfirm-model-grid">${Object.entries(MODELS).map(([code, model]) => `<article class="propfirm-model-card ${attempt?.model === code || (!attempt && this.model === code) ? "selected" : ""}"><div><b>${escape(model.name)}</b><span>${model.sizes.map(x => `$${x/1000}K`).join(" · ")}</span></div><div class="propfirm-model-metrics"><span>Daily loss <b>${model.dailyLossPct}%</b></span><span>Max loss <b>${model.maxLossPct}%</b></span><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Min. active days <b>${model.minDays} / phase</b></span><span>Time limit <b>14 calendar days / phase</b></span></div></article>`).join("")}</div><p class="propfirm-rule-footnote">Daily loss is based on the higher day-opening balance or equity and resets at 00:00 platform time (UTC+3). Maximum loss is static from starting balance. Open-position floating loss counts toward both limits.</p></section>
-        <section class="propfirm-card"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">YOUR ROUNDS</span><h3>Practice history <small>(${attempts.length})</small></h3><p>Attempts are saved in this browser and separated by your active TradeFXBook account.</p></div></div>${attempts.length ? `<div class="propfirm-history-list">${attempts.map(item => { const r=MODELS[item.model];const active=["active","phase-ready"].includes(item.status);return `<button class="propfirm-history-row ${item.id===attempt?.id?"selected":""}" data-prop-attempt="${escape(item.id)}"><span class="propfirm-history-icon ${item.model}">${item.model === "pro" ? "P" : "S"}</span><span class="propfirm-history-name"><b>${escape(r.name)} · ${money(item.startingBalance)}</b><small>Phase ${item.phase} · ${new Date(item.startedAt).toLocaleDateString()}</small></span><span class="propfirm-history-status" data-status="${item.status}">${escape(statusLabel(item.status))}</span><span>›</span></button>`;}).join("")}</div>` : `<div class="propfirm-empty"><span>◎</span><b>No practice rounds yet</b><p>Choose a model and account size to start your first simulated evaluation.</p></div>`}</section>
-        <section class="propfirm-disclaimer"><b>How chart trades are scored</b><p>When a round is active, new simulated orders from Backtesting are included in that round. They are still recorded in the currently selected TradeFXBook demo account’s trade history. The round’s virtual starting balance and objectives are tracked separately and are not a provider account. FXN/session overlays are not used to determine prop-firm trading days; the round follows UTC+3 platform-day boundaries.</p></section>
+        <section class="propfirm-card"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">YOUR ACCOUNTS</span><h3>Practice accounts <small>(${attempts.length})</small></h3><p>Select an account to open its balance, objectives, trading history, and open positions.</p></div><span class="propfirm-count-badge">${attempts.length} ${attempts.length === 1 ? "account" : "accounts"}</span></div>${attempts.length ? `<div class="propfirm-account-grid">${attempts.map(item => { const r=MODELS[item.model];const pnl=this.summary(item)?.pnl || 0;return `<button class="propfirm-account-card ${item.id===attempt?.id?"selected":""}" data-prop-attempt="${escape(item.id)}"><span class="propfirm-account-card-top"><span class="propfirm-history-icon ${item.model}">${item.model === "pro" ? "P" : "S"}</span><span class="propfirm-history-status" data-status="${item.status}">${escape(statusLabel(item.status))}</span><span class="propfirm-account-arrow">↗</span></span><b class="propfirm-account-name">${escape(r.name)} · ${money(item.startingBalance)}</b><span class="propfirm-account-meta">XAUUSD · Phase ${item.phase} · ${new Date(item.startedAt).toLocaleDateString()}</span><span class="propfirm-account-balance-label"><span>Balance</span><span>Phase P&amp;L</span></span><span class="propfirm-account-balance"><b>${money(item.startingBalance + (this.summary(item)?.closedPnl || 0))}</b><b class="${pnl >= 0 ? "positive" : "negative"}">${pnl >= 0 ? "+" : ""}${money(pnl)}</b></span><span class="propfirm-account-progress"><i style="width:${this.summary(item)?.targetProgress || 0}%"></i></span><span class="propfirm-account-foot">Profit target ${r.targets[item.phase]}% <b>${Math.round(this.summary(item)?.targetProgress || 0)}%</b></span></button>`;}).join("")}</div>` : `<div class="propfirm-empty"><span>◎</span><b>No practice accounts yet</b><p>Select a challenge model above and start your first simulated evaluation.</p></div>`}</section>
+        <section class="propfirm-disclaimer"><b>How chart trades are scored</b><p>Each round and phase has an independent practice ledger and XAUUSD chart workspace. Prop practice trades do not enter your normal backtesting history. Drawings and replay are restored for the selected round and phase. Open the dedicated Practice Chart to trade. FXN/session overlays are not used to determine prop-firm trading days; the round follows UTC+3 platform-day boundaries.</p></section>
       </section>`;
     },
     afterRender(container) {
+      const attempt = this.selected();
+      if (attempt && window.PropPracticeWorkspace && !window.PropPracticeWorkspace.hasState(attempt)) {
+        window.PropPracticeWorkspace.ensure(attempt).then(() => {
+          if (window.Router.current === 'prop-firm-session' && this.selectedId === attempt.id) this.refreshView();
+        }).catch(error => {
+          const notice = container.querySelector('.propfirm-notice');
+          if (notice) notice.textContent = error.message;
+        });
+      }
       this.load();
       const model = container.querySelector("#propFirmModel");
       const size = container.querySelector("#propFirmSize");
+      container.querySelectorAll("[data-select-model]").forEach(button => button.addEventListener("click", () => {
+        this.model = button.dataset.selectModel;
+        const allowed = MODELS[this.model].sizes;
+        if (!allowed.includes(Number(this.size))) this.size = allowed[0];
+        this.refreshView();
+      }));
       model?.addEventListener("change", () => {
         this.model = model.value;
         const allowed = MODELS[this.model].sizes;
@@ -244,6 +298,7 @@
         if (size) size.innerHTML = allowed.map(n => `<option value="${n}" ${n === Number(this.size) ? "selected" : ""}>${money(n)}</option>`).join("");
         const preview = container.querySelector("#propFirmRulePreview");
         if (preview) preview.textContent = this.model === "standard" ? "Phase 1 target 8% · Phase 2 target 5% · Daily loss 5% · Max loss 10% · 3 minimum trading days per phase · 14 calendar days per phase" : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · 2 minimum trading days per phase · 14 calendar days per phase";
+        container.querySelectorAll("[data-select-model]").forEach(card => { const selected = card.dataset.selectModel === this.model; card.classList.toggle("selected", selected); card.setAttribute("aria-pressed", String(selected)); });
       });
       size?.addEventListener("change", () => { this.size = Number(size.value); });
       container.querySelector("#propFirmStart")?.addEventListener("click", () => {
@@ -251,7 +306,7 @@
         if (!result.ok) { window.UI?.showToast?.(result.message, "info"); return; }
         window.Router.go("prop-firm-session");
       });
-      container.querySelector("#propFirmChart")?.addEventListener("click", () => window.Router.go("backtesting"));
+      container.querySelector("#propFirmChart")?.addEventListener("click", () => window.Router.go("prop-chart"));
       container.querySelector("#propFirmAdvance")?.addEventListener("click", () => { this.advance(); window.Router.go("prop-firm-session"); });
       container.querySelector("#propFirmNewRound")?.addEventListener("click", () => { this.selectedId = null; this.save(); window.Router.go("prop-firm-session"); });
       container.querySelectorAll("[data-prop-attempt]").forEach(button => button.addEventListener("click", () => { this.activate(button.dataset.propAttempt); window.Router.go("prop-firm-session"); }));
@@ -265,3 +320,4 @@
   window.addEventListener("hashchange", () => PagePropFirmSession.syncChartBadge());
   window.Store?.subscribe?.(() => PagePropFirmSession.sync());
 })();
+

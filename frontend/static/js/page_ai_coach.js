@@ -2,8 +2,9 @@
    Uses local trade analytics only; no external AI service or backend changes. */
 
 const PageAICoach = {
+  get store() { return this._store || Store; },
   render() {
-    const snap = TradeAnalyticsEngine.snapshot(Store.state);
+    const snap = TradeAnalyticsEngine.snapshot(this.store.state);
     const m = snap.performance;
     const r = snap.risk;
     const weakSession = snap.sessions.at(-1);
@@ -16,7 +17,7 @@ const PageAICoach = {
 
     return `
       <div class="section-title" style="font-size:19px;margin-bottom:2px">${this.svgCoach()} AI Coach</div>
-      <div class="section-sub" style="margin-bottom:18px">Behavior, risk, and execution review generated from your trading history</div>
+      <div class="section-sub" style="margin-bottom:18px">Rule-based review of your trading history · calculated locally, no AI model connected</div>
 
       <div class="grid grid-4" style="margin-bottom:16px">
         ${this.scoreCard("Edge", this.edgeScore(m), `${m.profitFactor && isFinite(m.profitFactor) ? m.profitFactor.toFixed(2) : "0.00"} PF`)}

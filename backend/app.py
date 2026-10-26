@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-from flask import Flask, jsonify, request, send_from_directory, session, Response
+from flask import Flask, jsonify, request, send_from_directory, session, Response, has_request_context
 from flask_cors import CORS
 from werkzeug.security import check_password_hash, generate_password_hash
 try:
@@ -309,7 +309,7 @@ def _account_summary(account):
 
 def _state_response(data):
     account = _active_account(data)
-    response = json.loads(json.dumps(account))
+    response = json.loads(json.dumps({k: v for k, v in account.items() if k != 'prop_practice'}))
     response["active_account_id"] = account["id"]
     response["accounts"] = [_account_summary(a) for a in data["accounts"]]
     response["user"] = _public_user(_active_user(data))
@@ -339,6 +339,15 @@ def _active_user(data):
 
 
 def _active_account(data):
+    account = _primary_account(data)
+    practice = request.headers.get('X-Practice-Id') if has_request_context() else None
+    if practice and request.path != '/api/prop-practice':
+        account = next(a for a in data['accounts'] if a['id'] == request.headers.get('X-Practice-Owner'))
+        return account['prop_practice'][practice]
+    return account
+
+
+def _primary_account(data):
     active_id = data.get("active_account_id")
     account = next((a for a in data.get("accounts", []) if a.get("id") == active_id), None)
     if account:
@@ -372,7 +381,7 @@ def _migrate_legacy(data):
         data = _normalize_state(data)
         data.setdefault("active_account_id", data["accounts"][0]["id"] if data["accounts"] else "demo")
         data["accounts"] = [_normalize_account(a) for a in data.get("accounts", [])]
-        _active_account(data)
+        _primary_account(data)
         return data
 
     account = _new_account("demo", "Demo Account")
@@ -410,6 +419,46 @@ def _save(data):
 
 
 # ---------------------------------------------------------------- frontend
+
+@app.before_request
+def practice_workspace_guard():
+    practice = request.headers.get('X-Practice-Id')
+    if not practice:
+        return None
+    allowed = request.path in ('/api/state', '/api/settings', '/api/prop-practice') or request.path.startswith('/api/trades/')
+    if not allowed or len(practice) > 120 or not all(c.isalnum() or c in '-_' for c in practice):
+        return jsonify(error='Invalid practice workspace request.'), 400
+    with _lock:
+        owner = _primary_account(_load())
+        if request.headers.get('X-Practice-Owner') != owner['id']:
+            return jsonify(error='Account changed. Reopen the prop practice workspace.'), 409
+        if request.path != '/api/prop-practice' and practice not in owner.get('prop_practice', {}):
+            return jsonify(error='Start this prop practice phase first.'), 404
+    payload = request.get_json(silent=True) or {}
+    if payload.get('symbol', 'XAUUSD') != 'XAUUSD' or any(s != 'XAUUSD' for s in payload.get('ticks', {})):
+        return jsonify(error='Prop practice supports XAUUSD only.'), 400
+    return None
+
+
+@app.route('/api/prop-practice', methods=['POST'])
+def initialize_practice_workspace():
+    practice = request.headers.get('X-Practice-Id')
+    payload = request.get_json(silent=True) or {}
+    if not practice or payload.get('model') not in ('standard', 'pro'):
+        return jsonify(error='Choose a valid prop practice round.'), 400
+    sizes = [5000, 10000, 25000, 50000, 100000] + ([200000] if payload['model'] == 'pro' else [])
+    if payload.get('balance') not in sizes:
+        return jsonify(error='Choose a supported practice balance.'), 400
+    with _lock:
+        data = _load()
+        owner = _primary_account(data)
+        ledgers = owner.setdefault('prop_practice', {})
+        if practice not in ledgers:
+            ledger = _new_account('prop-' + practice, 'Prop Firm Practice', starting_balance=payload['balance'])
+            ledger['settings'].update(symbol='XAUUSD', timeframe='1m')
+            ledgers[practice] = ledger
+            _save(data)
+        return jsonify(ledgers[practice])
 
 @app.route("/")
 def index():
@@ -880,6 +929,17 @@ def create_pending_order():
         account.setdefault("pending_orders", []).append(order)
         _save(data)
         return jsonify(order)
+
+
+@app.route('/api/trades/pending/cancel-all', methods=['POST'])
+def cancel_pending_orders():
+    with _lock:
+        data = _load()
+        account = _active_account(data)
+        count = len(account.get('pending_orders', []))
+        account['pending_orders'] = []
+        _save(data)
+        return jsonify(ok=True, cancelled=count)
 
 
 @app.route('/api/trades/protection', methods=['POST'])

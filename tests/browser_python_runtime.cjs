@@ -8,8 +8,8 @@ const {loadPyodide}=require('../deployment-check/node_modules/pyodide');
  py.FS.mkdirTree('/workspace/backend');
  for(const name of ['app.py','trade_importer.py','xauusd_data_provider.py'])py.FS.writeFile('/workspace/backend/'+name,fs.readFileSync('backend/'+name,'utf8'));
  await py.runPythonAsync(fs.readFileSync('frontend/pages-runtime.py','utf8'));
- const call=(path,body,method=body?'POST':'GET')=>{
-  py.globals.set('_request_json',JSON.stringify({path,method,body:body?JSON.stringify(body):null}));
+ const call=(path,body,method=body?'POST':'GET',headers={})=>{
+  py.globals.set('_request_json',JSON.stringify({path,method,headers,body:body?JSON.stringify(body):null}));
   const r=JSON.parse(py.runPython('dispatch(_request_json)'));assert.ok(r.status<500,JSON.stringify(r));
   return {status:r.status,value:JSON.parse(Buffer.from(r.body,'base64').toString()),state:r.state};
  };
@@ -23,6 +23,13 @@ const {loadPyodide}=require('../deployment-check/node_modules/pyodide');
  assert.equal(call('/api/journal').value.length,1);
  const snapshot=call('/api/state').state;assert.ok(snapshot.includes('Local WASM test'));
  py.FS.writeFile('/workspace/browser-state.json',snapshot);
+ assert.equal(call('/api/state').value.history.length,1);
+ const practiceHeaders={'x-practice-id':'wasm-round-phase-1','x-practice-owner':state.id};
+ assert.equal(call('/api/prop-practice',{model:'standard',balance:5000},'POST',practiceHeaders).status,200);
+ const practiceTrade=call('/api/trades/open',{symbol:'XAUUSD',type:'SELL',entry:2650,lots:.1},'POST',practiceHeaders).value;
+ call('/api/trades/close',{id:practiceTrade.id,exit:2640},'POST',practiceHeaders);
+ assert.equal(call('/api/state',null,'GET',practiceHeaders).value.balance,5100);
+ assert.equal(call('/api/state').value.balance,10200,'practice does not change the normal WASM ledger');
  assert.equal(call('/api/state').value.history.length,1);
  const signup=call('/api/auth/signup',{email:'browser-test@example.invalid',password:'test-password',name:'Browser test'});assert.equal(signup.status,200);
  assert.equal(call('/api/auth/login',{email:'browser-test@example.invalid',password:'test-password'}).status,200);

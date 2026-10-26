@@ -10,10 +10,14 @@ const Router = {
     "ai-coach": { title: "AI Coach", mod: () => PageAICoach },
     "backtesting": { title: "Backtesting", mod: () => PageBacktesting },
     "prop-firm-session": { title: "Prop Firm Session", mod: () => window.PagePropFirmSession },
+    "prop-chart": { title: "Prop Practice Chart", mod: () => window.PagePropChart },
+    "prop-performance": { title: "Prop Performance", mod: () => window.PagePropPerformance },
+    "prop-trade-analysis": { title: "Prop Trade Analysis", mod: () => window.PagePropTradeAnalysis },
+    "prop-ai-coach": { title: "Prop AI Coach", mod: () => window.PagePropAICoach },
     "tradingview": { title: "TradingView", mod: () => PageTradingView },
     "subscription": { title: "Plans & Billing", mod: () => PageSubscription },
   },
-  pageFeatures: { dashboard: "dashboard", trades: "trades", journal: "trades", performance: ["analysis", "performance"], "trade-analysis": "tradeAnalysis", "ai-coach": "aiCoach", backtesting: "backtesting", "prop-firm-session": "backtesting", tradingview: "tradingView" },
+  pageFeatures: { dashboard: "dashboard", trades: "trades", journal: "trades", performance: ["analysis", "performance"], "trade-analysis": "tradeAnalysis", "ai-coach": "aiCoach", backtesting: "backtesting", "prop-firm-session": "backtesting", "prop-chart": "backtesting", "prop-performance": ["backtesting", "performance"], "prop-trade-analysis": ["backtesting", "tradeAnalysis"], "prop-ai-coach": ["backtesting", "aiCoach"], tradingview: "tradingView" },
   current: "dashboard",
 
   updatePlanNavigation() {
@@ -129,6 +133,10 @@ const Router = {
       document.querySelector('.nav-sub[data-group="analysis"]')?.classList.add("open");
     }
 
+    if (page.startsWith('prop-')) {
+      document.querySelector('.nav-group-toggle[data-group="prop-analysis"]')?.classList.add('open');
+      document.querySelector('.nav-sub[data-group="prop-analysis"]')?.classList.add('open');
+    }
     const meta = this.pages[page];
     document.getElementById("pageTitle").textContent = meta.title;
 

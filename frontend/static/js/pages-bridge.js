@@ -31,7 +31,7 @@
     const result=await new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>{pending.delete(id);reject(Error('Workspace startup or request timed out. Check your connection and retry.'));},180000);
       pending.set(id,{resolve,reject,timer});
-      worker.postMessage({id,path,method:options.method||'GET',body:options.body||null,contentType:new Headers(options.headers).get('Content-Type')||'application/json'});
+      worker.postMessage({id,path,method:options.method||'GET',body:options.body||null,contentType:new Headers(options.headers).get('Content-Type')||'application/json',headers:Object.fromEntries(new Headers(options.headers))});
     });
     if(options.signal?.aborted)throw new DOMException('Aborted','AbortError');
     if(path==='/browser/backup' && result.text){

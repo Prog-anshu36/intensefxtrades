@@ -76,6 +76,7 @@ const PageBacktesting = {
     fontSize: 13,
     fontWeight: "400",
   },
+  drawingOpacityOverride: null,
   magnetMode: true,
   pendingDrawing: null,
   dataSource: "loading",
@@ -96,13 +97,17 @@ const PageBacktesting = {
   _canvasW: 0,
   _canvasH: 0,
 
+  get store() { return this._store || Store; },
+  get api() { return this._api || API; },
+  availableSymbols() { return this.allowedSymbols || Object.keys(MarketData.SYMBOLS); },
+
   chartStorage() {
     return this._chartAccountStorage || localStorage;
   },
 
   init() {
     this._initialized = true;
-    const settings = Store.state.settings;
+    const settings = this.store.state.settings;
     this.symbol = settings.symbol || "BTCUSD";
     this.timeframe = settings.timeframe || "1m";
     this.speed = settings.replay_speed || this.speed;
@@ -301,7 +306,7 @@ const PageBacktesting = {
 
   render() {
     if (!this._initialized) this.init();
-    const s = Store.state;
+    const s = this.store.state;
     const current = this.candles[this.idx];
     const prev = this.candles[Math.max(0, this.idx - 1)] || current;
     const meta = MarketData.getMeta(this.symbol);
@@ -316,7 +321,7 @@ const PageBacktesting = {
           <div class="tv-command-group tv-symbol-command">
             <span class="tv-search-glyph" aria-hidden="true">⌕</span>
             <select id="symbolSelect" class="tv-symbol-select" title="Select symbol">
-            ${Object.keys(MarketData.SYMBOLS).map((sym) => `<option value="${sym}" ${sym === this.symbol ? "selected" : ""}>${sym}</option>`).join("")}
+            ${this.availableSymbols().map((sym) => `<option value="${sym}" ${sym === this.symbol ? "selected" : ""}>${sym}</option>`).join("")}
             </select>
             <button class="tv-icon-action" id="addSymbolBtn" title="Choose another instrument" aria-label="Choose another instrument">+</button>
           </div>
@@ -396,6 +401,7 @@ const PageBacktesting = {
               ${["1D", "5D", "1M", "3M", "6M", "YTD", "1Y", "3Y", "All"].map((r) => `<button data-range-preset="${r}">${r}</button>`).join("")}
               <span class="tv-clock">${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
             </div>
+            <div class="tv-bottom-resize-handle" role="separator" aria-orientation="horizontal" aria-label="Resize open and closed trades panel" tabindex="0" title="Drag up or down to resize the trades panel"></div>
             <div class="bt-bottom-tabs">
               <div class="bt-tabs-head">
                 ${["open", "closed"].map((t) => `<button class="bt-tab-btn ${this.bottomTab === t ? "active" : ""}" data-bottomtab="${t}">${t === "open" ? `Open (${openTrades.length})` : `Closed (${s.history.filter((h) => h.symbol === this.symbol).length})`}</button>`).join("")}
@@ -575,41 +581,12 @@ const PageBacktesting = {
     const priceText = current ? Fmt.price(current.close, meta.decimals) : "--";
     const tradedSymbols = [...new Set([
       symbol,
-      ...Store.state.active_trades.map((t) => t.symbol),
-      ...Store.state.history.slice(-12).map((t) => t.symbol),
+      ...this.store.state.active_trades.map((t) => t.symbol),
+      ...this.store.state.history.slice(-12).map((t) => t.symbol),
     ])].filter(Boolean);
     const scope = tradedSymbols.slice(0, 4).join(", ");
-    const templates = {
-      fx: [
-        ["FX Desk", `${name} traders watch dollar momentum around ${priceText}`],
-        ["Rates", "Treasury yield repricing keeps major currency pairs active"],
-        ["Macro", "Upcoming inflation and jobs data remain key drivers for FX risk"],
-        ["Liquidity", "London and New York overlap expected to carry the strongest volume"],
-        ["Risk", `${symbol} setups remain sensitive to central-bank commentary`],
-      ],
-      metal: [
-        ["Metals Desk", `${name} holds focus as spot price trades near ${priceText}`],
-        ["Macro", "Gold and silver remain sensitive to dollar and real-yield shifts"],
-        ["Risk", "Safe-haven flows stay important around high-impact data releases"],
-        ["Liquidity", "New York metals session expected to drive intraday volatility"],
-        ["Commodities", `${symbol} traders monitor support and resistance around recent ranges`],
-      ],
-      crypto: [
-        ["Crypto Desk", `${name} volatility stays elevated near ${priceText}`],
-        ["Flows", "ETF and exchange-flow headlines remain key for crypto direction"],
-        ["Risk", "Broad risk sentiment continues to affect major digital assets"],
-        ["Liquidity", "US session volume expected to set the next directional impulse"],
-        ["Derivatives", `${symbol} traders watch liquidation zones around recent highs and lows`],
-      ],
-    };
-    const rows = templates[kind] || templates.fx;
-    return rows.map(([source, title], index) => ({
-      source,
-      title,
-      time: index === 0 ? "Now" : `${index + 1}h`,
-      impact: index < 2 ? "High" : index < 4 ? "Medium" : "Low",
-      scope: scope || symbol,
-    }));
+    // No news provider is configured; do not generate current-looking headlines.
+    return [{ source: "NOT CONNECTED", title: "Market news is unavailable. No news provider is configured for this workspace.", time: "", impact: "Unavailable", scope: scope || symbol }];
   },
 
   assetClass() {
@@ -894,7 +871,7 @@ const PageBacktesting = {
   },
 
   renderWatchlist() {
-    const groups = [
+    const groups = this.allowedSymbols ? [["PROP PRACTICE", this.allowedSymbols]] : [
       ["METALS", ["GOLD", "SILVER", "XAUUSD"]],
       ["FOREX", ["EURUSD", "GBPUSD", "USDJPY"]],
       ["CRYPTO", ["BTCUSD", "ETHUSD"]],
@@ -1027,7 +1004,7 @@ const PageBacktesting = {
     const estLoss = this.slEnabled ? this.slPips * pipVal : 0;
     const estProfit = this.tpEnabled ? this.tpPips * pipVal : 0;
     const rr = this.slEnabled && this.slPips > 0 && this.tpEnabled ? (this.tpPips / this.slPips) : null;
-    const riskPct = Store.state.balance > 0 ? (estLoss / Store.state.balance) * 100 : 0;
+    const riskPct = this.store.state.balance > 0 ? (estLoss / this.store.state.balance) * 100 : 0;
     const local = MarketData.isLocal(this.symbol);
     const paired = current.bid && current.ask;
     const spreadPips = local ? (paired ? (current.ask.close - current.bid.close) / meta.pip : 0) : +(meta.pip * 1.4).toPrecision(2);
@@ -1052,7 +1029,7 @@ const PageBacktesting = {
       <div class="tv-key-stats">
         <span>Source</span><b>${this.dataLabel()}</b>
         <span>Volume</span><b>${this.shortVolume(current?.volume || 0)}</b>
-        <span>Open positions</span><b>${Store.state.active_trades.filter((t) => t.symbol === this.symbol).length}</b>
+        <span>Open positions</span><b>${this.store.state.active_trades.filter((t) => t.symbol === this.symbol).length}</b>
         <span>Loaded candles</span><b>${this.candles.length}</b>
       </div>
     </div>`;
@@ -1404,7 +1381,7 @@ const PageBacktesting = {
     const progressMax = Math.max(0, this.candles.length - 1);
     const progressPct = progressMax > 0 ? Math.round((this.idx / progressMax) * 100) : 0;
     const session = this.currentSessionStats();
-    const openCount = Store.state.active_trades.filter((t) => t.symbol === this.symbol).length;
+    const openCount = this.store.state.active_trades.filter((t) => t.symbol === this.symbol).length;
     return `<div class="tv-fullscreen-replay" id="fullscreenReplayDock">
       <button class="replay-btn" id="fsExitFullscreen" title="Exit fullscreen">Exit fullscreen</button>
       <span class="tv-fullscreen-replay-state">${this.playing ? "Replay running" : this.replayActive ? "Replay ready" : "Live mode"}${session ? ` · ${this.escapeHtml(session.shortName)}` : ""}</span>
@@ -1420,6 +1397,18 @@ const PageBacktesting = {
       <button class="replay-btn" id="fsReplayLive" title="Exit replay and go live">Live</button>
       ${openCount ? `<button class="replay-btn fs-close-all-btn" id="fsCloseAllPositions" title="Close all open positions on ${this.symbol}">Close All (${openCount})</button>` : ""}
       <span class="tv-fullscreen-replay-meta">${progressPct}% · Hidden ${hiddenCount.toLocaleString()}</span>
+    </div>`;
+  },
+
+  renderFullscreenSessionNavigation() {
+    const sessionType = this.selectedSessionType();
+    const definition = this.sessionEngine?.getConfig?.().definitions?.[sessionType];
+    const short = this.sessionShortLabel(definition);
+    const name = definition?.name || "Session";
+    return `<div class="tv-fullscreen-session-nav" aria-label="${this.escapeHtml(name)} navigation">
+      <button type="button" class="replay-btn" data-fullscreen-session-nav="previous" title="Go to the previous ${this.escapeHtml(name)}">Previous ${this.escapeHtml(short)}</button>
+      <button type="button" class="replay-btn active" data-fullscreen-session-nav="go" title="Go to the selected ${this.escapeHtml(name)} date">GO TO ${this.escapeHtml(short)}</button>
+      <button type="button" class="replay-btn" data-fullscreen-session-nav="next" title="Go to the next ${this.escapeHtml(name)}">Next ${this.escapeHtml(short)}</button>
     </div>`;
   },
 
@@ -1555,13 +1544,13 @@ const PageBacktesting = {
   },
 
   persistReplayState(options = {}) {
-    if (window.ChartAccountState && !ChartAccountState.isCurrent(this)) return;
+    if (!this.practiceController && window.ChartAccountState && !ChartAccountState.isCurrent(this)) return;
     const delay = options.immediate ? 0 : (options.delay ?? 180);
     if (this._persistReplayTimer) clearTimeout(this._persistReplayTimer);
     const run = () => {
       this._persistReplayTimer = null;
       this.saveReplayStorage();
-      API.updateSettings(this.replaySettingsPayload()).catch(() => {});
+      this.api.updateSettings(this.replaySettingsPayload()).catch(() => {});
     };
     if (delay <= 0) run();
     else this._persistReplayTimer = setTimeout(run, delay);
@@ -1642,7 +1631,7 @@ const PageBacktesting = {
     this.syncReplayBuffers();
     this.sanitizeChartCamera();
     this.syncMouseEngineCamera();
-    API.updateSettings(this.replaySettingsPayload()).catch(() => {});
+    this.api.updateSettings(this.replaySettingsPayload()).catch(() => {});
     this.rerender();
   },
 
@@ -2503,7 +2492,7 @@ const PageBacktesting = {
 
   drawTradeLevels(ctx, yFor, chartWidth, meta) {
     this._tradeLevelHits = [];
-    Store.state.active_trades.filter((t) => t.symbol === this.symbol).forEach((t) => {
+    this.store.state.active_trades.filter((t) => t.symbol === this.symbol).forEach((t) => {
       const draft = this.tradeProtectionDraft?.id === t.id ? this.tradeProtectionDraft : null;
       const levels = draft || t;
       const x = Math.max(8, chartWidth - 270);
@@ -2617,15 +2606,14 @@ const PageBacktesting = {
 
   async confirmTradeProtection() {
     const draft=this.tradeProtectionDraft;
-    const trade=Store.state.active_trades.find(t=>t.id===draft?.id);
+    const trade=this.store.state.active_trades.find(t=>t.id===draft?.id);
     const candle=this.candles[this.idx];
     if(!draft || draft.saving || !trade || !candle)return;
     draft.saving=true;draft.error=null;this.scheduleDraw();
     try {
-      const response=await fetch('/api/trades/protection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:Store.state.id,id:trade.id,sl:draft.sl,tp:draft.tp,mark:candle[trade.type==='BUY'?'bid':'ask']?.close ?? candle.close})});
-      const result=await response.json();
-      if(!response.ok)throw new Error(result.error || 'Could not save SL/TP.');
-      await Store.refresh({fresh:true});this.tradeProtectionDraft=null;this.syncOrderPrices();
+      const result=await this.api.updateTradeProtection({account_id:this.store.state.id,id:trade.id,sl:draft.sl,tp:draft.tp,mark:candle[trade.type==='BUY'?'bid':'ask']?.close ?? candle.close});
+      if(result?.error)throw new Error(result.error || 'Could not save SL/TP.');
+      await this.store.refresh({fresh:true});this.tradeProtectionDraft=null;this.syncOrderPrices();
     } catch(error){draft.error=error.message;} finally{draft.saving=false;this.scheduleDraw();}
   },
 
@@ -4247,6 +4235,7 @@ const PageBacktesting = {
 
   afterRender(container) {
     this.container = container;
+    this.bindBottomPanelResize(container);
     container.insertAdjacentHTML('beforeend', this.renderDrawingSettingsDialog());
     container.insertAdjacentHTML('beforeend', this.renderDrawingHelp());
     if(this.drawingObjectsOpen && !this.drawingSettingsOpen){ this.drawingManagerHidden=false;container.querySelector('#chartCard')?.insertAdjacentHTML('beforeend',this.renderDrawingManager()); }
@@ -4368,7 +4357,7 @@ const PageBacktesting = {
       container.querySelector(".tv-order-card button, .tv-order-card input")?.focus?.();
     });
     container.querySelector("#propFirmChartBadge")?.addEventListener("click", () => Router.go("prop-firm-session"));
-    window.PropFirmSession?.syncChartBadge?.();
+    (this.practiceController || window.PropFirmSession)?.syncChartBadge?.();
     container.querySelector("#goToBtn")?.addEventListener("click", () => {
       if (this.sessionPanelHidden) this.setSessionPanelHidden(false);
       requestAnimationFrame(() => container.querySelector(".tv-session-panel")?.scrollIntoView?.({ behavior: "smooth", block: "center" }));
@@ -4378,7 +4367,7 @@ const PageBacktesting = {
     container.querySelector("#saveChartBtn")?.addEventListener("click", async () => {
       this.saveDrawingStorage();
       this.persistReplayState({ immediate: true });
-      await API.updateSettings({ symbol: this.symbol, timeframe: this.timeframe, chart_visible_count: this.visibleCount, chart_view_end: this.viewEnd, chart_y_zoom: this.yZoom, chart_y_offset: this.yOffset, chart_auto_follow: this.autoFollow });
+      await this.api.updateSettings({ symbol: this.symbol, timeframe: this.timeframe, chart_visible_count: this.visibleCount, chart_view_end: this.viewEnd, chart_y_zoom: this.yZoom, chart_y_offset: this.yOffset, chart_auto_follow: this.autoFollow });
       toast("Chart workspace saved.", "success");
     });
     container.querySelector("#chartSettingsBtn")?.addEventListener("click", () => UI?.openModal?.("settingsModal"));
@@ -4497,6 +4486,64 @@ const PageBacktesting = {
     document.addEventListener("click", this._railOutsideHandler);
     this.bindDrawingManager(container);
     this.bindCursorModeMenu(container);
+  },
+
+  bindBottomPanelResize(container) {
+    const area = container.querySelector(".tv-chart-area");
+    const handle = container.querySelector(".tv-bottom-resize-handle");
+    const panel = container.querySelector(".bt-bottom-tabs");
+    if (!area || !handle || !panel) return;
+    const storageKey = "tfb_backtesting_bottom_panel_height";
+    const limits = () => ({ min: 88, max: Math.max(140, Math.round(window.innerHeight * 0.52)) });
+    const setHeight = (value, persist = false) => {
+      const { min, max } = limits();
+      const height = Math.max(min, Math.min(max, Math.round(value)));
+      area.style.setProperty("--bt-bottom-panel-height", `${height}px`);
+      handle.setAttribute("aria-valuenow", String(height));
+      if (persist) {
+        try { this.chartStorage().setItem(storageKey, String(height)); } catch (_) { /* storage may be disabled */ }
+      }
+      this.scheduleDraw();
+    };
+    try {
+      const saved = Number(this.chartStorage().getItem(storageKey));
+      if (Number.isFinite(saved) && saved > 0) setHeight(saved);
+      else setHeight(145);
+    } catch (_) { setHeight(145); }
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      handle.setPointerCapture?.(event.pointerId);
+      const startY = event.clientY;
+      const startHeight = panel.getBoundingClientRect().height;
+      document.body.classList.add("resizing-chart-bottom-panel");
+      const move = (moveEvent) => {
+        if (moveEvent.pointerId !== event.pointerId || !handle.hasPointerCapture?.(event.pointerId)) return;
+        setHeight(startHeight + startY - moveEvent.clientY);
+        window.dispatchEvent(new Event("tfb:chart-resize"));
+      };
+      const finish = (endEvent) => {
+        if (endEvent.pointerId !== event.pointerId || !handle.hasPointerCapture?.(event.pointerId)) return;
+        handle.releasePointerCapture?.(event.pointerId);
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", finish);
+        handle.removeEventListener("pointercancel", finish);
+        document.body.classList.remove("resizing-chart-bottom-panel");
+        setHeight(panel.getBoundingClientRect().height, true);
+        window.dispatchEvent(new Event("resize"));
+        window.dispatchEvent(new Event("tfb:chart-resize"));
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", finish);
+      handle.addEventListener("pointercancel", finish);
+    });
+    handle.addEventListener("keydown", (event) => {
+      if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
+      event.preventDefault();
+      const delta = event.key === "ArrowUp" ? 16 : -16;
+      setHeight(panel.getBoundingClientRect().height + delta, true);
+      window.dispatchEvent(new Event("tfb:chart-resize"));
+    });
   },
 
   bindDrawingManager(container) {
@@ -5049,7 +5096,7 @@ const PageBacktesting = {
         if(this.tradeProtectionDraft?.saving)return;
         if(tradeHit.action==='discard'){this.tradeProtectionDraft=null;this.scheduleDraw();return;}
         if(tradeHit.action==='confirm'){this.confirmTradeProtection();return;}
-        const trade=Store.state.active_trades.find(t=>t.id===tradeHit.id);
+        const trade=this.store.state.active_trades.find(t=>t.id===tradeHit.id);
         if(trade){
           if(this.playing)this.stopPlay();
           if(this.tradeProtectionDraft?.id!==trade.id)this.tradeProtectionDraft={id:trade.id,sl:trade.sl ?? null,tp:trade.tp ?? null};
@@ -5361,7 +5408,7 @@ const PageBacktesting = {
       if (!document.querySelector(".tv-shell")) return;
       if (typeof UI !== "undefined" && UI.getSetting?.("keyboardShortcuts") === false) return;
       const tag = (e.target.tagName || "").toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (e.target.isContentEditable || tag === "input" || tag === "textarea" || tag === "select") return;
       if (e.code === "Space") {
         e.preventDefault();
         if (!e.repeat) {
@@ -5370,7 +5417,7 @@ const PageBacktesting = {
         }
         return;
       }
-      if (e.ctrlKey && e.key.toLowerCase() === "z") {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         const handled = e.shiftKey ? this.redoDrawingAction() : this.undoDrawingAction();
         if (!handled) {
@@ -5512,7 +5559,7 @@ const PageBacktesting = {
       if (!document.querySelector(".tv-shell")) return;
       if (e.code !== "Space") return;
       const tag = (e.target.tagName || "").toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (e.target.isContentEditable || tag === "input" || tag === "textarea" || tag === "select") return;
       e.preventDefault();
       const usedForPan = !!this._spacePanUsed;
       this._spacePan = false;
@@ -5654,7 +5701,7 @@ const PageBacktesting = {
     this.rerender();
     // Loading must not wait for a settings write, or remain blank if it fails.
     const loading = this.loadRealHistory();
-    API.updateSettings({ timeframe: newTf, ...this.replaySettingsPayload() }).catch(error => console.warn('Timeframe preference could not be saved', error));
+    this.api.updateSettings({ timeframe: newTf, ...this.replaySettingsPayload() }).catch(error => console.warn('Timeframe preference could not be saved', error));
     await loading;
   },
 
@@ -5675,7 +5722,7 @@ const PageBacktesting = {
     this.autoFollow = true;
     this.yOffset = 0;
     this.syncMouseEngineCamera();
-    await API.updateSettings({ symbol: this.symbol, ...this.replaySettingsPayload() });
+    await this.api.updateSettings({ symbol: this.symbol, ...this.replaySettingsPayload() });
     if (accountScope !== this._chartAccountScope) return;
     this.rerender();
     this.loadRealHistory();
@@ -6260,7 +6307,7 @@ const PageBacktesting = {
     this.yOffset = 0;
     this.syncMouseEngineCamera();
     this.tool = "scissors";
-    API.updateSettings(this.replaySettingsPayload()).catch(() => {});
+    this.api.updateSettings(this.replaySettingsPayload()).catch(() => {});
     this.emitReplayEvent("ReplayReset", { index: this.idx });
     this.saveReplayStorage();
     this.rerender();
@@ -6287,7 +6334,7 @@ const PageBacktesting = {
     this.syncReplayBuffers();
     if (this.autoFollow) { this.viewEnd = this.followViewEnd(); this.syncMouseEngineCamera(); }
     await this.evaluateCandle();
-    await API.updateSettings(this.replaySettingsPayload());
+    await this.api.updateSettings(this.replaySettingsPayload());
     this.updateReplayChrome();
     this.emitReplayEvent("ReplayFinished", { index: this.idx });
     this.saveReplayStorage();
@@ -6306,7 +6353,7 @@ const PageBacktesting = {
     this.syncReplayTimestamp();
     this.syncReplayBuffers();
     if (this.autoFollow) { this.viewEnd = this.followViewEnd(); this.syncMouseEngineCamera(); }
-    API.updateSettings(this.replaySettingsPayload()).catch(() => {});
+    this.api.updateSettings(this.replaySettingsPayload()).catch(() => {});
     this.updateReplayChrome();
     this.emitReplayEvent("ReplayJumped", { index: this.idx, source: "start" });
     this.saveReplayStorage();
@@ -6335,29 +6382,29 @@ const PageBacktesting = {
   },
 
   async evaluateCandle() {
-    if (this._evaluatingCandle || ![...Store.state.active_trades, ...(Store.state.pending_orders || [])].some(t => t.symbol === this.symbol)) return;
+    if (this._evaluatingCandle || ![...this.store.state.active_trades, ...(this.store.state.pending_orders || [])].some(t => t.symbol === this.symbol)) return;
     const c = this.candles[this.idx];
     if (!c) return;
     const accountScope = this._chartAccountScope;
     this._evaluatingCandle = true;
     try {
-      const result = await API.updateFloating({ [this.symbol]: { ...c, closed_time: c.time + this.candleDuration() } });
+      const result = await this.api.updateFloating({ [this.symbol]: { ...c, closed_time: c.time + this.candleDuration() } });
       if (accountScope !== this._chartAccountScope) return;
       if (result.closed?.length) {
         result.closed.forEach((t) => toast(`${t.symbol} closed ${t.reason}: ${Fmt.money(t.pnl)}`, t.pnl > 0 ? "success" : "error"));
         if (typeof UI !== "undefined" && UI.getSetting?.("autoPauseOnTrade")) this.stopPlay();
       }
-      await Store.refresh({fresh:true});
-      const propResult = window.PropFirmSession?.onMarketCandle?.(c.time + this.candleDuration(), Store.state);
+      await this.store.refresh({fresh:true});
+      const propResult = (this.practiceController || window.PropFirmSession)?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
       if (propResult?.failed && propResult.liquidate?.length) {
         const meta = MarketData.getMeta(this.symbol);
-        await Promise.all(propResult.liquidate.map((trade) => API.closeTrade({
+        await Promise.all(propResult.liquidate.map((trade) => this.api.closeTrade({
           id: trade.id,
           exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close,
           reason: "PROP_RULE_BREACH",
           closed_at: new Date(c.time + this.candleDuration()).toISOString(),
         })));
-        await Store.refresh({fresh:true});
+        await this.store.refresh({fresh:true});
         toast(`Practice round failed: ${propResult.reason || "a loss limit was breached"}. Positions on ${meta.name || this.symbol} were closed.`, "error");
       }
     } finally {
@@ -6448,7 +6495,7 @@ const PageBacktesting = {
     if (MarketData.isLocal(this.symbol) && (this.dataSource !== "local-csv" || this._historyError)) return;
     const c = this.candles[this.idx];
     if (!c) return;
-    const practiceCheck = window.PropFirmSession?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    const practiceCheck = (this.practiceController || window.PropFirmSession)?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
     if (practiceCheck?.attempt && this.orderTab !== "Market") { toast("Prop Firm Session scoring currently supports market orders from the replay chart. Switch the order type to Market.", "info"); return; }
     const meta = MarketData.getMeta(this.symbol);
@@ -6466,14 +6513,14 @@ const PageBacktesting = {
     try {
     let result;
     if (this.orderTab === "Market") {
-      result = await API.openTrade({ symbol: this.symbol, type, entry, lots, sl, tp, opened_at: new Date(c.time + this.candleDuration()).toISOString() });
+      result = await this.api.openTrade({ symbol: this.symbol, type, entry, lots, sl, tp, opened_at: new Date(c.time + this.candleDuration()).toISOString() });
     } else {
-      result = await API.createPendingOrder({ symbol: this.symbol, type, order_type: this.orderTab.toLowerCase(), entry, lots, sl, tp, created_at: new Date(c.time + this.candleDuration()).toISOString() });
+      result = await this.api.createPendingOrder({ symbol: this.symbol, type, order_type: this.orderTab.toLowerCase(), entry, lots, sl, tp, created_at: new Date(c.time + this.candleDuration()).toISOString() });
     }
     if (result?.error) throw new Error(result.error);
     this.orderDraft = null;
-    await Store.refresh({fresh:true});
-    window.PropFirmSession?.onMarketCandle?.(c.time + this.candleDuration(), Store.state);
+    await this.store.refresh({fresh:true});
+    (this.practiceController || window.PropFirmSession)?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
     toast(`${this.orderTab} ${type} ${this.lots} ${this.symbol} @ ${Fmt.price(entry, meta.decimals)}`, "success");
     } catch (error) {
       if (draft) draft.error = 'Order could not be placed. Please retry.';
@@ -6504,37 +6551,37 @@ const PageBacktesting = {
     });
     const time = this.container?.querySelector(".tv-order-card .tv-panel-head span");
     if (time) time.textContent = candle ? Fmt.dateTime(candle.date) : "";
-    const trades = Store.state.active_trades.filter(t => t.symbol === this.symbol);
+    const trades = this.store.state.active_trades.filter(t => t.symbol === this.symbol);
     const body = this.container?.querySelector(".bt-tabs-body");
-    if (body) body.innerHTML = this.bottomTab === "open" ? this.renderOpenTable(trades) : this.renderClosedTable(Store.state.history.filter(t => t.symbol === this.symbol));
+    if (body) body.innerHTML = this.bottomTab === "open" ? this.renderOpenTable(trades) : this.renderClosedTable(this.store.state.history.filter(t => t.symbol === this.symbol));
     const openTab = this.container?.querySelector('[data-bottomtab="open"]');
     if (openTab) openTab.textContent = `Open (${trades.length})`;
     const closedTab = this.container?.querySelector('[data-bottomtab="closed"]');
-    if (closedTab) closedTab.textContent = `Closed (${Store.state.history.filter(t => t.symbol === this.symbol).length})`;
+    if (closedTab) closedTab.textContent = `Closed (${this.store.state.history.filter(t => t.symbol === this.symbol).length})`;
   },
 
   async closeActive() {
-    const trade = Store.state.active_trades.find((t) => t.symbol === this.symbol);
+    const trade = this.store.state.active_trades.find((t) => t.symbol === this.symbol);
     const c = this.candles[this.idx];
     if (!trade || !c) return;
-    const practiceCheck = window.PropFirmSession?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    const practiceCheck = (this.practiceController || window.PropFirmSession)?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
-    await API.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL", closed_at: new Date(c.time + this.candleDuration()).toISOString() });
-    await Store.refresh({fresh:true});
-    window.PropFirmSession?.onMarketCandle?.(c.time + this.candleDuration(), Store.state);
+    await this.api.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL", closed_at: new Date(c.time + this.candleDuration()).toISOString() });
+    await this.store.refresh({fresh:true});
+    (this.practiceController || window.PropFirmSession)?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
     toast("Position closed", "info");
     this.rerender();
   },
 
   async closeAllPositions() {
     const c = this.candles[this.idx];
-    const trades = Store.state.active_trades.filter((t) => t.symbol === this.symbol);
+    const trades = this.store.state.active_trades.filter((t) => t.symbol === this.symbol);
     if (!c || !trades.length) return;
-    const practiceCheck = window.PropFirmSession?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    const practiceCheck = (this.practiceController || window.PropFirmSession)?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
-    await Promise.all(trades.map((trade) => API.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL_CLOSE_ALL", closed_at: new Date(c.time + this.candleDuration()).toISOString() })));
-    await Store.refresh({fresh:true});
-    window.PropFirmSession?.onMarketCandle?.(c.time + this.candleDuration(), Store.state);
+    await Promise.all(trades.map((trade) => this.api.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL_CLOSE_ALL", closed_at: new Date(c.time + this.candleDuration()).toISOString() })));
+    await this.store.refresh({fresh:true});
+    (this.practiceController || window.PropFirmSession)?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
     toast(`${trades.length} position${trades.length === 1 ? "" : "s"} closed`, "info");
     this.rerender();
   },
@@ -6584,8 +6631,25 @@ const PageBacktesting = {
     this._interactionRaf = null;
     if (this._drawingRaf) cancelAnimationFrame(this._drawingRaf);
     this._drawingRaf = null;
+    this.container = null;
   },
 };
 
 window.PageBacktesting = PageBacktesting;
 
+
+window.createBacktestingWorkspace = (() => {
+  const template = Object.getOwnPropertyDescriptors(PageBacktesting);
+  return ({ store, api, storage, scope, practiceController, allowedSymbols } = {}) => {
+    const chart = {};
+    for (const [key, original] of Object.entries(template)) {
+      const descriptor = { ...original };
+      if ('value' in descriptor && typeof descriptor.value !== 'function') descriptor.value = structuredClone(descriptor.value);
+      Object.defineProperty(chart, key, { ...descriptor });
+    }
+    chart._store = store; chart._api = api;
+    chart._chartAccountStorage = storage; chart._chartAccountScope = scope;
+    chart.practiceController = practiceController; chart.allowedSymbols = allowedSymbols;
+    return chart;
+  };
+})();

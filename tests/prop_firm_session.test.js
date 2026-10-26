@@ -47,6 +47,7 @@ assert.equal(page.advance(attempt.id).ok, true);
 assert.equal(attempt.phase, 2);
 assert.equal(attempt.phaseBaselineKeys.length, 3, 'phase 1 trades are excluded from phase 2 scoring');
 assert.equal(page.summary(attempt).pnl, 0);
+assert.equal(page.currentMarketTime, null, 'new phase starts with a fresh market-time baseline');
 addClosed(4, day(4), 100);
 addClosed(5, day(5), 100);
 addClosed(6, day(6), 100);
@@ -86,3 +87,4 @@ page.evaluate(pro);
 assert.equal(pro.status, 'expired', 'phase deadline expires after fourteen calendar days');
 
 console.log('prop_firm_session.test.js passed: rule profiles, phase targets, minimum trading days, phase isolation, per-account persistence, floating-loss breach, expiry');
+

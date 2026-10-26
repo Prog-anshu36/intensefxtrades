@@ -1,13 +1,14 @@
 /* page_trade_analysis.js - Analysis > Trade Analysis page */
 
 const PageTradeAnalysis = {
+  get store() { return this._store || Store; },
   sortKey: "closed_at",
   sortDir: "desc",
   symbolFilter: "All",
   query: "",
 
   render() {
-    const s = Store.state;
+    const s = this.store.state;
     const baseRows = typeof TradeAnalyticsEngine !== "undefined" ? TradeAnalyticsEngine.normalizeTrades(s.history, s.journal || []) : [...s.history];
     const symbols = ["All", ...new Set(baseRows.map((t) => t.symbol))];
     let rows = [...baseRows];
@@ -22,7 +23,7 @@ const PageTradeAnalysis = {
       return this.sortDir === "asc" ? cmp : -cmp;
     });
 
-    const m = Store.metrics(rows);
+    const m = this.store.metrics(rows);
 
     return `
       <div class="section-title" style="font-size:19px;margin-bottom:2px">Trade Analysis</div>
