@@ -9,10 +9,11 @@ const Router = {
     "trade-analysis": { title: "Analysis", mod: () => PageTradeAnalysis },
     "ai-coach": { title: "AI Coach", mod: () => PageAICoach },
     "backtesting": { title: "Backtesting", mod: () => PageBacktesting },
+    "prop-firm-session": { title: "Prop Firm Session", mod: () => window.PagePropFirmSession },
     "tradingview": { title: "TradingView", mod: () => PageTradingView },
     "subscription": { title: "Plans & Billing", mod: () => PageSubscription },
   },
-  pageFeatures: { dashboard: "dashboard", trades: "trades", journal: "trades", performance: ["analysis", "performance"], "trade-analysis": "tradeAnalysis", "ai-coach": "aiCoach", backtesting: "backtesting", tradingview: "tradingView" },
+  pageFeatures: { dashboard: "dashboard", trades: "trades", journal: "trades", performance: ["analysis", "performance"], "trade-analysis": "tradeAnalysis", "ai-coach": "aiCoach", backtesting: "backtesting", "prop-firm-session": "backtesting", tradingview: "tradingView" },
   current: "dashboard",
 
   updatePlanNavigation() {
