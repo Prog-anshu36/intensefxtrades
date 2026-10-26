@@ -21,6 +21,9 @@ function setup(legacy = {}) {
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync('frontend/static/js/page_backtesting.js', 'utf8'), sandbox);
   const chart = sandbox.PageBacktesting;
+  // The production script exposes a global lexical binding; account isolation
+  // must still attach if the window property is absent in another build host.
+  delete sandbox.PageBacktesting;
   chart.updateDrawingHistoryControls = chart.syncDrawingEngineFromLegacy = chart.ensureDrawingNames = () => {};
   chart.normalizeDrawing = drawing => drawing;
   chart.syncReplayBuffers = chart.updateReplayChrome = () => {};
