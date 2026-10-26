@@ -32,6 +32,13 @@ function setup(){
   first.worker.emit({id,result:{status:200,headers:{},text:'{"balance":10000}'}});
   assert.equal((await (await request).json()).balance,10000);
   assert.equal(first.timers.size,0,'Completed startup leaves no timeout listeners behind');
+  const scoped=first.context.fetch('/api/state',{headers:{'X-Practice-Id':'round-phase-1','X-Practice-Owner':'demo'}});
+  await Promise.resolve();
+  const message=first.worker.messages.at(-1);
+  assert.equal(message.headers['x-practice-id'],'round-phase-1','practice identity reaches the browser Python transport');
+  assert.equal(message.headers['x-practice-owner'],'demo');
+  first.worker.emit({id:message.id,result:{status:200,headers:{},text:'{"balance":5000}'}});
+  assert.equal((await (await scoped).json()).balance,5000);
   const failed=setup();
   failed.worker.onerror({message:'Module download failed'});
   await assert.rejects(failed.context.fetch('/api/state'),/Module download failed/);

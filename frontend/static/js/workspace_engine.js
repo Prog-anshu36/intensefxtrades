@@ -33,7 +33,7 @@ const WorkspaceEngine = (() => {
   }
 
   function chartPage() {
-    return typeof PageBacktesting !== "undefined" ? PageBacktesting : null;
+    return window.PropPracticeWorkspace?.activeChart?.() || (typeof PageBacktesting !== "undefined" ? PageBacktesting : null);
   }
 
   function workspaceStorage() {
@@ -373,11 +373,11 @@ const WorkspaceEngine = (() => {
       ["dock-ai", "Dock AI Coach Right", () => dockPanel("ai")],
       ["dock-journal", "Dock Journal Right", () => dockPanel("journal")],
       ["dock-analytics", "Dock Analytics Right", () => dockPanel("analytics")],
-      ["start-replay", "Start / Pause Replay", () => PageBacktesting?.togglePlay?.()],
-      ["next-candle", "Next Candle", () => PageBacktesting?.step?.(1)],
-      ["place-buy", "Place Buy", () => PageBacktesting?.placeTrade?.("BUY")],
-      ["place-sell", "Place Sell", () => PageBacktesting?.placeTrade?.("SELL")],
-      ["reset-chart", "Reset Chart", () => PageBacktesting?.resetChartView?.()],
+      ["start-replay", "Start / Pause Replay", () => chartPage()?.togglePlay?.()],
+      ["next-candle", "Next Candle", () => chartPage()?.step?.(1)],
+      ["place-buy", "Place Buy", () => chartPage()?.placeTrade?.("BUY")],
+      ["place-sell", "Place Sell", () => chartPage()?.placeTrade?.("SELL")],
+      ["reset-chart", "Reset Chart", () => chartPage()?.resetChartView?.()],
       ["toggle-focus", "Toggle Focus Mode", () => toggleFocusMode()],
       ["chart-only", "Toggle Chart Only Mode", () => toggleChartOnly()],
       ["create-workspace", "Create Workspace", () => createWorkspace()],
@@ -430,7 +430,7 @@ const WorkspaceEngine = (() => {
     el.id = "desktopCommandPalette";
     el.className = "desktop-command-backdrop";
     el.innerHTML = `
-      <div class="desktop-command">
+      <div class="desktop-command" role="dialog" aria-modal="true" aria-label="Search workspace">
         <input id="desktopCommandInput" type="text" placeholder="Type a command, symbol, trade, journal note, or workspace...">
         <div id="desktopCommandResults"></div>
       </div>
@@ -438,7 +438,10 @@ const WorkspaceEngine = (() => {
     document.body.appendChild(el);
     const input = el.querySelector("#desktopCommandInput");
     const results = el.querySelector("#desktopCommandResults");
+    let selected = 0;
+    const highlight = () => { results.querySelectorAll("button").forEach((button, index) => { button.classList.toggle("command-selected", index === selected); }); results.querySelectorAll("button")[selected]?.scrollIntoView?.({ block: "nearest" }); };
     const render = () => {
+      selected = 0;
       const q = input.value.toLowerCase().trim();
       const commands = commandList().filter(([, label]) => !q || label.toLowerCase().includes(q));
       const workspaces = Object.values(state.workspaces)
@@ -455,13 +458,19 @@ const WorkspaceEngine = (() => {
         });
       });
     };
-    input.addEventListener("input", render);
+    input.addEventListener("input", () => { render(); highlight(); });
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") results.querySelector("button")?.click();
+      const buttons = results.querySelectorAll("button");
+      if (["ArrowDown", "ArrowUp"].includes(e.key)) {
+        e.preventDefault();
+        selected = buttons.length ? (selected + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length : 0;
+        highlight();
+      }
+      if (e.key === "Enter") { e.preventDefault(); buttons[selected]?.click(); }
       if (e.key === "Escape") closeCommandPalette();
     });
     el.addEventListener("click", (e) => { if (e.target === el) closeCommandPalette(); });
-    render();
+    render(); highlight();
     requestAnimationFrame(() => input.focus());
   }
 

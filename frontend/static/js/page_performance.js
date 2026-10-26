@@ -1,12 +1,13 @@
 /* page_performance.js - Analysis > Performance page */
 
 const PagePerformance = {
+  get store() { return this._store || Store; },
   period: "All Time",
   filter: "All Trades",
 
   render() {
     const history = this.filteredHistory();
-    const state = { ...Store.state, history };
+    const state = { ...this.store.state, history };
     const snap = TradeAnalyticsEngine.snapshot(state);
     const m = snap.performance;
     const r = snap.risk;
@@ -117,7 +118,7 @@ const PagePerformance = {
   },
 
   filteredHistory() {
-    let history = [...Store.state.history];
+    let history = [...this.store.state.history];
     const now = Date.now();
     const cutoffs = { "Today": 1, "7 Days": 7, "30 Days": 30, "3 Months": 90, "1 Year": 365, "All Time": null };
     const days = cutoffs[this.period];

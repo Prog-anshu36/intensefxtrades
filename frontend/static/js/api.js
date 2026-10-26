@@ -1,9 +1,33 @@
 /* api.js — thin wrapper around the Flask backend */
 const API = {
   base: "",
+  fetch(input, options) { return window.fetch(input, options); },
+  forPractice(id, owner) {
+    const client = Object.create(this);
+    client.fetch = (input, options = {}) => {
+      const headers = new Headers(options.headers);
+      headers.set('X-Practice-Id', id);
+      headers.set('X-Practice-Owner', owner);
+      return window.fetch(input, { ...options, headers });
+    };
+    return client;
+  },
+  async initializePractice(payload) {
+    const response = await this.fetch(`${this.base}/api/prop-practice`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Practice workspace could not be opened.');
+    return data;
+  },
+  async updateTradeProtection(payload) {
+    return this.fetch(`${this.base}/api/trades/protection`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+  },
 
   async signup(payload) {
-    const r = await fetch(`${this.base}/api/auth/signup`, {
+    const r = await this.fetch(`${this.base}/api/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -12,7 +36,7 @@ const API = {
   },
 
   async login(payload) {
-    const r = await fetch(`${this.base}/api/auth/login`, {
+    const r = await this.fetch(`${this.base}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -21,7 +45,7 @@ const API = {
   },
 
   async forgotPassword(email) {
-    const r = await fetch(`${this.base}/api/auth/forgot-password`, {
+    const r = await this.fetch(`${this.base}/api/auth/forgot-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -30,7 +54,7 @@ const API = {
   },
 
   async getState() {
-    const r = await fetch(`${this.base}/api/state`);
+    const r = await this.fetch(`${this.base}/api/state`);
     return r.json();
   },
 
@@ -39,7 +63,7 @@ const API = {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
-    const r = await fetch(`${this.base}/api/market/history?${params}`, { signal: controller.signal });
+    const r = await this.fetch(`${this.base}/api/market/history?${params}`, { signal: controller.signal });
     const payload = await r.json();
     if (!r.ok) throw new Error(payload.error || "Historical data could not be loaded.");
     return payload;
@@ -47,7 +71,7 @@ const API = {
   },
 
   async updateSettings(payload) {
-    const r = await fetch(`${this.base}/api/settings`, {
+    const r = await this.fetch(`${this.base}/api/settings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -56,7 +80,7 @@ const API = {
   },
 
   async createAccount(payload) {
-    const r = await fetch(`${this.base}/api/accounts`, {
+    const r = await this.fetch(`${this.base}/api/accounts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -65,7 +89,7 @@ const API = {
   },
 
   async archiveAccount(id) {
-    const r = await fetch(`${this.base}/api/accounts/archive`, {
+    const r = await this.fetch(`${this.base}/api/accounts/archive`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -74,7 +98,7 @@ const API = {
   },
 
   async restoreAccount(id) {
-    const r = await fetch(`${this.base}/api/accounts/restore`, {
+    const r = await this.fetch(`${this.base}/api/accounts/restore`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -83,7 +107,7 @@ const API = {
   },
 
   async deleteAccount(id) {
-    const r = await fetch(`${this.base}/api/accounts/delete`, {
+    const r = await this.fetch(`${this.base}/api/accounts/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -92,7 +116,7 @@ const API = {
   },
 
   async switchAccount(id) {
-    const r = await fetch(`${this.base}/api/accounts/switch`, {
+    const r = await this.fetch(`${this.base}/api/accounts/switch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -101,12 +125,12 @@ const API = {
   },
 
   async resetAccount() {
-    const r = await fetch(`${this.base}/api/accounts/reset`, { method: "POST" });
+    const r = await this.fetch(`${this.base}/api/accounts/reset`, { method: "POST" });
     return r.json();
   },
 
   async openTrade(payload) {
-    const r = await fetch(`${this.base}/api/trades/open`, {
+    const r = await this.fetch(`${this.base}/api/trades/open`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -115,7 +139,7 @@ const API = {
   },
 
   async createPendingOrder(payload) {
-    const r = await fetch(`${this.base}/api/trades/pending`, {
+    const r = await this.fetch(`${this.base}/api/trades/pending`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -123,8 +147,13 @@ const API = {
     return r.json();
   },
 
+  async cancelPendingOrders() {
+    const response = await this.fetch(`${this.base}/api/trades/pending/cancel-all`, { method: 'POST' });
+    return response.json();
+  },
+
   async closeTrade(payload) {
-    const r = await fetch(`${this.base}/api/trades/close`, {
+    const r = await this.fetch(`${this.base}/api/trades/close`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -133,7 +162,7 @@ const API = {
   },
 
   async updateFloating(ticks) {
-    const r = await fetch(`${this.base}/api/trades/update`, {
+    const r = await this.fetch(`${this.base}/api/trades/update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticks }),
@@ -142,12 +171,12 @@ const API = {
   },
 
   async getJournal() {
-    const r = await fetch(`${this.base}/api/journal`);
+    const r = await this.fetch(`${this.base}/api/journal`);
     return r.json();
   },
 
   async addJournal(payload) {
-    const r = await fetch(`${this.base}/api/journal`, {
+    const r = await this.fetch(`${this.base}/api/journal`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -156,12 +185,12 @@ const API = {
   },
 
   async deleteJournal(id) {
-    const r = await fetch(`${this.base}/api/journal/${id}`, { method: "DELETE" });
+    const r = await this.fetch(`${this.base}/api/journal/${id}`, { method: "DELETE" });
     return r.json();
   },
 
   async resetAll() {
-    const r = await fetch(`${this.base}/api/reset`, { method: "POST" });
+    const r = await this.fetch(`${this.base}/api/reset`, { method: "POST" });
     return r.json();
   },
 };

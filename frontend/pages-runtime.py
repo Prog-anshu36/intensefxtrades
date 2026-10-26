@@ -41,7 +41,8 @@ def dispatch(request_json):
         raise ValueError('Only local business API calls are accepted here.')
     response = client.open(path, method=request.get('method','GET'),
                            data=request.get('body'),
-                           content_type=request.get('contentType','application/json'))
+                           content_type=request.get('contentType','application/json'),
+                           headers={k:v for k,v in request.get('headers', {}).items() if k.lower() in ('x-practice-id', 'x-practice-owner')})
     state = None
     if os.path.exists(backend.DATA_FILE):
         with open(backend.DATA_FILE, encoding='utf-8') as stream: state = stream.read()
