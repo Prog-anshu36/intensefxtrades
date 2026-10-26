@@ -96,6 +96,10 @@ const PageBacktesting = {
   _canvasW: 0,
   _canvasH: 0,
 
+  chartStorage() {
+    return this._chartAccountStorage || localStorage;
+  },
+
   init() {
     this._initialized = true;
     const settings = Store.state.settings;
@@ -1260,23 +1264,23 @@ const PageBacktesting = {
 
   getFxnIndicator() {
     if(!this.fxnIndicator && window.FXNAsianSessionRange){
-      let config={};try{config=JSON.parse(localStorage.getItem('tfb_fxn_asian_range_v1') || '{}');}catch{}
+      let config={};try{config=JSON.parse(this.chartStorage().getItem('tfb_fxn_asian_range_v1') || '{}');}catch{}
       // Apply the requested visibility change to existing saved workspaces once.
       try{
-        if(localStorage.getItem('tfb_fxn_hide_yellow_levels_v2')!=='true'){
+        if(this.chartStorage().getItem('tfb_fxn_hide_yellow_levels_v2')!=='true'){
           config.showPreviousDayHiLo=false;
           config.showLastWeeklyHiLo=false;
           config.showAsianMidpoint=false;
           config.showRangeBreaks=false;
-          localStorage.setItem('tfb_fxn_asian_range_v1',JSON.stringify(config));
-          localStorage.setItem('tfb_fxn_hide_yellow_levels_v2','true');
+          this.chartStorage().setItem('tfb_fxn_asian_range_v1',JSON.stringify(config));
+          this.chartStorage().setItem('tfb_fxn_hide_yellow_levels_v2','true');
         }
       }catch{Object.assign(config,{showPreviousDayHiLo:false,showLastWeeklyHiLo:false,showAsianMidpoint:false,showRangeBreaks:false});}
       try {
-        if (localStorage.getItem('tfb_fxn_ist_boundary_v1') !== 'true') {
+        if (this.chartStorage().getItem('tfb_fxn_ist_boundary_v1') !== 'true') {
           config.dailyUtcOffset = 5.5;
-          localStorage.setItem('tfb_fxn_asian_range_v1', JSON.stringify(config));
-          localStorage.setItem('tfb_fxn_ist_boundary_v1','true');
+          this.chartStorage().setItem('tfb_fxn_asian_range_v1', JSON.stringify(config));
+          this.chartStorage().setItem('tfb_fxn_ist_boundary_v1','true');
         }
       } catch { config.dailyUtcOffset = 5.5; }
       this.fxnIndicator=new window.FXNAsianSessionRange(config);
@@ -1288,7 +1292,7 @@ const PageBacktesting = {
     const indicator=this.getFxnIndicator();if(!indicator)return;
     indicator.setConfig(patch);
     this.syncNewYorkSession();
-    try{localStorage.setItem('tfb_fxn_asian_range_v1',JSON.stringify(indicator.config));}catch{}
+    try{this.chartStorage().setItem('tfb_fxn_asian_range_v1',JSON.stringify(indicator.config));}catch{}
     this.rerender();
   },
 
@@ -1546,10 +1550,11 @@ const PageBacktesting = {
       autoFollow: this.autoFollow,
       bookmarks: this.replayBookmarks,
     };
-    localStorage.setItem("tfb_replay_engine_v1", JSON.stringify(payload));
+    this.chartStorage().setItem("tfb_replay_engine_v1", JSON.stringify(payload));
   },
 
   persistReplayState(options = {}) {
+    if (window.ChartAccountState && !ChartAccountState.isCurrent(this)) return;
     const delay = options.immediate ? 0 : (options.delay ?? 180);
     if (this._persistReplayTimer) clearTimeout(this._persistReplayTimer);
     const run = () => {
@@ -1563,7 +1568,7 @@ const PageBacktesting = {
 
   loadReplayStorage() {
     try {
-      const saved = JSON.parse(localStorage.getItem("tfb_replay_engine_v1") || "null");
+      const saved = JSON.parse(this.chartStorage().getItem("tfb_replay_engine_v1") || "null");
       if (!saved || saved.symbol !== this.symbol) return;
       this.speed = saved.speed || this.speed;
       this.replayBookmarks = Array.isArray(saved.bookmarks) ? saved.bookmarks : [];
@@ -2052,7 +2057,7 @@ const PageBacktesting = {
 
   loadSessionSettings() {
     try {
-      return JSON.parse(localStorage.getItem("tfb_session_settings_v1") || "null") || {};
+      return JSON.parse(this.chartStorage().getItem("tfb_session_settings_v1") || "null") || {};
     } catch {
       return {};
     }
@@ -2061,7 +2066,7 @@ const PageBacktesting = {
   saveSessionSettings() {
     try {
       const config = this.sessionEngine?.getConfig?.();
-      if (config) localStorage.setItem("tfb_session_settings_v1", JSON.stringify({ ...config, navigatorHidden: this.sessionPanelHidden }));
+      if (config) this.chartStorage().setItem("tfb_session_settings_v1", JSON.stringify({ ...config, navigatorHidden: this.sessionPanelHidden }));
     } catch { /* localStorage can be disabled */ }
   },
 
@@ -2373,7 +2378,7 @@ const PageBacktesting = {
 
   isVolumeVisible() {
     if(this.volumeVisible == null){
-      try { const saved=localStorage.getItem('tfb_volume_visible_v1');if(saved!==null)return saved==='true'; } catch {}
+      try { const saved=this.chartStorage().getItem('tfb_volume_visible_v1');if(saved!==null)return saved==='true'; } catch {}
       return this.indicator === 'volume' || this.indicator === 'ema';
     }
     return this.volumeVisible;
@@ -3232,7 +3237,7 @@ const PageBacktesting = {
 
   initializeDrawingWorkspaceUX() {
     if (!this.drawingWorkspaceUX && window.IntenseDrawing?.DrawingWorkspaceUX) {
-      this.drawingWorkspaceUX = new window.IntenseDrawing.DrawingWorkspaceUX({ key: "tfb_drawing_workspace_ux_v1" });
+      this.drawingWorkspaceUX = new window.IntenseDrawing.DrawingWorkspaceUX({ key: "tfb_drawing_workspace_ux_v1", storage: this.chartStorage() });
     }
     const state = this.drawingWorkspaceUX?.getState?.();
     if (state) {
@@ -3251,14 +3256,14 @@ const PageBacktesting = {
     try {
       this.syncDrawingEngineFromLegacy();
       this.ensureDrawingNames();
-      localStorage.setItem(this.drawingStorageKey(), JSON.stringify(this.drawings.map((d) => this.normalizeDrawing(d))));
+      this.chartStorage().setItem(this.drawingStorageKey(), JSON.stringify(this.drawings.map((d) => this.normalizeDrawing(d))));
       this.drawingWorkspaceUX?.save?.();
     } catch { /* localStorage can be disabled */ }
   },
 
   loadDrawingStorage() {
     try {
-      const saved = JSON.parse(localStorage.getItem(this.drawingStorageKey()) || "[]");
+      const saved = JSON.parse(this.chartStorage().getItem(this.drawingStorageKey()) || "[]");
       this.drawings = Array.isArray(saved) ? saved.map((d) => this.normalizeDrawing(d)) : [];
       this.selectedDrawingIds = [];
     } catch {
@@ -3333,7 +3338,7 @@ const PageBacktesting = {
   initializeDrawingEngine() {
     if (!window.IntenseDrawing?.createDrawingEngine) return null;
     if (this.stayInDrawingMode == null) {
-      try { this.stayInDrawingMode = localStorage.getItem('tfb_stay_drawing_v1') === 'true'; } catch { this.stayInDrawingMode = false; }
+      try { this.stayInDrawingMode = this.chartStorage().getItem('tfb_stay_drawing_v1') === 'true'; } catch { this.stayInDrawingMode = false; }
     }
     if (!this.drawingEngine) {
       this.drawingEngine = window.IntenseDrawing.createDrawingEngine({
@@ -3862,7 +3867,7 @@ const PageBacktesting = {
 
   loadDrawingManagerPanelState() {
     try {
-      this.drawingManagerHidden = localStorage.getItem("tfb_drawing_manager_hidden_v1") === "true";
+      this.drawingManagerHidden = this.chartStorage().getItem("tfb_drawing_manager_hidden_v1") === "true";
     } catch {
       this.drawingManagerHidden = false;
     }
@@ -3871,7 +3876,7 @@ const PageBacktesting = {
   setDrawingManagerHidden(hidden) {
     this.drawingManagerHidden = !!hidden;
     try {
-      localStorage.setItem("tfb_drawing_manager_hidden_v1", String(this.drawingManagerHidden));
+      this.chartStorage().setItem("tfb_drawing_manager_hidden_v1", String(this.drawingManagerHidden));
     } catch { /* localStorage can be disabled */ }
     this.rerender();
   },
@@ -4312,7 +4317,7 @@ const PageBacktesting = {
     container.querySelector('#volumeToggleBtn')?.addEventListener('click',()=>{
       if(!window.SubscriptionSystem?.canAccessFeature("technicalIndicators")){window.SubscriptionSystem?.requestUpgrade("technicalIndicators");return;}
       this.volumeVisible=!this.isVolumeVisible();
-      try{localStorage.setItem('tfb_volume_visible_v1',String(this.volumeVisible));}catch{}
+      try{this.chartStorage().setItem('tfb_volume_visible_v1',String(this.volumeVisible));}catch{}
       this.rerender();
     });
     container.querySelector("#layoutBtn")?.addEventListener("click", () => container.querySelector(".tv-panel-collapse-btn")?.click());
@@ -4596,7 +4601,7 @@ const PageBacktesting = {
   selectTool(tool) {
     if (tool === 'stayDrawing') {
       this.stayInDrawingMode = !this.stayInDrawingMode;
-      try { localStorage.setItem('tfb_stay_drawing_v1',String(this.stayInDrawingMode)); } catch { /* optional persistence */ }
+      try { this.chartStorage().setItem('tfb_stay_drawing_v1',String(this.stayInDrawingMode)); } catch { /* optional persistence */ }
       if (this.drawingEngine?.state) this.drawingEngine.state.toolMode = this.stayInDrawingMode ? 'PERSISTENT' : 'SINGLE_USE';
       this.updateToolChrome();
       return;
@@ -5649,6 +5654,7 @@ const PageBacktesting = {
   },
 
   async switchSymbol(symbol) {
+    const accountScope = this._chartAccountScope;
     this.stopPlay();
     this.dataSource = "loading";
     this.symbol = symbol;
@@ -5665,6 +5671,7 @@ const PageBacktesting = {
     this.yOffset = 0;
     this.syncMouseEngineCamera();
     await API.updateSettings({ symbol: this.symbol, ...this.replaySettingsPayload() });
+    if (accountScope !== this._chartAccountScope) return;
     this.rerender();
     this.loadRealHistory();
   },
@@ -6016,6 +6023,7 @@ const PageBacktesting = {
     if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     if (this._stepping || this._placingOrder) return;
     if (MarketData.isLocal(this.symbol) && (this.dataSource !== "local-csv" || this._historyError)) return;
+    const accountScope = this._chartAccountScope;
     this._stepping = true;
     try {
     if (!this.replayActive) {
@@ -6025,11 +6033,13 @@ const PageBacktesting = {
     if (MarketData.isLocal(this.symbol) && n > 0) {
       for (let i = 0; i < n; i++) {
         if (this.idx >= this.candles.length - 1) await this.loadLocalPage(1);
+        if (accountScope !== this._chartAccountScope) return;
         if (this._historyError || this.idx >= this.candles.length - 1) { this.stopPlay(); break; }
         this.idx++;
         this.syncReplayTimestamp();
         this.syncReplayBuffers();
         await this.evaluateCandle();
+        if (accountScope !== this._chartAccountScope) return;
         this.playBarCloseSound();
       }
       if (this.autoFollow) { this.viewEnd = this.followViewEnd(); this.syncMouseEngineCamera(); }
@@ -6053,6 +6063,7 @@ const PageBacktesting = {
         this.syncReplayTimestamp();
         this.syncReplayBuffers();
         await this.evaluateCandle();
+      if (accountScope !== this._chartAccountScope) return;
       this.playBarCloseSound();
       }
     } else {
@@ -6068,7 +6079,7 @@ const PageBacktesting = {
     this.persistReplayState();
     if (this.idx >= this.candles.length - 1) this.stopPlay();
     } finally {
-      this._stepping = false;
+      if (accountScope === this._chartAccountScope) this._stepping = false;
     }
   },
 
@@ -6322,16 +6333,18 @@ const PageBacktesting = {
     if (this._evaluatingCandle || ![...Store.state.active_trades, ...(Store.state.pending_orders || [])].some(t => t.symbol === this.symbol)) return;
     const c = this.candles[this.idx];
     if (!c) return;
+    const accountScope = this._chartAccountScope;
     this._evaluatingCandle = true;
     try {
       const result = await API.updateFloating({ [this.symbol]: { ...c, closed_time: c.time + this.candleDuration() } });
+      if (accountScope !== this._chartAccountScope) return;
       if (result.closed?.length) {
         result.closed.forEach((t) => toast(`${t.symbol} closed ${t.reason}: ${Fmt.money(t.pnl)}`, t.pnl > 0 ? "success" : "error"));
         if (typeof UI !== "undefined" && UI.getSetting?.("autoPauseOnTrade")) this.stopPlay();
       }
       await Store.refresh({fresh:true});
     } finally {
-      this._evaluatingCandle = false;
+      if (accountScope === this._chartAccountScope) this._evaluatingCandle = false;
     }
   },
 
@@ -6517,7 +6530,13 @@ const PageBacktesting = {
   },
 
   cleanup() {
+    if (!this._initialized) return;
     this.stopPlay();
+    clearTimeout(this._persistReplayTimer);
+    clearTimeout(this._flashTimer);
+    this._persistReplayTimer = null;
+    if (this._drawRaf) cancelAnimationFrame(this._drawRaf);
+    if (this.zoomAnim?.raf) cancelAnimationFrame(this.zoomAnim.raf);
     this._historyRequest = (this._historyRequest || 0) + 1;
     if (this._drawingPanelClickHandler) this._drawingPanelClickContainer?.removeEventListener('click', this._drawingPanelClickHandler);
     this.drawingEngine?.cancelSelectionDrag?.();

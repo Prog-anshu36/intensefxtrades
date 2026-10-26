@@ -36,14 +36,18 @@ const WorkspaceEngine = (() => {
     return typeof PageBacktesting !== "undefined" ? PageBacktesting : null;
   }
 
+  function workspaceStorage() {
+    return window.ChartAccountState?.storageForCurrent() || localStorage;
+  }
+
   function safeJsonGet(key, fallback) {
-    try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+    try { return JSON.parse(workspaceStorage().getItem(key) || JSON.stringify(fallback)); }
     catch { return fallback; }
   }
 
   function save() {
-    localStorage.setItem(KEY, JSON.stringify(state.workspaces));
-    localStorage.setItem(ACTIVE_KEY, state.activeId);
+    workspaceStorage().setItem(KEY, JSON.stringify(state.workspaces));
+    workspaceStorage().setItem(ACTIVE_KEY, state.activeId);
     autosaveRecovery();
   }
 
@@ -73,12 +77,12 @@ const WorkspaceEngine = (() => {
   }
 
   function initState() {
-    try { localStorage.removeItem('tfb_broker_connections_v1'); } catch {}
+    try { workspaceStorage().removeItem('tfb_broker_connections_v1'); } catch {}
     state.workspaces = safeJsonGet(KEY, {});
     if (!Object.keys(state.workspaces).length) {
       DEFAULT_WORKSPACES.forEach(([id, name, page]) => { state.workspaces[id] = defaultWorkspace(id, name, page); });
     }
-    state.activeId = localStorage.getItem(ACTIVE_KEY) || "backtesting";
+    state.activeId = workspaceStorage().getItem(ACTIVE_KEY) || "backtesting";
     if (!state.workspaces[state.activeId]) state.activeId = Object.keys(state.workspaces)[0] || "backtesting";
     state.notificationSettings = { ...state.notificationSettings, ...safeJsonGet(PREF_KEY, {}).notificationSettings };
   }
@@ -470,7 +474,7 @@ const WorkspaceEngine = (() => {
     if (!state.workspaces[id]) return;
     capture();
     state.activeId = id;
-    localStorage.setItem(ACTIVE_KEY, id);
+    workspaceStorage().setItem(ACTIVE_KEY, id);
     apply(active());
     notify(`Workspace switched to ${active().name}`, "success");
   }
@@ -547,7 +551,7 @@ const WorkspaceEngine = (() => {
     ws.activePage = ws.tabs[0]?.page || ws.activePage;
     const closedTabs = safeJsonGet(CLOSED_TABS_KEY, []);
     closedTabs.unshift({ workspaceId: ws.id, tab: closed });
-    localStorage.setItem(CLOSED_TABS_KEY, JSON.stringify(closedTabs.slice(0, 20)));
+    workspaceStorage().setItem(CLOSED_TABS_KEY, JSON.stringify(closedTabs.slice(0, 20)));
     save();
     apply(ws);
   }
@@ -560,7 +564,7 @@ const WorkspaceEngine = (() => {
     ws.tabs = [...(ws.tabs || []), entry.tab];
     ws.activeTabId = entry.tab.id;
     ws.activePage = entry.tab.page;
-    localStorage.setItem(CLOSED_TABS_KEY, JSON.stringify(closedTabs));
+    workspaceStorage().setItem(CLOSED_TABS_KEY, JSON.stringify(closedTabs));
     state.activeId = ws.id;
     save();
     apply(ws);
@@ -608,7 +612,7 @@ const WorkspaceEngine = (() => {
 
   function autosaveRecovery() {
     const payload = { activeId: state.activeId, workspaces: state.workspaces, savedAt: Date.now(), pending: true };
-    localStorage.setItem(RECOVERY_KEY, JSON.stringify(payload));
+    workspaceStorage().setItem(RECOVERY_KEY, JSON.stringify(payload));
   }
 
   function markCleanShutdown() {
@@ -616,7 +620,7 @@ const WorkspaceEngine = (() => {
     if (!payload) return;
     payload.pending = false;
     payload.savedAt = Date.now();
-    localStorage.setItem(RECOVERY_KEY, JSON.stringify(payload));
+    workspaceStorage().setItem(RECOVERY_KEY, JSON.stringify(payload));
   }
 
   function maybeShowRecoveryPrompt() {
@@ -757,6 +761,15 @@ const WorkspaceEngine = (() => {
 
     window.addEventListener("ui:context-action", (e) => handleContextAction(e.detail?.action));
     window.addEventListener("tfb:route-change", (e) => syncRoute(e.detail?.page));
+    window.addEventListener("tfb:chart-account-change", () => {
+      state.pageBackStack = [];
+      state.dragWindow = null;
+      state.resizeWindow = null;
+      initState();
+      document.getElementById("desktopRecoveryBanner")?.remove();
+      if (typeof Router !== "undefined") syncRoute(Router.current);
+      renderTabs();
+    });
     window.addEventListener("beforeunload", () => { capture(); markCleanShutdown(); });
     window.addEventListener("tfb:ReplayFinished", () => notify("Replay finished", "info"));
   }
