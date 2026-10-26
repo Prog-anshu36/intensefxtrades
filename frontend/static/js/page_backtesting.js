@@ -6358,25 +6358,6 @@ const PageBacktesting = {
     this.container?.querySelector('.tv-order-draft')?.scrollIntoView({ block: 'nearest' });
   },
 
-
-    const candle = this.candles[this.idx];
-    if (!candle || this._placingOrder || (MarketData.isLocal(this.symbol) && (this.dataSource !== 'local-csv' || this._historyError))) return;
-    this.stopPlay();
-    if (typeof UI !== "undefined" && !UI.getSetting?.("confirmBeforeOrder")) {
-      this.placeTrade(type);
-      return;
-    }
-    const entry = Number(this.orderPrice(type, candle));
-    const pip = MarketData.getMeta(this.symbol).pip;
-    const direction = type === 'BUY' ? 1 : -1;
-    this.orderDraft = { type, symbol: this.symbol, timeframe: this.timeframe, time: candle.time,
-      orderTab: this.orderTab, entry, lots: this.lots,
-      sl: this.slEnabled ? entry - direction * this.slPips * pip : null,
-      tp: this.tpEnabled ? entry + direction * this.tpPips * pip : null, error: '' };
-    this.rerender();
-    this.container?.querySelector('.tv-order-draft')?.scrollIntoView({ block: 'nearest' });
-  },
-
   playBarCloseSound() {
     if (typeof UI === "undefined" || !UI.getSetting?.("soundOnBarClose")) return;
     try {
@@ -6430,22 +6411,6 @@ const PageBacktesting = {
       draft.saving = false;
       this.rerender();
     }
-  },
-
-
-    const draft = this.orderDraft;
-    if (!draft || this._placingOrder) return;
-    const sameContext = draft.symbol === this.symbol && draft.timeframe === this.timeframe && draft.time === this.candles[this.idx]?.time && draft.orderTab === this.orderTab && draft.entry === Number(this.orderPrice(draft.type));
-    const direction = draft.type === 'BUY' ? 1 : -1;
-    const valid = Number.isFinite(draft.entry) && draft.entry > 0 && Number.isFinite(draft.lots) && draft.lots > 0 &&
-      (draft.sl == null || (Number.isFinite(draft.sl) && draft.sl > 0 && direction * (draft.entry - draft.sl) > 0)) &&
-      (draft.tp == null || (Number.isFinite(draft.tp) && draft.tp > 0 && direction * (draft.tp - draft.entry) > 0));
-    if (!sameContext || !valid) {
-      draft.error = !sameContext ? 'Chart time or order entry changed. Cancel and preview again.' : 'SL and TP must be on the correct sides of entry; prices and lots must be positive.';
-      this.rerender();
-      return;
-    }
-    await this.placeTrade(draft.type, draft);
   },
 
   async placeTrade(type, draft = null) {
