@@ -1,0 +1,166 @@
+/* Light theme overrides for intensefxTRADES. Keep chart accents and profit/loss
+   colors intact while replacing the dark surfaces and hard-coded chart chrome. */
+body.light-mode {
+  color-scheme: light;
+  --bg-app: #f3f6fb;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f7f9fc;
+  --bg-elevated: #edf1f7;
+  --bg-input: #ffffff;
+  --bg-hover: #e8eef7;
+  --border: #d6deea;
+  --border-soft: #e2e8f0;
+  --text-primary: #172033;
+  --text-secondary: #526078;
+  --text-tertiary: #748198;
+  --glass-bg: rgba(255,255,255,.9);
+  --glass-border: rgba(30,45,70,.12);
+  --shadow-sm: 0 2px 8px rgba(28,42,66,.06);
+  --shadow-md: 0 8px 24px rgba(28,42,66,.1);
+  --shadow-lg: 0 16px 48px rgba(28,42,66,.14);
+  background: var(--bg-app);
+  color: var(--text-primary);
+}
+body.light-mode input,
+body.light-mode select,
+body.light-mode textarea { color-scheme: light; }
+
+body.light-mode ::-webkit-scrollbar-thumb { background: #c4cedd; }
+body.light-mode ::-webkit-scrollbar-thumb:hover { background: #aab7ca; }
+body.light-mode .sidebar {
+  background: radial-gradient(circle at 12% 0%, rgba(61,127,255,.08), transparent 30%),
+    linear-gradient(180deg,#fff,#f7f9fc);
+  border-right-color: var(--border);
+  box-shadow: 8px 0 24px rgba(28,42,66,.05);
+}
+body.light-mode .sidebar::before { opacity: .25; }
+body.light-mode .main-area,
+body.light-mode .page-container,
+body.light-mode .app-shell { background: var(--bg-app); }
+body.light-mode .topbar {
+  background: linear-gradient(180deg,rgba(255,255,255,.98),rgba(247,249,252,.96));
+  border-bottom-color: var(--border);
+  box-shadow: 0 6px 18px rgba(28,42,66,.06);
+}
+body.light-mode .search-box,
+body.light-mode .icon-btn,
+body.light-mode .account-controls select,
+body.light-mode .account-action,
+body.light-mode .settings-nav button,
+body.light-mode .tv-control-btn,
+body.light-mode .tv-action,
+body.light-mode .tv-tool-btn,
+body.light-mode .tv-rail-btn,
+body.light-mode .tv-chart-control,
+body.light-mode .bt-tf-btn {
+  background: #f4f7fb;
+  border-color: #d7dfeb;
+  color: #3b4a62;
+  box-shadow: 0 1px 2px rgba(25,40,65,.04);
+}
+body.light-mode .search-box { background:#fff; }
+body.light-mode .icon-btn:hover,
+body.light-mode .account-action:hover,
+body.light-mode .tv-control-btn:hover,
+body.light-mode .tv-action:hover,
+body.light-mode .tv-tool-btn:hover,
+body.light-mode .tv-rail-btn:hover,
+body.light-mode .bt-tf-btn:hover {
+  background: #e9f0fb;
+  border-color: #b9c9e3;
+  color: #1b2a41;
+}
+body.light-mode .icon-btn.primary,
+body.light-mode .btn-primary,
+body.light-mode .tv-control-btn.active,
+body.light-mode .tv-tool-btn.active,
+body.light-mode .tv-action.active { color:#fff; }
+body.light-mode .nav-item { color:var(--text-secondary); }
+body.light-mode .nav-item:hover { background:#edf3fc; color:#23344f; }
+body.light-mode .nav-item.active { background:#e8f0ff; color:#225fce; }
+body.light-mode .card,
+body.light-mode .kpi-card,
+body.light-mode .empty-state,
+body.light-mode .account-card,
+body.light-mode .trade-filters,
+body.light-mode .bt-tabs,
+body.light-mode .bt-bottom-tabs,
+body.light-mode .tv-panel,
+body.light-mode .tv-order-card,
+body.light-mode .tv-order-draft,
+body.light-mode .journal-entry,
+body.light-mode .settings-card,
+body.light-mode .settings-section,
+body.light-mode .modal-card,
+body.light-mode .modal-content,
+body.light-mode .desktop-tab,
+body.light-mode .desktop-dock-window,
+body.light-mode .desktop-floating-panel,
+body.light-mode .desktop-dock-panel {
+  background-color:var(--bg-card);
+  border-color:var(--border-soft);
+  color:var(--text-primary);
+  box-shadow:var(--shadow-sm);
+}
+body.light-mode input:not([type="checkbox"]):not([type="range"]),
+body.light-mode select,
+body.light-mode textarea,
+body.light-mode .search-box input {
+  background:#fff;
+  border-color:#cfd8e6;
+  color:#172033;
+}
+body.light-mode select option { background:#fff; color:#172033; }
+body.light-mode input::placeholder,
+body.light-mode textarea::placeholder { color:#8290a5; }
+body.light-mode table th { background:#f4f7fb; color:#53627a; }
+body.light-mode table td,
+body.light-mode table th { border-color:#e1e7ef; }
+body.light-mode .ticker { background:#fff; }
+body.light-mode .tv-topbar,
+body.light-mode .tv-session-menu-wrap,
+body.light-mode .tv-chart-head,
+body.light-mode .tv-toolbar-group,
+body.light-mode .tv-fullscreen-replay,
+body.light-mode .tv-session-menu,
+body.light-mode .tv-tool-help,
+body.light-mode .tv-context-menu,
+body.light-mode .tv-drawing-manager,
+body.light-mode .tv-settings-panel,
+body.light-mode .tv-external-chart-head,
+body.light-mode .tv-external-chart-panel,
+body.light-mode .tv-rail { background:#fff; border-color:#d9e1ec; color:#243149; }
+body.light-mode .tv-chart-title,
+body.light-mode .tv-ohlc,
+body.light-mode .tv-chart-head span,
+body.light-mode .tv-topbar label,
+body.light-mode .tv-action,
+body.light-mode .tv-control-btn { color:#43516a; }
+body.light-mode .tv-chart-area,
+body.light-mode .tv-chart-card,
+body.light-mode .tv-workspace,
+body.light-mode .tv-shell,
+body.light-mode .tv-chart-plot { background:#f9fbfe; }
+body.light-mode .tv-right-panel { background:#f4f7fb; border-color:#d9e1ec; }
+body.light-mode .tv-chart-grid-line { border-color:rgba(71,91,122,.12); }
+body.light-mode .tv-crosshair-label,
+body.light-mode .tv-axis-label { color:#526078; }
+body.light-mode .tv-range-row { background:#fff; border-color:#e0e6ef; }
+body.light-mode .tv-bottom-tabs { background:#fff; border-color:#dce3ed; }
+body.light-mode .tv-tab.active { background:#eef4ff; color:#225fce; }
+body.light-mode .desktop-floating-head,
+body.light-mode .desktop-dock-panel header,
+body.light-mode .desktop-floating-body,
+body.light-mode .desktop-dock-body { background:#fff; color:#43516a; border-color:#e1e7ef; }
+body.light-mode .desktop-floating-panel,
+body.light-mode .desktop-dock-panel { background:#fff; border-color:#d6deea; box-shadow:0 12px 36px rgba(28,42,66,.14); }
+body.light-mode .desktop-panel-action { background:#f2f5fa; color:#596981; border-color:#d9e1ec; }
+body.light-mode .settings-modal,
+body.light-mode .settings-panel,
+body.light-mode .modal-backdrop > div,
+body.light-mode .command-palette,
+body.light-mode .toast,
+body.light-mode .notification-panel { background:#fff; color:#1a263a; border-color:#d6deea; }
+
+
