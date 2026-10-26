@@ -351,6 +351,7 @@ const PageBacktesting = {
           <datalist id="drawingToolOptions">${(this.drawingEngine?.toolRegistry?.getTools?.() || []).map(tool => `<option value="${this.escapeHtml(tool.name)}"></option>`).join('')}</datalist>
           <button class="tv-action tv-order-command" id="placeOrderBtn" title="Open the simulated order ticket">+ Place Order</button>
           <button class="tv-action" id="goToBtn" title="Open session and date navigation">Go To</button>
+          <button type="button" class="tv-action tv-prop-firm-badge" id="propFirmChartBadge" hidden title="Open Prop Firm Session"></button>
           <button class="tv-icon-action" id="toolbarUndoBtn" title="Undo drawing" aria-label="Undo drawing">${this.toolSvg("undo")}</button>
           <button class="tv-icon-action" id="toolbarRedoBtn" title="Redo drawing" aria-label="Redo drawing">${this.toolSvg("redo")}</button>
           <div class="tv-command-market">
@@ -4366,6 +4367,8 @@ const PageBacktesting = {
       container.querySelector(".tv-order-card")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
       container.querySelector(".tv-order-card button, .tv-order-card input")?.focus?.();
     });
+    container.querySelector("#propFirmChartBadge")?.addEventListener("click", () => Router.go("prop-firm-session"));
+    window.PropFirmSession?.syncChartBadge?.();
     container.querySelector("#goToBtn")?.addEventListener("click", () => {
       if (this.sessionPanelHidden) this.setSessionPanelHidden(false);
       requestAnimationFrame(() => container.querySelector(".tv-session-panel")?.scrollIntoView?.({ behavior: "smooth", block: "center" }));
@@ -6345,6 +6348,18 @@ const PageBacktesting = {
         if (typeof UI !== "undefined" && UI.getSetting?.("autoPauseOnTrade")) this.stopPlay();
       }
       await Store.refresh({fresh:true});
+      const propResult = window.PropFirmSession?.onMarketCandle?.(c.time + this.candleDuration(), Store.state);
+      if (propResult?.failed && propResult.liquidate?.length) {
+        const meta = MarketData.getMeta(this.symbol);
+        await Promise.all(propResult.liquidate.map((trade) => API.closeTrade({
+          id: trade.id,
+          exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close,
+          reason: "PROP_RULE_BREACH",
+          closed_at: new Date(c.time + this.candleDuration()).toISOString(),
+        })));
+        await Store.refresh({fresh:true});
+        toast(`Practice round failed: ${propResult.reason || "a loss limit was breached"}. Positions on ${meta.name || this.symbol} were closed.`, "error");
+      }
     } finally {
       if (accountScope === this._chartAccountScope) this._evaluatingCandle = false;
     }
@@ -6433,6 +6448,9 @@ const PageBacktesting = {
     if (MarketData.isLocal(this.symbol) && (this.dataSource !== "local-csv" || this._historyError)) return;
     const c = this.candles[this.idx];
     if (!c) return;
+    const practiceCheck = window.PropFirmSession?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
+    if (practiceCheck?.attempt && this.orderTab !== "Market") { toast("Prop Firm Session scoring currently supports market orders from the replay chart. Switch the order type to Market.", "info"); return; }
     const meta = MarketData.getMeta(this.symbol);
     const requested = this.orderTab === "Market" ? null : Number(this.pendingPrice ?? c.close);
     if (this.orderTab !== "Market" && (!Number.isFinite(requested) || requested <= 0)) {
@@ -6455,6 +6473,7 @@ const PageBacktesting = {
     if (result?.error) throw new Error(result.error);
     this.orderDraft = null;
     await Store.refresh({fresh:true});
+    window.PropFirmSession?.onMarketCandle?.(c.time + this.candleDuration(), Store.state);
     toast(`${this.orderTab} ${type} ${this.lots} ${this.symbol} @ ${Fmt.price(entry, meta.decimals)}`, "success");
     } catch (error) {
       if (draft) draft.error = 'Order could not be placed. Please retry.';
