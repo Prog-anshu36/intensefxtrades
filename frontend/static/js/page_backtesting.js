@@ -4235,6 +4235,7 @@ const PageBacktesting = {
 
   afterRender(container) {
     this.container = container;
+    this.resumeAfterNavigation();
     this.bindBottomPanelResize(container);
     container.insertAdjacentHTML('beforeend', this.renderDrawingSettingsDialog());
     container.insertAdjacentHTML('beforeend', this.renderDrawingHelp());
@@ -6632,13 +6633,23 @@ const PageBacktesting = {
     }
   },
 
+  resumeAfterNavigation() {
+    this._chartFrame = null;
+    if (this._historyInterrupted) {
+      this._historyInterrupted = false;
+      this.loadRealHistory();
+    }
+  },
+
   cleanup() {
     if (!this._initialized) return;
     this.stopPlay();
     clearTimeout(this._persistReplayTimer);
     clearTimeout(this._flashTimer);
     this._persistReplayTimer = null;
+    this._historyInterrupted = this.dataSource === "loading";
     if (this._drawRaf) cancelAnimationFrame(this._drawRaf);
+    this._drawRaf = null;
     if (this.zoomAnim?.raf) cancelAnimationFrame(this.zoomAnim.raf);
     this._historyRequest = (this._historyRequest || 0) + 1;
     if (this._drawingPanelClickHandler) this._drawingPanelClickContainer?.removeEventListener('click', this._drawingPanelClickHandler);
@@ -6654,7 +6665,10 @@ const PageBacktesting = {
     }
     if (this._chartContextActionHandler) window.removeEventListener("ui:context-action", this._chartContextActionHandler);
     if (this.mouseEngine?.raf) cancelAnimationFrame(this.mouseEngine.raf);
+    if (this.mouseEngine) this.mouseEngine.raf = null;
     if (this.inertia?.raf) cancelAnimationFrame(this.inertia.raf);
+    this.inertia = null;
+    this.zoomAnim = null;
     this._resizeObserver?.disconnect();
     if (this._interactionRaf) cancelAnimationFrame(this._interactionRaf);
     this._interactionRaf = null;

@@ -123,8 +123,9 @@ const WorkspaceEngine = (() => {
     ws.layout.focusMode = document.body.classList.contains("desktop-focus-mode");
     ws.layout.chartOnly = document.body.classList.contains("desktop-chart-only");
     ws.layout.density = document.body.dataset.density || ws.layout.density || "comfortable";
-    if (chart?._initialized) {
+    if (window.Router?.current === "backtesting" && chart?._initialized) {
       ws.chart = {
+        workspaceKind: "backtesting",
         symbol: chart.symbol,
         timeframe: chart.timeframe,
         visibleCount: chart.visibleCount,
@@ -166,11 +167,12 @@ const WorkspaceEngine = (() => {
     renderDockedPanels();
     renderFloatingPanels();
     if (window.Router && ws.activePage && Router.current !== ws.activePage) Router.go(ws.activePage);
-    if (chartPage()?._initialized && ws.chart) applyChartSnapshot(ws.chart);
+    if (window.Router?.current === "backtesting" && chartPage()?._initialized && ws.chart?.workspaceKind === "backtesting") applyChartSnapshot(ws.chart);
     window.dispatchEvent(new Event("tfb:chart-resize"));
   }
 
   async function applyChartSnapshot(chartSnap) {
+    if (window.Router?.current !== "backtesting" || chartSnap.workspaceKind !== "backtesting") return;
     const chart = chartPage();
     if (!chart || !chart._initialized) return;
     if (chartSnap.symbol && chartSnap.symbol !== chart.symbol && chart.switchSymbol) {
