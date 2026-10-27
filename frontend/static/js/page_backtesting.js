@@ -6441,7 +6441,7 @@ const PageBacktesting = {
     const candle = this.candles[this.idx];
     if (!candle || this._placingOrder || (MarketData.isLocal(this.symbol) && (this.dataSource !== 'local-csv' || this._historyError))) return;
     this.stopPlay();
-    if (typeof UI !== "undefined" && !UI.getSetting?.("confirmBeforeOrder")) {
+    if (!this.practiceController && typeof UI !== "undefined" && !UI.getSetting?.("confirmBeforeOrder")) {
       this.placeTrade(type);
       return;
     }
@@ -6521,7 +6521,10 @@ const PageBacktesting = {
     const c = this.candles[this.idx];
     if (!c) return;
     const practiceCheck = this.practiceController?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
-    if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
+    if (practiceCheck && !practiceCheck.ok) {
+      if (draft) { draft.error = practiceCheck.message; this.rerender(); }
+      toast(practiceCheck.message, "error"); return;
+    }
     const meta = MarketData.getMeta(this.symbol);
     const requested = this.orderTab === "Market" ? null : Number(this.pendingPrice ?? c.close);
     if (this.orderTab !== "Market" && (!Number.isFinite(requested) || requested <= 0)) {
@@ -6536,6 +6539,8 @@ const PageBacktesting = {
     this.syncOrderPrices();
     try {
     let result;
+    // Establish the chosen historical start before the first order locks time.
+    this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
     if (this.orderTab === "Market") {
       result = await this.api.openTrade({ symbol: this.symbol, type, entry, lots, sl, tp, opened_at: new Date(c.time + this.candleDuration()).toISOString() });
     } else {
@@ -6547,7 +6552,7 @@ const PageBacktesting = {
     this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
     toast(`${this.orderTab} ${type} ${this.lots} ${this.symbol} @ ${Fmt.price(entry, meta.decimals)}`, "success");
     } catch (error) {
-      if (draft) draft.error = 'Order could not be placed. Please retry.';
+      if (draft) draft.error = error.message || 'Order could not be placed. Please retry.';
       toast(error.message || "Order could not be placed.", "error");
     } finally {
       this._placingOrder = false;

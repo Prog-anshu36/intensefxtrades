@@ -39,6 +39,7 @@ jobs:
           node tests/prop_account_management.test.js
           node tests/prop_workspace_lifecycle.test.js
           node tests/prop_practice_chart.test.js
+          node tests/prop_order_flow.test.js
           node tests/account_chart_isolation.test.js
           node tests/prop_navigation.test.js
           node tests/replay_mouse_selection.test.js

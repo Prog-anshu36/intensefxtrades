@@ -68,7 +68,10 @@
       }
       const current = () => owner() === context.ownerId && PropFirmSession.selected()?.id === attempt.id && keyFor(attempt) === context.key;
       const controller = {
-        canEvaluateAt(time) { return current() && (!attempt.lastMarketTimestamp || time >= attempt.lastMarketTimestamp); },
+        canEvaluateAt(time) {
+          const floor = PropFirmSession.tradingTimeFloor(PropFirmSession.selected(), context.store.state);
+          return current() && (floor == null || time >= floor);
+        },
         canTradeAt(time, symbol) {
           return current() ? PropFirmSession.canTradeAt(time, symbol) : { ok: false, message: 'Practice context changed. Reopen the chart.' };
         },

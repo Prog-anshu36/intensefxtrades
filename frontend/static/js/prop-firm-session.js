@@ -207,13 +207,19 @@
       this.save();
       return { attempt, failed, liquidate: failed ? this.summary(attempt, state).open : [], reason: attempt.breachReason };
     },
+    tradingTimeFloor(attempt = this.selected(), state = this.tradingState(attempt)) {
+      if (!attempt) return null;
+      const { closed, open } = this.newTrades(attempt, state);
+      return closed.length || open.length || (state.pending_orders || []).length ? timestamp(attempt.lastMarketTimestamp) : null;
+    },
     onMarketCandle(time, state = this.tradingState()) {
       this.load();
       this.currentMarketTime = timestamp(time);
       const attempt = this.selected() || this.practiceAttempt();
       if (!attempt || attempt.archived || attempt.status !== "active") { this.syncChartBadge(); return { attempt, failed: false, liquidate: [] }; }
       const candleTime = Number(this.currentMarketTime);
-      if (!Number.isFinite(candleTime) || (attempt.lastMarketTimestamp && candleTime < attempt.lastMarketTimestamp)) {
+      const floor = this.tradingTimeFloor(attempt, state);
+      if (!Number.isFinite(candleTime) || (floor != null && candleTime < floor)) {
         return { attempt, failed: false, liquidate: [], outOfOrder: true };
       }
       const day = dayKey(candleTime);
@@ -224,7 +230,7 @@
         const floating = open.reduce((sum, t) => sum + (Number(t.floating_pnl) || 0), 0);
         attempt.dailyBaselines[day] = { balance, equity: balance + floating, capturedAt: new Date(candleTime).toISOString() };
       }
-      attempt.lastMarketTimestamp = Math.max(attempt.lastMarketTimestamp || 0, candleTime);
+      attempt.lastMarketTimestamp = floor == null ? candleTime : Math.max(floor, candleTime);
       const result = this.evaluate(attempt, state);
       return result;
     },
@@ -240,7 +246,8 @@
         this.evaluate(attempt);
         return { ok: false, message: "This practice phase has expired. Create a new practice account." };
       }
-      if (attempt.lastMarketTimestamp && ms != null && ms < attempt.lastMarketTimestamp) return { ok: false, message: "Practice trades must follow replay time. Move the replay forward before placing an order." };
+      const floor = this.tradingTimeFloor(attempt);
+      if (floor != null && ms < floor) return { ok: false, message: "Practice trades must follow replay time. Move the replay forward before placing an order." };
       const otherSymbol = this.summary(attempt).open.find(trade => trade.symbol && trade.symbol !== symbol)?.symbol;
       if (otherSymbol) return { ok: false, message: `Close the active ${otherSymbol} practice position before placing a ${symbol} trade.` };
       return { ok: true, attempt };
