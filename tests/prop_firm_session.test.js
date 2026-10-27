@@ -22,6 +22,7 @@ assert.deepEqual(JSON.parse(JSON.stringify({ standard: rules.standard.targets, p
 });
 assert.equal(rules.standard.dailyLossPct, 5);
 assert.equal(rules.pro.maxLossPct, 6);
+assert.equal(rules.pro.minDays, 0, 'Pro model matches the supplied zero-minimum-days reference');
 
 const day = n => Date.UTC(2026, 0, n, 12);
 let result = page.create('standard', 5000);
@@ -78,8 +79,8 @@ sandbox.Store.state.active_trades[0].floating_pnl = -160;
 page.sync();
 assert.equal(rollover.status, 'active', 'store refresh does not evaluate against a stale prior-day loss baseline');
 const nextDay = page.onMarketCandle(day(9), sandbox.Store.state);
-assert.equal(rollover.status, 'active', 'the UTC+3 rollover captures a fresh daily baseline before loss checks');
-assert.equal(nextDay.failed, false);
+assert.equal(rollover.status, 'failed', 'overnight floating loss counts against the higher day-opening balance/equity');
+assert.equal(nextDay.failed, true);
 
 pro.status = 'active';
 pro.deadlineAt = new Date(Date.now() - 1).toISOString();
@@ -88,3 +89,20 @@ assert.equal(pro.status, 'expired', 'phase deadline expires after fourteen calen
 
 console.log('prop_firm_session.test.js passed: rule profiles, phase targets, minimum trading days, phase isolation, per-account persistence, floating-loss breach, expiry');
 
+// Concurrent accounts remain separate and cannot submit invalid/expired trades.
+sandbox.Store.state.active_account_id = 'multi';
+page.load();
+const first = page.create('standard', 5000).attempt;
+const second = page.create('pro', 10000).attempt;
+assert.notEqual(first.id, second.id);
+assert.equal(page.attempts.length, 2);
+page.activate(first.id);
+assert.equal(page.canTradeAt(null, 'XAUUSD').ok, false);
+first.lastMarketTimestamp = day(1);
+second.lastMarketTimestamp = day(9);
+page.currentMarketTime = day(1);
+assert.equal(page.summary(second).currentDay, '2026-01-09');
+first.deadlineAt = new Date(Date.now() - 1).toISOString();
+assert.equal(page.canTradeAt(day(10), 'XAUUSD').ok, false);
+assert.equal(first.status, 'expired');
+console.log('Concurrent accounts, independent dates, invalid-candle and pre-order expiry checks passed');

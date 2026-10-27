@@ -4357,7 +4357,7 @@ const PageBacktesting = {
       container.querySelector(".tv-order-card button, .tv-order-card input")?.focus?.();
     });
     container.querySelector("#propFirmChartBadge")?.addEventListener("click", () => Router.go("prop-firm-session"));
-    (this.practiceController || window.PropFirmSession)?.syncChartBadge?.();
+    this.practiceController?.syncChartBadge?.();
     container.querySelector("#goToBtn")?.addEventListener("click", () => {
       if (this.sessionPanelHidden) this.setSessionPanelHidden(false);
       requestAnimationFrame(() => container.querySelector(".tv-session-panel")?.scrollIntoView?.({ behavior: "smooth", block: "center" }));
@@ -6382,7 +6382,14 @@ const PageBacktesting = {
   },
 
   async evaluateCandle() {
-    if (this._evaluatingCandle || ![...this.store.state.active_trades, ...(this.store.state.pending_orders || [])].some(t => t.symbol === this.symbol)) return;
+    if (this._evaluatingCandle) return;
+    const replayCandle = this.candles[this.idx];
+    if (replayCandle && this.practiceController?.canEvaluateAt && !this.practiceController.canEvaluateAt(replayCandle.time + this.candleDuration())) return;
+    if (![...this.store.state.active_trades, ...(this.store.state.pending_orders || [])].some(t => t.symbol === this.symbol)) {
+      const candle = this.candles[this.idx];
+      if (candle) this.practiceController?.onMarketCandle?.(candle.time + this.candleDuration(), this.store.state);
+      return;
+    }
     const c = this.candles[this.idx];
     if (!c) return;
     const accountScope = this._chartAccountScope;
@@ -6395,8 +6402,9 @@ const PageBacktesting = {
         if (typeof UI !== "undefined" && UI.getSetting?.("autoPauseOnTrade")) this.stopPlay();
       }
       await this.store.refresh({fresh:true});
-      const propResult = (this.practiceController || window.PropFirmSession)?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
-      if (propResult?.failed && propResult.liquidate?.length) {
+      const propResult = this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
+      if (propResult?.failed) {
+        await this.api.cancelPendingOrders();
         const meta = MarketData.getMeta(this.symbol);
         await Promise.all(propResult.liquidate.map((trade) => this.api.closeTrade({
           id: trade.id,
@@ -6495,9 +6503,8 @@ const PageBacktesting = {
     if (MarketData.isLocal(this.symbol) && (this.dataSource !== "local-csv" || this._historyError)) return;
     const c = this.candles[this.idx];
     if (!c) return;
-    const practiceCheck = (this.practiceController || window.PropFirmSession)?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    const practiceCheck = this.practiceController?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
-    if (practiceCheck?.attempt && this.orderTab !== "Market") { toast("Prop Firm Session scoring currently supports market orders from the replay chart. Switch the order type to Market.", "info"); return; }
     const meta = MarketData.getMeta(this.symbol);
     const requested = this.orderTab === "Market" ? null : Number(this.pendingPrice ?? c.close);
     if (this.orderTab !== "Market" && (!Number.isFinite(requested) || requested <= 0)) {
@@ -6520,7 +6527,7 @@ const PageBacktesting = {
     if (result?.error) throw new Error(result.error);
     this.orderDraft = null;
     await this.store.refresh({fresh:true});
-    (this.practiceController || window.PropFirmSession)?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
+    this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
     toast(`${this.orderTab} ${type} ${this.lots} ${this.symbol} @ ${Fmt.price(entry, meta.decimals)}`, "success");
     } catch (error) {
       if (draft) draft.error = 'Order could not be placed. Please retry.';
@@ -6564,11 +6571,11 @@ const PageBacktesting = {
     const trade = this.store.state.active_trades.find((t) => t.symbol === this.symbol);
     const c = this.candles[this.idx];
     if (!trade || !c) return;
-    const practiceCheck = (this.practiceController || window.PropFirmSession)?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    const practiceCheck = this.practiceController?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
     await this.api.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL", closed_at: new Date(c.time + this.candleDuration()).toISOString() });
     await this.store.refresh({fresh:true});
-    (this.practiceController || window.PropFirmSession)?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
+    this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
     toast("Position closed", "info");
     this.rerender();
   },
@@ -6577,11 +6584,11 @@ const PageBacktesting = {
     const c = this.candles[this.idx];
     const trades = this.store.state.active_trades.filter((t) => t.symbol === this.symbol);
     if (!c || !trades.length) return;
-    const practiceCheck = (this.practiceController || window.PropFirmSession)?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
+    const practiceCheck = this.practiceController?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
     await Promise.all(trades.map((trade) => this.api.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL_CLOSE_ALL", closed_at: new Date(c.time + this.candleDuration()).toISOString() })));
     await this.store.refresh({fresh:true});
-    (this.practiceController || window.PropFirmSession)?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
+    this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
     toast(`${trades.length} position${trades.length === 1 ? "" : "s"} closed`, "info");
     this.rerender();
   },

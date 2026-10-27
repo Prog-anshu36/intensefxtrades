@@ -898,6 +898,8 @@ def close_trade():
             "pnl": pnl,
             "result": "WIN" if pnl > 0 else "LOSS",
             "reason": reason,
+            "sl": t.get("sl"), "tp": t.get("tp"),
+            "commission": t.get("commission", 0), "swap": t.get("swap", 0),
             "opened_at": t.get("opened_at"),
             "closed_at": payload.get("closed_at") or datetime.now(timezone.utc).isoformat(),
         }
@@ -1044,6 +1046,8 @@ def update_floating():
                     "entry": t["entry"], "exit": exit_price, "lots": t["lots"],
                     "pnl": pnl, "result": "WIN" if pnl > 0 else "LOSS",
                     "reason": "SL" if hit_sl else "TP",
+                    "sl": t.get("sl"), "tp": t.get("tp"),
+                    "commission": t.get("commission", 0), "swap": t.get("swap", 0),
                     "opened_at": t.get("opened_at"),
                     "closed_at": datetime.fromtimestamp(tick["closed_time"] / 1000, tz=timezone.utc).isoformat() if tick.get("closed_time") else datetime.now(timezone.utc).isoformat(),
                 }

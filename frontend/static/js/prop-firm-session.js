@@ -6,7 +6,7 @@
   const PLATFORM_OFFSET_MS = 3 * 60 * 60 * 1000;
   const MODELS = {
     standard: { name: "2 Step Standard", dailyLossPct: 5, maxLossPct: 10, targets: { 1: 8, 2: 5 }, minDays: 3, sizes: [5000, 10000, 25000, 50000, 100000] },
-    pro: { name: "2 Step Pro", dailyLossPct: 3, maxLossPct: 6, targets: { 1: 6, 2: 6 }, minDays: 2, sizes: [5000, 10000, 25000, 50000, 100000, 200000] },
+    pro: { name: "2 Step Pro", dailyLossPct: 3, maxLossPct: 6, targets: { 1: 6, 2: 6 }, minDays: 0, sizes: [5000, 10000, 25000, 50000, 100000, 200000] },
   };
 
   function timestamp(value) {
@@ -45,6 +45,8 @@
   const PagePropFirmSession = {
     model: "standard",
     size: 5000,
+    standardDailyLoss: 5, standardMinDays: 3,
+    filters: { search: "", model: "all", status: "all", phase: "all", archive: "active" },
     selectedId: null,
     attempts: [],
     currentMarketTime: null,
@@ -59,7 +61,10 @@
       try {
         const stored = JSON.parse(localStorage.getItem(this.storageKey()) || "{}");
         this.attempts = Array.isArray(stored.attempts) ? stored.attempts : [];
-        this.selectedId = stored.selectedId || this.attempts.find(a => ["active", "phase-ready"].includes(a.status))?.id || this.attempts[0]?.id || null;
+        // Preserve the rules used by legacy accounts when model defaults evolve.
+        this.attempts.forEach(a => { if (!a.rules) a.rules = { ...MODELS[a.model], minDays: a.model === 'pro' ? 2 : 3, targets: {...MODELS[a.model].targets} }; });
+        this.filters = { search: "", model: "all", status: "all", phase: "all", archive: "active" };
+        this.selectedId = stored.selectedId || this.attempts.find(a => !a.archived && ["active", "phase-ready"].includes(a.status))?.id || this.attempts.find(a => !a.archived)?.id || null;
         this.currentMarketTime = timestamp(this.attempts.find(a => a.id === this.selectedId)?.lastMarketTimestamp);
       } catch (_) { this.attempts = []; this.selectedId = null; }
     },
@@ -70,7 +75,31 @@
       this.syncChartBadge();
     },
     selected() { return this.attempts.find(a => a.id === this.selectedId) || null; },
-    practiceAttempt() { return this.attempts.find(a => a.status === "active" || a.status === "phase-ready") || null; },
+    practiceAttempt() { return this.attempts.find(a => !a.archived && (a.status === "active" || a.status === "phase-ready")) || null; },
+    rulesFor(attempt) { return attempt?.rules || MODELS[attempt?.model || this.model]; },
+    rename(id, name) {
+      const attempt = this.attempts.find(a => a.id === id);
+      const clean = String(name || '').trim();
+      if (!attempt || !clean || clean.length > 60) return {ok:false, message:'Use an account name between 1 and 60 characters.'};
+      attempt.name = clean; this.save(); return {ok:true};
+    },
+    archive(id, archived = true) {
+      const attempt = this.attempts.find(a => a.id === id);
+      if (!attempt) return {ok:false, message:'Account not found.'};
+      const state = this.tradingState(attempt);
+      if (archived && ((state.active_trades || []).length || (state.pending_orders || []).length)) return {ok:false, message:'Close positions and cancel pending orders before archiving.'};
+      attempt.archived = archived;
+      if (archived && this.selectedId === id) this.selectedId = this.attempts.find(a => !a.archived)?.id || null;
+      this.currentMarketTime = timestamp(this.selected()?.lastMarketTimestamp);
+      this.save(); return {ok:true};
+    },
+    filteredAccounts() {
+      const f = this.filters;
+      return this.attempts.filter(a => (f.archive === 'all' || Boolean(a.archived) === (f.archive === 'archived')) &&
+        (f.model === 'all' || a.model === f.model) && (f.status === 'all' || a.status === f.status) &&
+        (f.phase === 'all' || String(a.phase) === f.phase) &&
+        `${a.name || ''} ${a.id} ${MODELS[a.model].name} ${a.startingBalance}`.toLowerCase().includes(f.search.toLowerCase()));
+    },
     baselineKeys(state) { return [...new Set(allTrades(state).map(tradeKey))]; },
     newTrades(attempt, state) {
       const baseline = new Set(state?.practice_workspace ? [] : (attempt.phaseBaselineKeys || []));
@@ -88,13 +117,14 @@
       const floating = open.reduce((sum, trade) => sum + (Number(trade.floating_pnl) || 0), 0);
       const equity = attempt.startingBalance + closedPnl + floating;
       const tradedDays = [...new Set([...closed, ...open].map(t => dayKey(t.opened_at || t.closed_at)).filter(Boolean))].sort();
-      const currentDay = dayKey(this.currentMarketTime || open.at(-1)?.opened_at || closed.at(-1)?.closed_at || Date.now());
+      const currentDay = dayKey(attempt.lastMarketTimestamp || (attempt.id === this.selectedId && this.currentMarketTime) || open.at(-1)?.opened_at || closed.at(-1)?.closed_at || Date.now());
       const dayClosed = closed.filter(t => dayKey(t.closed_at || t.opened_at) === currentDay).reduce((s, t) => s + (Number(t.pnl) || 0), 0);
       const dayOpen = attempt.dailyBaselines?.[currentDay] || null;
-      const dailyFloor = dayOpen ? dayOpen.equity - Math.max(dayOpen.balance, dayOpen.equity) * (MODELS[attempt.model].dailyLossPct / 100) : null;
-      const maxFloor = attempt.startingBalance * (1 - MODELS[attempt.model].maxLossPct / 100);
-      const dailyDrawdown = dayOpen ? Math.max(0, dayOpen.equity - equity) : Math.max(0, -dayClosed - floating);
-      const targetPct = MODELS[attempt.model].targets[attempt.phase];
+      const dailyReference = dayOpen ? Math.max(dayOpen.balance, dayOpen.equity) : null;
+      const dailyFloor = dayOpen ? dailyReference * (1 - this.rulesFor(attempt).dailyLossPct / 100) : null;
+      const maxFloor = attempt.startingBalance * (1 - this.rulesFor(attempt).maxLossPct / 100);
+      const dailyDrawdown = dayOpen ? Math.max(0, dailyReference - equity) : Math.max(0, -dayClosed - floating);
+      const targetPct = this.rulesFor(attempt).targets[attempt.phase];
       const target = attempt.startingBalance * targetPct / 100;
       const pnl = closedPnl + floating;
       const deadline = timestamp(attempt.deadlineAt);
@@ -102,18 +132,22 @@
       return { closed, open, closedPnl, floating, pnl, equity, tradedDays, currentDay, dailyFloor, dailyDrawdown,
         maxFloor, maxDrawdown: Math.max(0, attempt.startingBalance - equity), target, targetPct,
         targetProgress: Math.max(0, Math.min(100, pnl / target * 100)), remainingMs,
-        tradingDaysNeeded: Math.max(0, MODELS[attempt.model].minDays - tradedDays.length),
+        tradingDaysNeeded: Math.max(0, this.rulesFor(attempt).minDays - tradedDays.length),
         balanceAtDayStart: dayOpen?.balance ?? attempt.startingBalance };
     },
-    create(model = this.model, size = this.size) {
+    create(model = this.model, size = this.size, options = {}) {
       this.load();
       const rules = MODELS[model];
       const amount = Number(size);
       if (!rules || !rules.sizes.includes(amount)) return { ok: false, message: "Choose a supported account size." };
+      const dailyLossPct = model === 'standard' ? Number(options.dailyLossPct ?? this.standardDailyLoss) : rules.dailyLossPct;
+      const minDays = model === 'standard' ? Number(options.minDays ?? this.standardMinDays) : rules.minDays;
+      if ((model === 'standard' && (![3,5].includes(dailyLossPct) || ![0,3].includes(minDays)))) return {ok:false, message:'Choose a supported Standard rule variant.'};
       const state = window.PropPracticeWorkspace ? {} : (window.Store?.state || {});
       const now = Date.now();
       const attempt = { id: `practice-${now}-${Math.random().toString(36).slice(2, 8)}`, model, startingBalance: amount,
-        phase: 1, status: "active", startedAt: new Date(now).toISOString(), phaseStartedAt: new Date(now).toISOString(),
+        rules: { ...rules, dailyLossPct, minDays, targets: {...rules.targets} }, archived: false,
+        name: `${rules.name} ${this.attempts.length + 1}`, phase: 1, status: "active", startedAt: new Date(now).toISOString(), phaseStartedAt: new Date(now).toISOString(),
         deadlineAt: new Date(now + 14 * DAY_MS).toISOString(), phaseBaselineKeys: this.baselineKeys(state), dailyBaselines: {},
         lastMarketTimestamp: null, breachReason: "", completedAt: null };
       this.attempts.unshift(attempt);
@@ -145,8 +179,8 @@
     },
     activate(attemptId) { this.selectedId = attemptId; this.currentMarketTime = timestamp(this.selected()?.lastMarketTimestamp); this.save(); },
     evaluate(attempt = this.selected() || this.practiceAttempt(), state = this.tradingState(attempt)) {
-      if (!attempt || attempt.status !== "active") return { attempt, failed: false, liquidate: [] };
-      const model = MODELS[attempt.model];
+      if (!attempt || attempt.archived || attempt.status !== "active") return { attempt, failed: false, liquidate: [] };
+      const model = this.rulesFor(attempt);
       const summary = this.summary(attempt, state);
       const previousStatus = attempt.status;
       if (Date.now() >= timestamp(attempt.deadlineAt)) {
@@ -173,7 +207,7 @@
       this.load();
       this.currentMarketTime = timestamp(time);
       const attempt = this.selected() || this.practiceAttempt();
-      if (!attempt || attempt.status !== "active") { this.syncChartBadge(); return { attempt, failed: false, liquidate: [] }; }
+      if (!attempt || attempt.archived || attempt.status !== "active") { this.syncChartBadge(); return { attempt, failed: false, liquidate: [] }; }
       const candleTime = Number(this.currentMarketTime);
       if (!Number.isFinite(candleTime) || (attempt.lastMarketTimestamp && candleTime < attempt.lastMarketTimestamp)) {
         return { attempt, failed: false, liquidate: [], outOfOrder: true };
@@ -193,9 +227,15 @@
     canTradeAt(time, symbol = "") {
       const attempt = this.selected() || this.practiceAttempt();
       if (!attempt) return { ok: false, message: "Start a prop practice round first." };
+      if (attempt.archived) return {ok:false, message:'Restore this archived account before trading.'};
       if (symbol !== "XAUUSD") return { ok: false, message: "Prop practice uses XAUUSD only." };
       if (attempt.status !== "active") return { ok: false, message: attempt.status === "phase-ready" ? "This phase met its target. Start the next phase from Prop Firm Session." : `This round is ${attempt.status}. Start a new practice round to place more trades.` };
       const ms = timestamp(time);
+      if (ms == null) return { ok: false, message: "Wait for a historical candle to load before placing an order." };
+      if (Date.now() >= timestamp(attempt.deadlineAt)) {
+        this.evaluate(attempt);
+        return { ok: false, message: "This practice phase has expired. Create a new practice account." };
+      }
       if (attempt.lastMarketTimestamp && ms != null && ms < attempt.lastMarketTimestamp) return { ok: false, message: "Practice trades must follow replay time. Move the replay forward before placing an order." };
       const otherSymbol = this.summary(attempt).open.find(trade => trade.symbol && trade.symbol !== symbol)?.symbol;
       if (otherSymbol) return { ok: false, message: `Close the active ${otherSymbol} practice position before placing a ${symbol} trade.` };
@@ -236,23 +276,24 @@
       const todayTrades = [...summary.closed, ...summary.open].filter(trade => dayKey(trade.closed_at || trade.opened_at) === today);
       const todayPnl = todayTrades.reduce((total, trade) => total + (Number(trade.pnl ?? trade.floating_pnl) || 0), 0);
       const deadline = attempt.deadlineAt ? new Date(attempt.deadlineAt) : null;
-      const title = `${rules.name} · ${money(attempt.startingBalance)}`;
+      const title = `${attempt.name || rules.name} · ${money(attempt.startingBalance)}`;
       const detailRows = summary.closed.slice().sort((a, b) => (timestamp(b.closed_at) || 0) - (timestamp(a.closed_at) || 0)).slice(0, 10);
       return `<section class="propfirm-overview" aria-label="Selected practice account details">
         <div class="propfirm-breadcrumb"><span>Prop Firm Accounts</span><b>›</b><strong>${escape(title)}</strong><span class="propfirm-status-tag" data-status="${escape(attempt.status)}">${escape(attempt.status === 'active' ? 'Ongoing' : attempt.status === 'phase-ready' ? 'Phase ready' : attempt.status)}</span></div>
         <header class="propfirm-overview-head"><div><span class="propfirm-eyebrow">SELECTED PRACTICE ACCOUNT · XAUUSD</span><h2>${escape(title)}</h2><div class="propfirm-overview-tags"><span>Phase ${attempt.phase}</span><span>${escape(attempt.model === 'pro' ? '2 Step Pro' : '2 Step Standard')}</span><span>Simulation</span></div></div><button class="propfirm-primary" id="propFirmChart">${attempt.status === 'phase-ready' ? 'Manage phase →' : 'Open XAUUSD chart & trade →'}</button></header>
-        <div class="propfirm-overview-stats"><article><span>Account size</span><b>${money(attempt.startingBalance)}</b></article><article><span>Today's profit</span><b class="${todayPnl >= 0 ? 'positive' : 'negative'}">${todayPnl >= 0 ? '+' : ''}${money(todayPnl)}</b></article><article><span>Start date</span><b>${new Date(attempt.phaseStartedAt || attempt.startedAt).toLocaleDateString()}</b></article><article><span>Phase end</span><b>${deadline && Number.isFinite(deadline.getTime()) ? deadline.toLocaleDateString() : '—'}</b></article></div>
-        <div class="propfirm-overview-grid"><div class="propfirm-overview-main">${this.renderEquityChart(attempt, summary)}<section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">TRADING HISTORY</span><h3>Closed positions <small>(${summary.closed.length})</small></h3></div><span class="propfirm-detail-caption">XAUUSD · Phase ${attempt.phase}</span></div>${detailRows.length ? `<div class="propfirm-trade-table-wrap"><table class="propfirm-trade-table"><thead><tr><th>Side</th><th>Open</th><th>Close</th><th>Size</th><th>Result</th></tr></thead><tbody>${detailRows.map(trade => `<tr><td class="${trade.type === 'BUY' ? 'positive' : 'negative'}">${escape(trade.type)}</td><td>${Number(trade.entry || 0).toFixed(2)}</td><td>${Number(trade.exit || 0).toFixed(2)}</td><td>${Number(trade.lots || 0).toFixed(2)}</td><td class="${Number(trade.pnl) >= 0 ? 'positive' : 'negative'}">${Number(trade.pnl) >= 0 ? '+' : ''}${money(trade.pnl)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="propfirm-empty-inline">No closed positions in this phase yet. Open the practice chart to place a simulated XAUUSD trade.</div>'}</section></div><aside class="propfirm-overview-side"><section class="propfirm-score-card"><div><span>Virtual balance</span><b>${money(attempt.startingBalance + summary.closedPnl)}</b></div><div class="propfirm-balance-track"><i style="width:${Math.max(0,Math.min(100,(summary.equity / (attempt.startingBalance * 1.1))*100))}%"></i></div><small>Equity ${money(summary.equity)} · starting ${money(attempt.startingBalance)}</small></section><section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">TRADING OBJECTIVES</span><h3>Phase ${attempt.phase} progress</h3></div></div><div class="propfirm-objective-row"><span>Minimum trading days</span><b>${summary.tradedDays.length} / ${rules.minDays}</b></div><div class="propfirm-mini-track"><i style="width:${Math.min(100,summary.tradedDays.length / Math.max(1,rules.minDays) * 100)}%"></i></div><div class="propfirm-objective-row"><span>Maximum daily loss</span><b>${rules.dailyLossPct}% · ${money(summary.dailyDrawdown)} used</b></div><div class="propfirm-objective-row"><span>Maximum loss</span><b>${rules.maxLossPct}% · ${money(summary.maxDrawdown)} used</b></div><div class="propfirm-objective-row"><span>Profit target</span><b>${money(Math.max(0,summary.pnl))} / ${money(summary.target)}</b></div><div class="propfirm-mini-track"><i style="width:${summary.targetProgress}%"></i></div><div class="propfirm-objective-row"><span>Phase deadline</span><b>${Math.ceil(summary.remainingMs / DAY_MS)} days left</b></div>${attempt.status === 'phase-ready' ? `<button class="propfirm-primary propfirm-wide" id="propFirmAdvance">${attempt.phase === 2 ? 'Complete round' : 'Start Phase 2 →'}</button>` : ''}</section><section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">OPEN POSITIONS</span><h3>Active · ${summary.open.length}</h3></div></div>${summary.open.length ? summary.open.map(trade => `<div class="propfirm-open-row"><span class="${trade.type === 'BUY' ? 'positive' : 'negative'}">${escape(trade.type)} XAUUSD</span><b class="${Number(trade.floating_pnl) >= 0 ? 'positive' : 'negative'}">${Number(trade.floating_pnl) >= 0 ? '+' : ''}${money(trade.floating_pnl)}</b></div>`).join('') : '<div class="propfirm-empty-inline">No open positions</div>'}</section></aside></div>
+        <form id="propRenameForm" class="propfirm-manage-row"><label>Account name<input id="propAccountName" aria-label="Account name" value="${escape(attempt.name || rules.name)}" maxlength="60" required></label><button class="propfirm-secondary" type="submit">Save name</button><button class="propfirm-secondary" type="button" id="propArchive">${attempt.archived ? 'Restore account' : 'Archive account'}</button><span role="status" id="propManageStatus"></span></form><div class="propfirm-overview-stats"><article><span>Account size</span><b>${money(attempt.startingBalance)}</b></article><article><span>Today's profit</span><b class="${todayPnl >= 0 ? 'positive' : 'negative'}">${todayPnl >= 0 ? '+' : ''}${money(todayPnl)}</b></article><article><span>Start date</span><b>${new Date(attempt.phaseStartedAt || attempt.startedAt).toLocaleDateString()}</b></article><article><span>Phase end</span><b>${deadline && Number.isFinite(deadline.getTime()) ? deadline.toLocaleDateString() : '—'}</b></article></div>
+        <div class="propfirm-overview-grid"><div class="propfirm-overview-main">${this.renderEquityChart(attempt, summary)}<section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">TRADING HISTORY</span><h3>Closed positions <small>(${summary.closed.length})</small></h3></div><span class="propfirm-detail-caption">XAUUSD · Phase ${attempt.phase}</span></div>${detailRows.length ? `<div class="propfirm-trade-table-wrap"><table class="propfirm-trade-table"><thead><tr><th>Side</th><th>Open</th><th>Close</th><th>Size</th><th>Result</th></tr></thead><tbody>${detailRows.map(trade => `<tr><td class="${trade.type === 'BUY' ? 'positive' : 'negative'}">${escape(trade.type)}</td><td>${Number(trade.entry || 0).toFixed(2)}</td><td>${Number(trade.exit || 0).toFixed(2)}</td><td>${Number(trade.lots || 0).toFixed(2)}</td><td class="${Number(trade.pnl) >= 0 ? 'positive' : 'negative'}">${Number(trade.pnl) >= 0 ? '+' : ''}${money(trade.pnl)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="propfirm-empty-inline">No closed positions in this phase yet. Open the practice chart to place a simulated XAUUSD trade.</div>'}</section></div><aside class="propfirm-overview-side"><section class="propfirm-score-card"><div><span>Virtual balance</span><b>${money(attempt.startingBalance + summary.closedPnl)}</b></div><div class="propfirm-balance-track"><i style="width:${Math.max(0,Math.min(100,(summary.equity / (attempt.startingBalance * 1.1))*100))}%"></i></div><small>Equity ${money(summary.equity)} · starting ${money(attempt.startingBalance)}</small></section><section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">TRADING OBJECTIVES</span><h3>Phase ${attempt.phase} progress</h3></div></div><div class="propfirm-objective-row"><span>Minimum trading days</span><b>${summary.tradedDays.length} / ${rules.minDays}</b></div><div class="propfirm-mini-track"><i style="width:${rules.minDays === 0 ? 100 : Math.min(100,summary.tradedDays.length / rules.minDays * 100)}%"></i></div><div class="propfirm-objective-row"><span>Maximum daily loss</span><b>${rules.dailyLossPct}% · ${money(summary.dailyDrawdown)} used</b></div><div class="propfirm-objective-row"><span>Maximum loss</span><b>${rules.maxLossPct}% · ${money(summary.maxDrawdown)} used</b></div><div class="propfirm-objective-row"><span>Profit target</span><b>${money(Math.max(0,summary.pnl))} / ${money(summary.target)}</b></div><div class="propfirm-mini-track"><i style="width:${summary.targetProgress}%"></i></div><div class="propfirm-objective-row"><span>Phase deadline</span><b>${Math.ceil(summary.remainingMs / DAY_MS)} days left</b></div>${attempt.status === 'phase-ready' ? `<button class="propfirm-primary propfirm-wide" id="propFirmAdvance">${attempt.phase === 2 ? 'Complete round' : 'Start Phase 2 →'}</button>` : ''}</section><section class="propfirm-detail-card"><div class="propfirm-detail-heading"><div><span class="propfirm-eyebrow">OPEN POSITIONS</span><h3>Active · ${summary.open.length}</h3></div></div>${summary.open.length ? summary.open.map(trade => `<div class="propfirm-open-row"><span class="${trade.type === 'BUY' ? 'positive' : 'negative'}">${escape(trade.type)} XAUUSD</span><b class="${Number(trade.floating_pnl) >= 0 ? 'positive' : 'negative'}">${Number(trade.floating_pnl) >= 0 ? '+' : ''}${money(trade.floating_pnl)}</b></div>`).join('') : '<div class="propfirm-empty-inline">No open positions</div>'}</section></aside></div>
+        ${window.PropPracticeAnalytics?.render(this, attempt, summary) || ''}
         <div class="propfirm-detail-foot">Practice simulator only · Your ordinary TradeFXBook backtesting history remains separate from this account.</div>
       </section>`;
     },
     render() {
       this.load();
-      const attempts = this.attempts;
+      const attempts = this.filteredAccounts();
       const selected = this.selected();
       const attempt = selected || this.practiceAttempt();
       if (attempt?.status === "active" && (!window.PropPracticeWorkspace || window.PropPracticeWorkspace.hasState(attempt))) this.evaluate(attempt);
-      const rules = attempt ? MODELS[attempt.model] : MODELS[this.model];
+      const rules = attempt ? this.rulesFor(attempt) : MODELS[this.model];
       const summary = attempt ? this.summary(attempt) : null;
       const daysLeft = summary ? Math.ceil(summary.remainingMs / DAY_MS) : null;
       const clock = ms => { const d = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(d / 86400)}d ${String(Math.floor(d % 86400 / 3600)).padStart(2,"0")}h ${String(Math.floor(d % 3600 / 60)).padStart(2,"0")}m`; };
@@ -262,25 +303,57 @@
         <header class="propfirm-hero"><div><span class="propfirm-eyebrow">INTENSEFXTRADES · SIMULATED EVALUATION</span><h2>Prop Firm Session</h2><p>Practice evaluation rounds in a dedicated XAUUSD chart with its own replay, drawings, orders, and analysis. Choose a model, trade by its published objectives, and review each attempt.</p></div><div class="propfirm-hero-mark"><b>PF</b><span>Practice mode</span></div></header>
         <div class="propfirm-notice"><b>Independent practice simulator.</b> Rule values below reference the provider’s public Free Trial rules. Trade execution and market conditions come from TradeFXBook’s local replay engine; this does not create a provider account, copy live credentials, or guarantee identical spreads, leverage, commissions, or fills.</div>
         <section class="propfirm-chart-launch"><div><span class="propfirm-eyebrow">DEDICATED XAUUSD CHART</span><b>Practice on the real historical candles</b><small>Open the isolated chart with replay, drawing tools, and simulated orders for the selected account.</small></div><button class="propfirm-primary" id="propFirmOpenChart">Open XAUUSD practice chart <span>→</span></button></section>
-        <section class="propfirm-card propfirm-create"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">CREATE ACCOUNT</span><h3>Add a practice account</h3><p>Create multiple independent rounds. Each account keeps its own balance, trades, replay, drawings, and objectives.</p></div><span class="propfirm-badge">XAUUSD PRACTICE</span></div><div class="propfirm-plan-grid">${Object.entries(MODELS).map(([code, model]) => `<button type="button" class="propfirm-plan-card ${code === "pro" ? "pro" : "standard"} ${this.model === code ? "selected" : ""}" data-select-model="${code}" aria-pressed="${this.model === code}"><span class="propfirm-plan-kicker">${code === "pro" ? "2 STEP PRO" : "2 STEP STANDARD"}</span><b class="propfirm-plan-title">${code === "pro" ? "Lean, Fast Efficient" : "Maximum Drawdown Space"}</b><span class="propfirm-plan-summary">${code === "pro" ? "Lower daily loss limit · built for focused traders" : "More breathing room · higher overall drawdown"}</span><span class="propfirm-plan-metrics"><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Daily loss limit <b>${model.dailyLossPct}%</b></span><span>Max drawdown <b>${model.maxLossPct}% static</b></span><span>Leverage reference <b>up to 1:100</b></span><span>Min. trading days <b>${model.minDays} / phase</b></span></span><span class="propfirm-plan-select">${this.model === code ? "Selected" : "Select this model"} <i>→</i></span></button>`).join("")}</div><div class="propfirm-create-grid"><label>Challenge model<select id="propFirmModel"><option value="standard" ${this.model === "standard" ? "selected" : ""}>2 Step Standard</option><option value="pro" ${this.model === "pro" ? "selected" : ""}>2 Step Pro</option></select></label><label>Virtual starting balance<select id="propFirmSize">${MODELS[this.model].sizes.map(size => `<option value="${size}" ${Number(this.size) === size ? "selected" : ""}>${money(size)}</option>`).join("")}</select></label><button class="propfirm-primary" id="propFirmStart">Create practice account <span>→</span></button></div><div class="propfirm-rule-preview" id="propFirmRulePreview">${this.model === "standard" ? "Phase 1 target 8% · Phase 2 target 5% · Daily loss 5% · Max loss 10% · 3 minimum trading days per phase" : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · 2 minimum trading days per phase"} · 14 calendar days per phase</div></section>
+        <section class="propfirm-card propfirm-create"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">CREATE ACCOUNT</span><h3>Add a practice account</h3><p>Create multiple independent rounds. Each account keeps its own balance, trades, replay, drawings, and objectives.</p></div><span class="propfirm-badge">XAUUSD PRACTICE</span></div><div class="propfirm-plan-grid">${Object.entries(MODELS).map(([code, model]) => `<button type="button" class="propfirm-plan-card ${code === "pro" ? "pro" : "standard"} ${this.model === code ? "selected" : ""}" data-select-model="${code}" aria-pressed="${this.model === code}"><span class="propfirm-plan-kicker">${code === "pro" ? "2 STEP PRO" : "2 STEP STANDARD"}</span><b class="propfirm-plan-title">${code === "pro" ? "Lean, Fast Efficient" : "Maximum Drawdown Space"}</b><span class="propfirm-plan-summary">${code === "pro" ? "Lower daily loss limit · built for focused traders" : "More breathing room · higher overall drawdown"}</span><span class="propfirm-plan-metrics"><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Daily loss limit <b>${code === "standard" ? this.standardDailyLoss : model.dailyLossPct}%</b></span><span>Max drawdown <b>${model.maxLossPct}% static</b></span><span>Leverage reference <b>up to 1:100</b></span><span>Min. trading days <b>${code === "standard" ? this.standardMinDays : model.minDays} / phase</b></span></span><span class="propfirm-plan-select">${this.model === code ? "Selected" : "Select this model"} <i>→</i></span></button>`).join("")}</div><div class="propfirm-create-grid"><label>Challenge model<select id="propFirmModel"><option value="standard" ${this.model === "standard" ? "selected" : ""}>2 Step Standard</option><option value="pro" ${this.model === "pro" ? "selected" : ""}>2 Step Pro</option></select></label><label>Virtual starting balance<select id="propFirmSize">${MODELS[this.model].sizes.map(size => `<option value="${size}" ${Number(this.size) === size ? "selected" : ""}>${money(size)}</option>`).join("")}</select></label><label ${this.model !== 'standard' ? 'hidden' : ''}>Standard daily loss<select id="propStandardLoss"><option value="3" ${this.standardDailyLoss === 3 ? 'selected' : ''}>3%</option><option value="5" ${this.standardDailyLoss === 5 ? 'selected' : ''}>5%</option></select></label><label ${this.model !== 'standard' ? 'hidden' : ''}>Minimum trading days<select id="propStandardDays"><option value="0" ${this.standardMinDays === 0 ? 'selected' : ''}>0 per phase</option><option value="3" ${this.standardMinDays === 3 ? 'selected' : ''}>3 per phase</option></select></label><button class="propfirm-primary" id="propFirmStart">Create practice account <span>→</span></button></div><div class="propfirm-rule-preview" id="propFirmRulePreview">${this.model === "standard" ? `Phase 1 target 8% · Phase 2 target 5% · Daily loss ${this.standardDailyLoss}% · Max loss 10% · ${this.standardMinDays} minimum trading days per phase` : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · No minimum trading days"} · 14 calendar days per phase</div></section>
         ${attempt ? this.renderAccountDashboard(attempt, rules, summary) : ""}
         ${attempt && ["passed", "failed", "expired"].includes(attempt.status) ? `<section class="propfirm-result-card" data-status="${attempt.status}"><div><span class="propfirm-eyebrow">ROUND ${escape(statusLabel(attempt.status).toUpperCase())}</span><h3>${attempt.status === "passed" ? "Practice evaluation complete" : attempt.status === "expired" ? "Phase time limit reached" : "Loss rule breached"}</h3><p>${escape(attempt.breachReason || "Both phases met their objectives. This result is for practice only.")}</p><b>Final virtual equity · ${money(summary.equity)}</b></div><button class="propfirm-secondary" id="propFirmNewRound">Start another round</button></section>` : ""}
-        <section class="propfirm-card"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">MODEL RULES</span><h3>Round objectives at a glance</h3><p>The selected model uses different drawdown and target thresholds.</p></div></div><div class="propfirm-model-grid">${Object.entries(MODELS).map(([code, model]) => `<article class="propfirm-model-card ${attempt?.model === code || (!attempt && this.model === code) ? "selected" : ""}"><div><b>${escape(model.name)}</b><span>${model.sizes.map(x => `$${x/1000}K`).join(" · ")}</span></div><div class="propfirm-model-metrics"><span>Daily loss <b>${model.dailyLossPct}%</b></span><span>Max loss <b>${model.maxLossPct}%</b></span><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Min. active days <b>${model.minDays} / phase</b></span><span>Time limit <b>14 calendar days / phase</b></span></div></article>`).join("")}</div><p class="propfirm-rule-footnote">Daily loss is based on the higher day-opening balance or equity and resets at 00:00 platform time (UTC+3). Maximum loss is static from starting balance. Open-position floating loss counts toward both limits.</p></section>
-        <section class="propfirm-card"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">YOUR ACCOUNTS</span><h3>Practice accounts <small>(${attempts.length})</small></h3><p>Select an account to open its balance, objectives, trading history, and open positions.</p></div><span class="propfirm-count-badge">${attempts.length} ${attempts.length === 1 ? "account" : "accounts"}</span></div>${attempts.length ? `<div class="propfirm-account-grid">${attempts.map(item => { const r=MODELS[item.model];const pnl=this.summary(item)?.pnl || 0;return `<button class="propfirm-account-card ${item.id===attempt?.id?"selected":""}" data-prop-attempt="${escape(item.id)}"><span class="propfirm-account-card-top"><span class="propfirm-history-icon ${item.model}">${item.model === "pro" ? "P" : "S"}</span><span class="propfirm-history-status" data-status="${item.status}">${escape(statusLabel(item.status))}</span><span class="propfirm-account-arrow">↗</span></span><b class="propfirm-account-name">${escape(r.name)} · ${money(item.startingBalance)}</b><span class="propfirm-account-meta">XAUUSD · Phase ${item.phase} · ${new Date(item.startedAt).toLocaleDateString()}</span><span class="propfirm-account-balance-label"><span>Balance</span><span>Phase P&amp;L</span></span><span class="propfirm-account-balance"><b>${money(item.startingBalance + (this.summary(item)?.closedPnl || 0))}</b><b class="${pnl >= 0 ? "positive" : "negative"}">${pnl >= 0 ? "+" : ""}${money(pnl)}</b></span><span class="propfirm-account-progress"><i style="width:${this.summary(item)?.targetProgress || 0}%"></i></span><span class="propfirm-account-foot">Profit target ${r.targets[item.phase]}% <b>${Math.round(this.summary(item)?.targetProgress || 0)}%</b></span></button>`;}).join("")}</div>` : `<div class="propfirm-empty"><span>◎</span><b>No practice accounts yet</b><p>Select a challenge model above and start your first simulated evaluation.</p></div>`}</section>
+        <section class="propfirm-card"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">MODEL RULES</span><h3>Round objectives at a glance</h3><p>The selected model uses different drawdown and target thresholds.</p></div></div><div class="propfirm-model-grid">${Object.entries(MODELS).map(([code, model]) => `<article class="propfirm-model-card ${attempt?.model === code || (!attempt && this.model === code) ? "selected" : ""}"><div><b>${escape(model.name)}</b><span>${model.sizes.map(x => `$${x/1000}K`).join(" · ")}</span></div><div class="propfirm-model-metrics"><span>Daily loss <b>${code === "standard" ? this.standardDailyLoss : model.dailyLossPct}%</b></span><span>Max loss <b>${model.maxLossPct}%</b></span><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Min. active days <b>${code === "standard" ? this.standardMinDays : model.minDays} / phase</b></span><span>Time limit <b>14 calendar days / phase</b></span></div></article>`).join("")}</div><p class="propfirm-rule-footnote">Daily loss is based on the higher day-opening balance or equity and resets at 00:00 platform time (UTC+3). Maximum loss is static from starting balance. Open-position floating loss counts toward both limits.</p></section>
+        ${this.renderAccounts()}
         <section class="propfirm-disclaimer"><b>How chart trades are scored</b><p>Each round and phase has an independent practice ledger and XAUUSD chart workspace. Prop practice trades do not enter your normal backtesting history. Drawings and replay are restored for the selected round and phase. Open the dedicated Practice Chart to trade. FXN/session overlays are not used to determine prop-firm trading days; the round follows UTC+3 platform-day boundaries.</p></section>
       </section>`;
     },
+    renderAccounts() {
+      const rows = this.filteredAccounts(), f = this.filters;
+      const select = (key, label, values) => `<label>${label}<select data-prop-filter="${key}">${values.map(([v,l]) => `<option value="${v}" ${f[key] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+      return `<section class="propfirm-card"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">YOUR ACCOUNTS</span><h3>Practice accounts (${this.attempts.length})</h3><p>${rows.length} matching · Archived accounts retain their trades, drawings and replay.</p></div></div><div class="propfirm-filters"><label>Search accounts<input id="propAccountSearch" value="${escape(f.search)}" placeholder="Name, balance or account ID"></label>${select('model','Model',[['all','All models'],['standard','Standard'],['pro','Pro']])}${select('status','Status',[['all','All statuses'],['active','In progress'],['phase-ready','Phase ready'],['passed','Passed'],['failed','Breached'],['expired','Expired']])}${select('phase','Phase',[['all','All phases'],['1','Phase 1'],['2','Phase 2']])}${select('archive','Accounts',[['active','Current'],['archived','Archived'],['all','All accounts']])}</div><div id="propAccountResults"><div class="propfirm-account-grid">${rows.map(item => {
+        const summary = this.summary(item), rules = this.rulesFor(item);
+        return `<article class="propfirm-account-item"><button class="propfirm-account-card ${item.id === this.selectedId ? 'selected' : ''}" data-prop-attempt="${escape(item.id)}"><span class="propfirm-account-card-top"><b>${item.archived ? 'Archived' : escape(item.status)}</b><span>Phase ${item.phase}</span></span><b>${escape(item.name || rules.name)}</b><small>${escape(rules.name)} · ${money(item.startingBalance)} · ${rules.dailyLossPct}% daily · ${rules.minDays} days</small><span class="propfirm-account-balance"><b>${money(item.startingBalance + summary.closedPnl)}</b><b class="${summary.pnl >= 0 ? 'positive' : 'negative'}">${money(summary.pnl)}</b></span><span class="propfirm-account-progress"><i style="width:${summary.targetProgress}%"></i></span><small>Target ${summary.targetPct}% · ${summary.targetProgress.toFixed(1)}%</small><small>${escape(item.id)}</small></button><button type="button" class="propfirm-secondary" data-prop-archive="${escape(item.id)}">${item.archived ? 'Restore' : 'Archive'}</button></article>`;
+      }).join('')}</div>${rows.length ? '' : '<p class="propfirm-empty-inline">No accounts match these filters.</p>'}</div></section>`;
+    },
     afterRender(container) {
-      const attempt = this.selected();
-      if (attempt && window.PropPracticeWorkspace && !window.PropPracticeWorkspace.hasState(attempt)) {
-        window.PropPracticeWorkspace.ensure(attempt).then(() => {
-          if (window.Router.current === 'prop-firm-session' && this.selectedId === attempt.id) this.refreshView();
+      this.load();
+      const scope = this._scope;
+      const missing = window.PropPracticeWorkspace ? this.attempts.filter(item => !window.PropPracticeWorkspace.hasState(item)) : [];
+      if (missing.length) {
+        Promise.all(missing.map(item => window.PropPracticeWorkspace.ensure(item))).then(() => {
+          if (window.Router.current === 'prop-firm-session' && this._scope === scope) this.refreshView();
         }).catch(error => {
           const notice = container.querySelector('.propfirm-notice');
           if (notice) notice.textContent = error.message;
         });
       }
       this.load();
+      window.PropPracticeAnalytics?.bind(container, this);
+      container.querySelector('#propRenameForm')?.addEventListener('submit', event => {
+        event.preventDefault(); const result = this.rename(this.selectedId, container.querySelector('#propAccountName').value);
+        if (result.ok) this.refreshView(); else container.querySelector('#propManageStatus').textContent = result.message;
+      });
+      const archive = async id => {
+        const attempt = this.attempts.find(a => a.id === id);
+        try { if (window.PropPracticeWorkspace) { const context = await PropPracticeWorkspace.ensure(attempt); await context.store.refresh(); } } catch(error) { window.UI?.showToast?.(error.message, 'error'); return; }
+        const result = this.archive(id, !attempt.archived);
+        if (result.ok) this.refreshView(); else window.UI?.showToast?.(result.message, 'info');
+      };
+      container.querySelector('#propArchive')?.addEventListener('click', () => archive(this.selectedId));
+      container.querySelectorAll('[data-prop-archive]').forEach(button => button.addEventListener('click', () => archive(button.dataset.propArchive)));
+      container.querySelectorAll('[data-prop-filter]').forEach(input => input.addEventListener('change', () => {this.filters[input.dataset.propFilter] = input.value; this.refreshView();}));
+      container.querySelector('#propAccountSearch')?.addEventListener('input', event => {
+        this.filters.search = event.target.value;
+        const start = event.target.selectionStart;
+        this.refreshView();
+        const input = document.querySelector('#propAccountSearch'); input?.focus(); input?.setSelectionRange(start,start);
+      });
+      container.querySelector('#propStandardLoss')?.addEventListener('change', event => {this.standardDailyLoss=Number(event.target.value);this.refreshView();});
+      container.querySelector('#propStandardDays')?.addEventListener('change', event => {this.standardMinDays=Number(event.target.value);this.refreshView();});
       const model = container.querySelector("#propFirmModel");
       const size = container.querySelector("#propFirmSize");
       container.querySelectorAll("[data-select-model]").forEach(button => button.addEventListener("click", () => {
@@ -289,15 +362,7 @@
         if (!allowed.includes(Number(this.size))) this.size = allowed[0];
         this.refreshView();
       }));
-      model?.addEventListener("change", () => {
-        this.model = model.value;
-        const allowed = MODELS[this.model].sizes;
-        if (!allowed.includes(Number(this.size))) this.size = allowed[0];
-        if (size) size.innerHTML = allowed.map(n => `<option value="${n}" ${n === Number(this.size) ? "selected" : ""}>${money(n)}</option>`).join("");
-        const preview = container.querySelector("#propFirmRulePreview");
-        if (preview) preview.textContent = this.model === "standard" ? "Phase 1 target 8% · Phase 2 target 5% · Daily loss 5% · Max loss 10% · 3 minimum trading days per phase · 14 calendar days per phase" : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · 2 minimum trading days per phase · 14 calendar days per phase";
-        container.querySelectorAll("[data-select-model]").forEach(card => { const selected = card.dataset.selectModel === this.model; card.classList.toggle("selected", selected); card.setAttribute("aria-pressed", String(selected)); });
-      });
+      model?.addEventListener("change", () => { this.model=model.value; if (!MODELS[this.model].sizes.includes(this.size)) this.size=MODELS[this.model].sizes[0]; this.refreshView(); });
       size?.addEventListener("change", () => { this.size = Number(size.value); });
       container.querySelector("#propFirmStart")?.addEventListener("click", () => {
         const result = this.create(model?.value || this.model, Number(size?.value || this.size));
@@ -319,4 +384,3 @@
   window.addEventListener("hashchange", () => PagePropFirmSession.syncChartBadge());
   window.Store?.subscribe?.(() => PagePropFirmSession.sync());
 })();
-

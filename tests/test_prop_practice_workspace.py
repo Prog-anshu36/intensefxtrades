@@ -22,6 +22,8 @@ class PropPracticeWorkspaceTests(unittest.TestCase):
             tick = dict(time=1767258060000, closed_time=1767258120000, open=2000, high=2021, low=2000, close=2020)
             closed = client.post('/api/trades/update', headers=headers, json={'ticks': {'XAUUSD': tick}}).get_json()['closed']
             self.assertEqual(closed[0]['reason'], 'TP')
+            self.assertEqual(closed[0]['sl'], 1990)
+            self.assertEqual(closed[0]['tp'], 2020)
             saved = client.get('/api/state', headers=headers).get_json()
             self.assertEqual(saved['balance'], 5200)
             self.assertEqual(len(saved['history']), 1)
@@ -51,4 +53,3 @@ class PropPracticeWorkspaceTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
