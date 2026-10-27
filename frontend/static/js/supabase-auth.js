@@ -50,7 +50,7 @@
     if (title) title.textContent = signup ? "Create your account" : forgot ? "Reset your password" : reset ? "Choose a new password" : "Sign in to your workspace";
     if (name) name.hidden = !signup;
     if (emailField) emailField.hidden = reset;
-    if (password) password.hidden = forgot || reset;
+    if (password) password.hidden = forgot;
     if (confirm) confirm.hidden = !signup && !reset;
     if (terms) terms.hidden = forgot || reset;
     if (links) links.hidden = signup || forgot || reset;
