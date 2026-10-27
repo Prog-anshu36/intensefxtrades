@@ -39,6 +39,7 @@ jobs:
           node tests/prop_workspace_lifecycle.test.js
           node tests/prop_practice_chart.test.js
           node tests/account_chart_isolation.test.js
+          node tests/prop_navigation.test.js
           node tests/tool_timeframe_matrix.test.js
           node tests/chart_replay_integration.test.js
           node tests/chart_pointer_integration.test.js

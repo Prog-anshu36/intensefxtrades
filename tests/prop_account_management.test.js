@@ -25,3 +25,15 @@ for(const label of ['Practice score','Daily summary','Short analysis','Long anal
 assert.ok(!html.includes('NaN'));assert.ok(!html.includes('Infinity'));
 console.log('prop_account_management.test.js passed: variants, frozen rules, rename, archive safety/restoration/filtering, persistence, analytics values and rendering');
 
+
+// Dashboard must expose a persistent account rail and a single selected view.
+page.creating=false;
+const portal=page.render();
+assert.ok(portal.includes('prop-account-sidebar'));
+assert.ok(portal.includes('prop-account-detail'));
+assert.ok(!portal.includes('propfirm-hero'));
+assert.ok(portal.indexOf('Practice score')<portal.indexOf('Account equity'));
+assert.ok(portal.indexOf('Account equity')<portal.indexOf('Trading objectives'));
+page.creating=true;
+assert.ok(page.render().includes('role="dialog"'));
+console.log('Reference account-list/detail order and creation dialog checks passed');

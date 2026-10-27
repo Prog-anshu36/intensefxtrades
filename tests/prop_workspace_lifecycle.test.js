@@ -37,5 +37,18 @@ const vm = require('node:vm');
   assert.equal(refreshed,1,'hydration does not cause a rerender loop');
   page.advance(a.id); // active rounds cannot advance prematurely
   assert.equal(a.phase,1);
+  let rejectedLoads=0;
+  sandbox.PropPracticeWorkspace.hasState=()=>false;
+  sandbox.PropPracticeWorkspace.ensure=async()=>{rejectedLoads++;throw new Error('Offline account service');};
+  page.afterRender(container);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(page.workspaceError,'Offline account service');
+  const callsAfterFailure=rejectedLoads;
+  page.afterRender(container);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(rejectedLoads,callsAfterFailure,'failed hydration waits for explicit retry rather than looping');
+  const failedView=page.render();
+  assert.ok(failedView.includes('Account data could not be loaded'));
+  assert.ok(failedView.includes('Retry account data'));
   console.log('prop_workspace_lifecycle.test.js passed: all-account hydration, ledger reuse, balances, selection and no refresh loop');
 })().catch(error=>{console.error(error);process.exitCode=1;});
