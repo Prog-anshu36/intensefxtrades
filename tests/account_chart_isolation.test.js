@@ -81,4 +81,3 @@ assert.notEqual(t.sandbox.ChartAccountState.scopeFor({ active_user_id: 'other', 
   assert.equal(s.store.state.history[0], 'b-record');
   console.log('account_chart_isolation.test.js passed: account storage, legacy migration, chart reset, replay cancellation, restoration, stale refresh');
 })().catch(error => { console.error(error); process.exitCode = 1; });
-

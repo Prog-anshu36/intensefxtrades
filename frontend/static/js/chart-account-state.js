@@ -2,7 +2,7 @@
 (function () {
   const chart = typeof PageBacktesting !== 'undefined' ? PageBacktesting : window.PageBacktesting;
   const clone = value => typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
-  const defaults = Object.fromEntries(Object.entries(chart || {}).filter(([, value]) => typeof value !== 'function').map(([key, value]) => [key, clone(value)]));
+  const defaults = Object.fromEntries(Object.entries(Object.getOwnPropertyDescriptors(chart || {})).filter(([, d]) => 'value' in d && typeof d.value !== 'function').map(([key, d]) => [key, clone(d.value)]));
   const adapters = new Map();
   const bootstrap = new Map();
   let activeScope = null;
@@ -69,7 +69,7 @@
       chart.cleanup();
     }
     chart.drawingEngine?.destroy?.();
-    for (const key of Object.keys(chart)) if (typeof chart[key] !== 'function') delete chart[key];
+    for (const key of Object.keys(chart)) if (!Object.getOwnPropertyDescriptor(chart, key)?.get && typeof chart[key] !== 'function') delete chart[key];
     for (const [key, value] of Object.entries(defaults)) chart[key] = clone(value);
     // Pending history responses and playback ticks must never match a new
     // account's requests, even if it uses the same symbol and timeframe.
