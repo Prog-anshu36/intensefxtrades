@@ -2,7 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 let local = false;
-const sandbox = { window: {}, Date, Math, MarketData: { isLocal: () => local } };
+const sandbox = { window: { SubscriptionSystem: {canAccessFeature:()=>true} }, Date, Math, MarketData: { isLocal: () => local } };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync('frontend/static/js/page_backtesting.js', 'utf8'), sandbox);
 const page = sandbox.window.PageBacktesting;

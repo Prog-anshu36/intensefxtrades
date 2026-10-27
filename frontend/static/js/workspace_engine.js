@@ -110,6 +110,7 @@ const WorkspaceEngine = (() => {
     ws.updatedAt = Date.now();
     save();
     renderTabs();
+    renderDockedPanels();
   }
 
   function capture() {
@@ -238,8 +239,9 @@ const WorkspaceEngine = (() => {
 
   function renderDockedPanels() {
     document.getElementById("desktopDockHost")?.remove();
+    if (typeof Router !== "undefined" && Router.current.startsWith("prop-")) return;
     const ws = active();
-    const docked = Object.entries(ws.panels || {}).filter(([, panel]) => panel.visible !== false && panel.dock && panel.dock !== "floating");
+    const docked = Object.entries(ws.panels || {}).filter(([id, panel]) => !["sidebar", "main", "watchlist", "tradePanel"].includes(id) && panel.visible !== false && panel.dock && panel.dock !== "floating");
     if (!docked.length) return;
     const host = document.createElement("aside");
     host.id = "desktopDockHost";

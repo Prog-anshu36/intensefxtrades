@@ -34,6 +34,13 @@ jobs:
           node tests/pages_startup.test.js
           node tests/trades_sync.test.js
           node tests/fxn_asian_session_range.test.js
+          node tests/prop_firm_session.test.js
+          node tests/prop_account_management.test.js
+          node tests/prop_workspace_lifecycle.test.js
+          node tests/prop_practice_chart.test.js
+          node tests/tool_timeframe_matrix.test.js
+          node tests/chart_replay_integration.test.js
+          node tests/chart_pointer_integration.test.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
