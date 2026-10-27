@@ -1754,3 +1754,12 @@ body.resizing-chart-bottom-panel .tv-bottom-resize-handle::after {
   #sidebar > div:has(> #pagesBackup) > div:first-child { display: none; }
   #sidebar #pagesBackup, #sidebar #pagesRestore { justify-content: center; padding-inline: 0; font-size: 0; gap: 0; }
 }
+
+/* Prepaid terms and the separate full-access Golden VIP pass. */
+.subscription-term { display:flex; align-items:center; gap:12px; margin:20px 0; color:var(--text-secondary,#a5b2ca); font-size:13px; }
+.subscription-term select { min-width:180px; padding:10px 12px; border:1px solid var(--border,#293448); border-radius:9px; background:var(--bg-card,#111723); color:var(--text-primary,#e9efff); }
+.golden-vip-pass { background:linear-gradient(115deg,rgba(179,133,32,.13),rgba(239,199,94,.03)); }
+.golden-vip-pass .subscription-kicker,.golden-vip-pass strong { color:#dcb750; }
+.golden-vip-pass .subscription-secondary { display:block; margin-top:12px; --plan-color:#dcb750; padding:9px 18px; }
+.subscription-gate .subscription-secondary { margin:8px 8px 0 0; padding:10px 16px; }
+

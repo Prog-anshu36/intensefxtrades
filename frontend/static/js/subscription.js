@@ -25,17 +25,24 @@
     blue: { code: "blue", name: "Blue", tier: "Free", color: COLORS.blue, price: 0,
       features: new Set(["dashboard", "trades", "generalSettings", "tradingView"]), accountLimit: 1,
       bullets: ["Dashboard, trades and journal", "Chart workspace", "One demo trading account"] },
-    green: { code: "green", name: "Green", tier: "Starter", color: COLORS.green, price: null,
+    green: { code: "green", name: "Green", tier: "Starter", color: COLORS.green, price: 49,
       features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "additionalAccount"]), accountLimit: Infinity,
       bullets: ["Everything in Blue", "Analysis and performance", "Backtesting", "Additional trading accounts"] },
-    purple: { code: "purple", name: "Purple", tier: "Pro", color: COLORS.purple, price: null,
+    purple: { code: "purple", name: "Purple", tier: "Pro", color: COLORS.purple, price: 149,
       features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount"]), accountLimit: Infinity,
       bullets: ["Everything in Green", "Replay and technical indicators", "Trading Analysis", "Replay history limited to one year"] },
-    red: { code: "red", name: "Red", tier: "Elite", color: COLORS.red, price: null,
+    red: { code: "red", name: "Red", tier: "Elite", color: COLORS.red, price: 199,
       features: new Set(Object.keys(FEATURES)), accountLimit: Infinity,
       bullets: ["Everything in Purple", "AI Coach and premium settings", "Full supported XAUUSD history", "All available replay history"] },
   };
   const ORDER = ["blue", "green", "purple", "red"];
+  const GOLDEN_PASS = { code: 'golden_vip', name: 'Golden VIP', tier: 'Pass', color: '#efc75e', price: 249, features: new Set(Object.keys(FEATURES)) };
+  function purchaseQuote(product, months = 1) {
+    const item = product === 'golden_vip' ? GOLDEN_PASS : PLANS[product];
+    if (!item || ![1,3,12].includes(months)) throw new Error('Choose a valid access term.');
+    return { product, months, amount: item.price * months, amountPaise: item.price * months * 100, currency: 'INR' };
+  }
+
   const configuredPrices = window.IntenseFXPlanPricing || {};
   for (const code of ["green", "purple", "red"]) {
     const amount = configuredPrices[code];
@@ -57,26 +64,22 @@
     if (!PLANS[code] || !["active", "trialing"].includes(status) || (hasEnd && (!Number.isFinite(end) || end <= Date.now()))) return "blue";
     return code;
   }
-  const VIP_KEYS = Object.freeze({ siuuu: "red", pro: "green", elite: "purple" });
-  const VIP_STORAGE_KEY = "intensefx_vip_plan";
+  // Legacy browser VIP values are deliberately ignored; leave stored data intact.
   function getVipPlanCode() {
-    try {
-      const code = localStorage.getItem(VIP_STORAGE_KEY);
-      return ORDER.includes(code) && code !== "blue" ? code : null;
-    } catch { return null; }
+    const subscription = window.IntenseFXAuth?.getSubscription?.();
+    return subscription?.provider === "vip" && normalizePlan(subscription) !== "blue" ? subscription.plan_code : null;
   }
-  function redeemVipKey(value) {
-    const code = String(value ?? "").trim().toLowerCase();
-    const planCode = VIP_KEYS[code];
-    if (!planCode) return { ok: false };
-    try { localStorage.setItem(VIP_STORAGE_KEY, planCode); }
-    catch { return { ok: false, storageUnavailable: true }; }
-    window.dispatchEvent(new Event("intensefx:subscription-changed"));
-    return { ok: true, plan: PLANS[planCode] };
+  async function redeemVipKey(value) {
+    const key = String(value ?? "").trim();
+    if (!key) return { ok: false, message: "Enter a VIP key." };
+    if (!window.IntenseFXAuth?.redeemVipKey) return { ok: false, message: "VIP redemption requires configured authentication and the server redemption service." };
+    try { return await window.IntenseFXAuth.redeemVipKey(key); }
+    catch { return { ok: false, message: "Could not reach VIP redemption. Check your connection and try again." }; }
   }
   function getUserPlan() {
-    const verified = normalizePlan(window.IntenseFXAuth?.getSubscription?.());
-    return PLANS[verified !== "blue" ? verified : (getVipPlanCode() || "blue")];
+    const subscription = window.IntenseFXAuth?.getSubscription?.();
+    const plan = PLANS[normalizePlan(subscription)];
+    return plan.code === 'red' && subscription?.product_code === 'golden_vip' ? { ...plan, name: GOLDEN_PASS.name, tier: GOLDEN_PASS.tier, color: GOLDEN_PASS.color, productCode: 'golden_vip' } : plan;
   }
   function getUserEntitlements(plan = getUserPlan()) { return new Set(plan.features); }
   function canAccessFeature(feature, plan = getUserPlan()) { return Boolean(plan?.features.has(feature)); }
@@ -115,6 +118,15 @@
     window.location.hash = "subscription";
   }
 
+  // A missing permission module must never turn a restricted control into an
+  // allowed one. The data-plan-feature contract is shared by chart controls,
+  // settings, menus, and future premium actions.
+  function guardFeature(feature, message) {
+    if (canAccessFeature(feature)) return true;
+    requestUpgrade(feature, message);
+    return false;
+  }
+
   function protectFeatureControls(root = document) {
     root.querySelectorAll?.("[data-plan-feature]").forEach((control) => {
       const feature = control.dataset.planFeature;
@@ -124,7 +136,7 @@
       control.setAttribute("aria-disabled", String(!allowed));
       if (!allowed) {
         const required = requiredPlan(feature);
-        control.title = FEATURES[feature].label + " is included with " + required.name + " · " + required.tier;
+        control.title = `${FEATURES[feature].label} is included with ${required.name} · ${required.tier}`;
       }
     });
   }
@@ -142,7 +154,8 @@
   window.addEventListener("intensefx:subscription-changed", () => protectFeatureControls());
   document.addEventListener("DOMContentLoaded", () => protectFeatureControls());
 
-  window.SubscriptionSystem = { PLANS, FEATURES, ORDER, normalizePlan, getUserPlan, getUserEntitlements,
+  window.SubscriptionSystem = { PLANS, FEATURES, ORDER, GOLDEN_PASS, purchaseQuote, normalizePlan, getUserPlan, getUserEntitlements,
     canAccessFeature, requiredPlan, canCreateAccount, getPermittedReplayRange, canAccessHistoricalData, canAccessReplayRange,
-    protectFeatureControls, getVipPlanCode, redeemVipKey, requestUpgrade };
+    guardFeature, protectFeatureControls, getVipPlanCode, redeemVipKey, requestUpgrade };
 })();
+

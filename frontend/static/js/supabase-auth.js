@@ -128,13 +128,14 @@
     const user = state.session.user;
     const [profileResult, subscriptionResult] = await Promise.all([
       state.client.from("profiles").select("user_id,email,full_name,avatar_url,created_at,updated_at").eq("user_id", user.id).maybeSingle(),
-      state.client.from("subscriptions").select("plan_code,status,current_period_end").eq("user_id", user.id).maybeSingle(),
+      state.client.from("subscriptions").select("plan_code,status,current_period_end,product_code,provider").eq("user_id", user.id).maybeSingle(),
     ]);
     if (profileResult.error) throw profileResult.error;
     if (subscriptionResult.error) throw subscriptionResult.error;
     state.profile = profileResult.data;
     state.subscription = subscriptionResult.data;
     renderAccount();
+    window.dispatchEvent(new Event("intensefx:subscription-changed"));
   }
   function renderAccount() {
     const user = state.session?.user;
@@ -148,10 +149,10 @@
     const trustedPlan = window.SubscriptionSystem?.normalizePlan?.(state.subscription) || "blue";
     const plan = trustedPlan === "blue" ? (window.SubscriptionSystem?.getUserPlan?.().code || "blue") : trustedPlan;
     const planNames = { blue: "Blue · Free", green: "Green · Starter", purple: "Purple · Pro", red: "Red · Elite" };
+    if (trustedPlan === "red" && state.subscription?.product_code === "golden_vip") planNames.red = "Golden VIP · Pass";
     if (el("authPlanName")) el("authPlanName").textContent = planNames[plan] || "Blue · Free";
     if (el("authPlanStatus")) el("authPlanStatus").textContent = trustedPlan === "blue" && window.SubscriptionSystem?.getVipPlanCode?.() ? "VIP key · this browser" : (state.subscription?.status || "Free plan");
     document.body.dataset.authPlan = ["blue", "green", "purple", "red"].includes(plan) ? plan : "blue";
-    window.dispatchEvent(new Event("intensefx:subscription-changed"));
   }
   function completeSignIn() {
     hideGate();
@@ -333,5 +334,28 @@
       return { configured: true, session: null, error };
     }
   }
-  window.IntenseFXAuth = { initialize, getUser: () => state.session?.user || null, getPlan: () => window.SubscriptionSystem?.getUserPlan?.().code || state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
+  window.addEventListener("intensefx:subscription-changed", renderAccount);
+  async function redeemVipKey(key) {
+    if (!state.client || !state.session) return { ok: false, message: "Sign in with a configured account before redeeming a VIP key." };
+    const { data, error } = await state.client.rpc("redeem_vip_key", { redemption_key: key });
+    if (error) return { ok: false, message: "VIP redemption could not connect. Check your connection and the server redemption setup, then retry." };
+    if (!data?.ok) return { ok: false, message: ({ invalid: "That VIP key was not recognized.", used: "This VIP key has already been used.", expired: "This VIP key has expired.", downgrade: "This key would lower your current plan. Contact support before changing plans." })[data?.reason] || "VIP redemption failed. Please try again." };
+    // Only publish a successful entitlement after reading the committed server record.
+    await fetchAccountData();
+    window.dispatchEvent(new Event("intensefx:subscription-changed"));
+    return { ok: true, plan: window.SubscriptionSystem.getUserPlan() };
+  }
+  async function billingRequest(body) {
+    if (!state.client || !state.session) throw new Error('Sign in before buying access.');
+    const { data, error } = await state.client.functions.invoke('billing', { body });
+    if (error) {
+      let message = 'Checkout is unavailable. Merchant setup may still be pending.';
+      try { message = (await error.context.json()).error || message; } catch (_) {}
+      throw new Error(message);
+    }
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+  window.IntenseFXAuth = { initialize, billingRequest, refreshSubscription: fetchAccountData, redeemVipKey, getUser: () => state.session?.user || null, getPlan: () => window.SubscriptionSystem?.getUserPlan?.().code || state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
 })();
+

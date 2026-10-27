@@ -9,10 +9,13 @@ vm.runInNewContext(`${fs.readFileSync('frontend/static/js/page_subscription.js',
 const html = context.testPage.render();
 assert.equal((html.match(/class="subscription-card /g) || []).length, 4);
 assert.match(html, /Blue · Free/);
-assert.match(html, /Price to be configured/);
+assert.match(html, /₹49/);
+assert.match(html, /₹149/);
+assert.match(html, /₹199/);
+assert.match(html, /Golden VIP Pass/);
 assert.match(html, /Plan feature comparison/);
 assert.match(html, /Replay · last 365 days/);
-assert.match(html, /Payments are not connected yet/);
+assert.match(html, /Payments are not open yet/);
 assert.match(html, /Choose Starter/);
 assert.match(html, /data-subscription-plan="green" aria-pressed="false"/);
 assert.match(html, /id="subscriptionContinue"/);
@@ -24,5 +27,10 @@ assert.equal(context.testPage.selectedPlan,'red');
 assert.equal(window.SubscriptionSystem.getUserPlan().code,'blue','choosing a card never grants paid access');
 assert.match(context.testPage.render(), /Selected: Red · Elite/);
 next.click();assert.equal(routes.at(-1),'dashboard');
+context.testPage.selectedPlan='golden_vip';context.testPage.termMonths=3;
+assert.match(context.testPage.render(), /₹747/);
+assert.match(context.testPage.render(), /Selected: Golden VIP · Pass/);
+assert.equal((context.testPage.render().match(/class="subscription-card /g)||[]).length,4);
+context.testPage.termMonths=12;assert.match(context.testPage.render(), /₹2,988/);
 console.log('subscription page tests passed');
 
