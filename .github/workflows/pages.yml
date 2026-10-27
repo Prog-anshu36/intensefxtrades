@@ -43,6 +43,7 @@ jobs:
           node tests/prop_order_flow.test.js
           node tests/account_chart_isolation.test.js
           node tests/prop_navigation.test.js
+          node tests/chart_navigation_lifecycle.test.js
           node tests/replay_mouse_selection.test.js
           node tests/tool_timeframe_matrix.test.js
           node tests/chart_replay_integration.test.js
