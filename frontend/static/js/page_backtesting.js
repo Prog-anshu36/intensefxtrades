@@ -4954,6 +4954,10 @@ const PageBacktesting = {
       const dy = event.clientY - pointer.y;
       const now = performance.now();
       pointer.moved = pointer.moved || Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) > 3;
+      if (pointer.mode === "replay-pick") {
+        updateCrosshair(event);
+        return;
+      }
       if (pointer.mode === "order-draft") {
         const point = updateCrosshair(event);
         const draft = this.orderDraft;
@@ -5082,6 +5086,11 @@ const PageBacktesting = {
       const zone = axisAt(event, rect);
       const anchor = anchorFromEvent(event, rect);
       updateCrosshair(event);
+      // Replay selection takes precedence over orders, drawings and panning.
+      if (zone === "chart" && event.button === 0 && !this._spacePan && this.tool === "scissors") {
+        pointer = { id: event.pointerId, mode: "replay-pick", startX: event.clientX, startY: event.clientY, moved: false };
+        return;
+      }
       const orderHit = zone === "chart" && event.button === 0 ? this.orderDraftHit(this.crosshair) : null;
       if (orderHit) {
         if (orderHit.key === "discard") { this.orderDraft = null; this.rerender(); return; }
@@ -5172,6 +5181,11 @@ const PageBacktesting = {
       updateCrosshair(event);
       const wasMoved = pointer.moved;
       const mode = pointer.mode;
+      if (mode === "replay-pick") {
+        pointer = null;
+        if (axisAt(event) === "chart" && this.crosshair && !this.crosshair.emptyTime) this.cutReplayAt(this.crosshair.index);
+        return;
+      }
       if (mode === "order-draft") { pointer = null; this.scheduleDraw(); return; }
       if(mode==='trade-protection'){pointer=null;this.scheduleDraw();return;}
       if (mode === "tool") {
@@ -5252,10 +5266,6 @@ const PageBacktesting = {
       }
       if (this.cursorMode === "eraser" && this.crosshair) {
         this.eraseNearestDrawing(this.crosshair);
-        return;
-      }
-      if (this.tool === "scissors" && this.crosshair) {
-        this.cutReplayAt(this.crosshair.index);
         return;
       }
       if (this.cursorMode === "arrow" && this.crosshair) {
@@ -5781,8 +5791,15 @@ const PageBacktesting = {
   toggleScissorsTool() {
     if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     this.tool = this.tool === "scissors" ? "crosshair" : "scissors";
+    this.stopPlay();
+    this.stopZoomAnimation();
+    if (this.inertia?.raf) cancelAnimationFrame(this.inertia.raf);
+    this.inertia = null;
+    this.drawingEngine?.toolController?.cancel?.({ silent: true });
     this.pendingDrawing = null;
     this.scheduleDraw();
+    this.updateToolChrome();
+    this.updateReplayChrome();
     this.container?.querySelector("#scissorsToolBtn")?.classList.toggle("active", this.tool === "scissors");
     toast(this.tool === "scissors" ? "Scissors active. Click a candle to start replay from there." : "Scissors disabled.", "info");
   },
