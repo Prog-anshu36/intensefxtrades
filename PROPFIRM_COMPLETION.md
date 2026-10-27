@@ -18,3 +18,5 @@ Closed trades now retain SL, TP, commission and swap fields. Existing missing fi
 
 ## Practical limits
 Automated tests exercise all registered tools and coordinate transformations; they do not prove every possible pointer gesture or browser/device combination. Provider spreads, private scoring and execution parity are not claimed. Auth/payment setup is outside this prop-firm update. QA account data and test entitlement overrides are not published.
+
+Responsive follow-up: verified phone viewport 390×844 with a 64px navigation rail and 326px usable content width; tablet/phone viewport checks performed. Prop routes retain a bounded scrolling app shell.
