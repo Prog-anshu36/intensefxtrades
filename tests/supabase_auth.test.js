@@ -23,13 +23,14 @@ function harness(config, signedIn = false) {
   let signInCalled = false;
   const account = { id: '54f6e212-1946-44ac-a974-432162f81012', email: 'trader@example.test', user_metadata: { full_name: 'Test Trader' } };
   const session = signedIn ? { user: account } : null;
-  const client = { auth: { getSession: async () => ({ data: { session: null }, error: null }), onAuthStateChange() {},
+  let authChange;
+  const client = { auth: { getSession: async () => ({ data: { session: null }, error: null }), onAuthStateChange(fn) { authChange = fn; },
     signInWithPassword: async () => { signInCalled = true; return { data: { session }, error: null }; } },
     from(table) { return { select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: table === 'profiles' ? { user_id: account.id, full_name: 'Test Trader', email: account.email } : { plan_code: 'blue', status: 'active' }, error: null }; },
       update() { return this; } }; } };
   const window = { addEventListener() {}, dispatchEvent() {}, IntenseFXAuthConfig: config, localStorage: {}, location: { href: 'https://example.test/intensefxtrades/', hash: '' }, setTimeout: (fn) => fn(), supabase: { createClient: () => client }, console };
   vm.runInNewContext(source, { window, document, Storage: function Storage() {}, URL, URLSearchParams, Event: function Event() {}, CustomEvent: function CustomEvent() {}, console });
-  return { window, document, ids, selectors, bodyClasses, get signInCalled() { return signInCalled; } };
+  return { window, document, ids, selectors, bodyClasses, authEvent: event => authChange(event, session), get signInCalled() { return signInCalled; } };
 }
 
 (async () => {
@@ -70,6 +71,15 @@ function harness(config, signedIn = false) {
   assert.equal(happy.signInCalled, true);
   assert.equal(happy.bodyClasses.has('auth-required'), false, 'successful provider session opens the protected workspace');
   assert.equal(happy.window.location.hash, '#subscription', 'successful login opens all plan cards');
+  happy.window.location.hash = '#backtesting';
+  happy.authEvent('SIGNED_IN');
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(happy.window.location.hash, '#backtesting', 'session confirmation on tab focus must not reopen billing');
+  happy.window.location.hash = '#prop-chart';
+  happy.authEvent('TOKEN_REFRESHED');
+  happy.authEvent('SIGNED_IN');
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(happy.window.location.hash, '#prop-chart', 'token refresh keeps the current workspace');
   assert.equal(happy.window.IntenseFXAuth.getPlan(), 'blue', 'profile access never promotes beyond the database plan');
   console.log('supabase_auth.test.js passed: local-mode compatibility, fail-closed config, gated session, form validation, registration fields');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

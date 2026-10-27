@@ -312,10 +312,11 @@
         renderAccount();
       }
       state.client.auth.onAuthStateChange((event, session) => {
+        const previousUserId = state.session?.user?.id;
         state.session = session;
         if (event === "PASSWORD_RECOVERY") { showGate("Choose a new password for your account.", "reset"); return; }
         if (event === "SIGNED_OUT") { window.location.reload(); return; }
-        if (event === "SIGNED_IN" && session) {
+        if (event === "SIGNED_IN" && session && session.user.id !== previousUserId) {
           window.setTimeout(async () => {
             try { scopeBrowserData(session.user.id); await fetchAccountData(); } catch (error) { window.console?.error("Could not load account profile", error); }
             completeSignIn();
