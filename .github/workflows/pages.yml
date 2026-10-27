@@ -33,6 +33,7 @@ jobs:
           node tests/pages_history.test.js
           node tests/pages_startup.test.js
           node tests/supabase_auth.test.js
+          node tests/billing_navigation.test.js
           node tests/subscription_page.test.js
           node tests/trades_sync.test.js
           node tests/fxn_asian_session_range.test.js
