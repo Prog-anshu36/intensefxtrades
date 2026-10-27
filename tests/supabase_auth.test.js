@@ -48,6 +48,7 @@ function harness(config, signedIn = false) {
   const validResult = await valid.window.IntenseFXAuth.initialize();
   assert.equal(validResult.configured, true);
   assert.equal(valid.bodyClasses.has('auth-required'), true, 'configured but signed-out visitors see the real sign-in gate');
+  assert.equal(valid.ids.get('authTermsRow').hidden, false, 'Google consent checkbox is visible on initial login');
   valid.ids.get('authEmail').value = 'not-an-email';
   valid.ids.get('authPassword').value = 'testing123';
   await valid.ids.get('authForm').listeners.submit({ preventDefault() {} });
@@ -68,6 +69,7 @@ function harness(config, signedIn = false) {
   await happy.ids.get('authForm').listeners.submit({ preventDefault() {} });
   assert.equal(happy.signInCalled, true);
   assert.equal(happy.bodyClasses.has('auth-required'), false, 'successful provider session opens the protected workspace');
+  assert.equal(happy.window.location.hash, '#subscription', 'successful login opens all plan cards');
   assert.equal(happy.window.IntenseFXAuth.getPlan(), 'blue', 'profile access never promotes beyond the database plan');
   console.log('supabase_auth.test.js passed: local-mode compatibility, fail-closed config, gated session, form validation, registration fields');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

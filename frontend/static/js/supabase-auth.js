@@ -155,6 +155,7 @@
   }
   function completeSignIn() {
     hideGate();
+    window.location.hash = "#subscription";
     document.dispatchEvent(new CustomEvent("intensefx:authenticated"));
   }
   function attachControls() {
@@ -276,7 +277,9 @@
     } catch (error) { window.toast?.(explainError(error), "error"); button.disabled = false; }
   }
   async function initialize() {
+    const authCallback = new URLSearchParams(window.location.search).has("code");
     attachControls();
+    setMode("login");
     state.initialized = true;
     if (!configured) return { configured: false, session: null };
     if (!configValid) {
@@ -294,6 +297,7 @@
       const { data, error } = await state.client.auth.getSession();
       if (error) throw error;
       state.session = data.session;
+      if (state.session && authCallback && !window.location.hash.includes("password-reset")) window.location.hash = "#subscription";
       const currentHash = new URLSearchParams(window.location.hash.slice(1));
       const callbackError = new URLSearchParams(window.location.search).get("error_description") || new URLSearchParams(window.location.hash.slice(1)).get("error_description");
       if (callbackError) showGate(explainError(callbackError), "login");
