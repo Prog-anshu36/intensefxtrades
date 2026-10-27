@@ -33,7 +33,7 @@ const WorkspaceEngine = (() => {
   }
 
   function chartPage() {
-    return window.PropPracticeWorkspace?.activeChart?.() || (typeof PageBacktesting !== "undefined" ? PageBacktesting : null);
+    return window.Router?.current?.startsWith("prop-") ? window.PropPracticeWorkspace?.activeChart?.() : (typeof PageBacktesting !== "undefined" ? PageBacktesting : null);
   }
 
   function workspaceStorage() {
