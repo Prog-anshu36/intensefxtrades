@@ -91,6 +91,22 @@ const Router = {
     this.go(this.pageFromHash() || this.current, { fromHash: true });
   },
 
+  featureGate(page, feature) {
+    const system = window.SubscriptionSystem;
+    const required = system.requiredPlan(feature);
+    const label = system.FEATURES[feature]?.label || this.pages[page].title;
+    return {
+      render: () => `<section class="subscription-page"><div class="subscription-gate" style="--plan-color:${required.color}"><span class="subscription-kicker">PLAN ACCESS</span><h2>${label} requires ${required.name} · ${required.tier}</h2><p>Your current plan does not include this workspace. Your saved data is preserved.</p><button type="button" class="subscription-secondary" id="featureViewPlans">View plans</button><button type="button" class="subscription-secondary" id="featureBackDashboard">Back to Dashboard</button></div></section>`,
+      afterRender: container => {
+        container.querySelector('#featureViewPlans')?.addEventListener('click', () => {
+          if (window.PageSubscription) PageSubscription.pendingFeature = feature;
+          this.go('subscription');
+        });
+        container.querySelector('#featureBackDashboard')?.addEventListener('click', () => this.go('dashboard'));
+      },
+    };
+  },
+
   pageFromHash() {
     const page = (window.location.hash || "").replace(/^#/, "").trim();
     return this.pages[page] ? page : null;
@@ -103,14 +119,7 @@ const Router = {
     const feature = Array.isArray(pageRequirement)
       ? pageRequirement.find((required) => !window.SubscriptionSystem?.canAccessFeature(required))
       : pageRequirement;
-    let subscriptionRedirect = false;
-    if (feature && !window.SubscriptionSystem?.canAccessFeature(feature)) {
-      const requested = page;
-      page = "subscription";
-      if (window.PageSubscription) PageSubscription.pendingFeature = feature;
-      subscriptionRedirect = true;
-      if (window.PageSubscription && window.SubscriptionSystem) PageSubscription.message = "The " + requested.replaceAll("-", " ") + " workspace is available on " + window.SubscriptionSystem.requiredPlan(feature).name + " · " + window.SubscriptionSystem.requiredPlan(feature).tier + ".";
-    }
+    const lockedFeature = feature && !window.SubscriptionSystem?.canAccessFeature(feature) ? feature : null;
     // tear down previous page (stop timers etc.)
     const prevMod = this.pages[this.current] ? this.pages[this.current].mod() : null;
     if (prevMod && prevMod.cleanup) prevMod.cleanup();
@@ -141,7 +150,7 @@ const Router = {
     document.getElementById("pageTitle").textContent = meta.title;
 
     const container = document.getElementById("pageContainer");
-    const pageMod = meta.mod();
+    const pageMod = lockedFeature ? this.featureGate(page, lockedFeature) : meta.mod();
     // init() seeds page-local state (e.g. candle history). Only run it the
     // first time we visit a page, so an in-progress replay/session survives
     // navigating away and back.
@@ -152,7 +161,7 @@ const Router = {
     container.innerHTML = pageMod.render();
     if (pageMod.afterRender) pageMod.afterRender(container);
 
-    if ((!options.fromHash || subscriptionRedirect) && window.location.hash !== `#${page}`) {
+    if (!options.fromHash && window.location.hash !== `#${page}`) {
       window.location.hash = page;
     }
   },
