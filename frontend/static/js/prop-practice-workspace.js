@@ -112,6 +112,11 @@
           this.context = context;
           PropFirmSession.currentMarketTime = attempt.lastMarketTimestamp || null;
           if (source) {
+            if (source === PageAICoach && !context.store.state.history?.length) {
+              container.innerHTML = header(attempt) + '<section class="propfirm-card"><h2>No closed prop trades yet</h2><p>Complete and journal trades in this account to receive analysis based on your own results.</p><button type="button" class="propfirm-primary" data-prop-route="prop-chart">Open XAUUSD practice chart →</button></section>';
+              bindHeader(container);
+              return;
+            }
             this.view = Object.create(source);
             this.view._store = context.store;
             if ('period' in source) this.view.period = 'All Time';
