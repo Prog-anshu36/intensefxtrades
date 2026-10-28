@@ -61,6 +61,9 @@ def build(output=ROOT/'_site',provider=None,assets_only=False):
     text=text.replace('<title>intensefxTRADES</title>','<title>intensefxTRADES</title>\n<meta name="description" content="Free real-CSV XAUUSD backtesting. Trades and journals are saved on this device.">')
     (output/'index.html').write_text(text,encoding='utf-8')
     (output/'.nojekyll').write_text('',encoding='utf-8')
+    marketing=ROOT/'frontend'/'marketing'
+    if marketing.exists():
+        shutil.copytree(marketing,output/'site',dirs_exist_ok=True)
     python=output/'python/backend';python.mkdir(parents=True,exist_ok=True)
     for name in ('app.py','trade_importer.py','xauusd_data_provider.py'):
         shutil.copy2(ROOT/'backend'/name,python/name)
