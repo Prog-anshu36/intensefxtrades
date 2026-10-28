@@ -339,7 +339,7 @@
     if (!state.client || !state.session) return { ok: false, message: "Sign in with a configured account before redeeming a VIP key." };
     const { data, error } = await state.client.rpc("redeem_vip_key", { redemption_key: key });
     if (error) return { ok: false, message: "VIP redemption could not connect. Check your connection and the server redemption setup, then retry." };
-    if (!data?.ok) return { ok: false, message: ({ invalid: "That VIP key was not recognized.", used: "This VIP key has already been used.", expired: "This VIP key has expired.", downgrade: "This key would lower your current plan. Contact support before changing plans." })[data?.reason] || "VIP redemption failed. Please try again." };
+    if (!data?.ok) return { ok: false, message: ({ invalid: "That VIP key was not recognized.", used: "You have already redeemed this VIP key on this account.", rate_limited: "Too many key attempts. Wait ten minutes and retry.", expired: "This VIP key has expired.", downgrade: "This key would lower your current plan. Contact support before changing plans." })[data?.reason] || "VIP redemption failed. Please try again." };
     // Only publish a successful entitlement after reading the committed server record.
     await fetchAccountData();
     window.dispatchEvent(new Event("intensefx:subscription-changed"));
@@ -358,4 +358,3 @@
   }
   window.IntenseFXAuth = { initialize, billingRequest, refreshSubscription: fetchAccountData, redeemVipKey, getUser: () => state.session?.user || null, getPlan: () => window.SubscriptionSystem?.getUserPlan?.().code || state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
 })();
-

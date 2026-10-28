@@ -47,3 +47,7 @@ The server computes prices, creates the provider order, stores its signed-in own
 
 Source references: https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/ ; https://razorpay.com/docs/webhooks/validate-test/ ; https://razorpay.com/docs/payments/settlements/
 
+
+
+## Checkout and account hub update
+Paid plan/pass buttons open a dedicated checkout route with duration and total. Interrupted orders can be checked through an authenticated status endpoint scoped to the purchaser. Activation still requires verified captured payment. Shared VIP codes are provisioned server-side, grant one month once per signed-in account per code, and are rate-limited (five attempts per ten minutes). Codes cannot downgrade active higher access. The Accounts launcher opens full-width trading account cards and the existing Standard/Pro practice creation form.

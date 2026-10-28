@@ -15,9 +15,11 @@ const Router = {
     "prop-trade-analysis": { title: "Prop Trade Analysis", mod: () => window.PagePropTradeAnalysis },
     "prop-ai-coach": { title: "Prop AI Coach", mod: () => window.PagePropAICoach },
     "tradingview": { title: "TradingView", mod: () => PageTradingView },
+    "checkout": { title: "Checkout", mod: () => PageCheckout },
+    "accounts": { title: "Choose Account", mod: () => PageAccounts },
     "subscription": { title: "Plans & Billing", mod: () => PageSubscription },
   },
-  pageFeatures: { dashboard: "dashboard", trades: "trades", journal: "trades", performance: ["analysis", "performance"], "trade-analysis": "tradeAnalysis", "ai-coach": "aiCoach", backtesting: "backtesting", "prop-firm-session": "backtesting", "prop-chart": "backtesting", "prop-performance": ["backtesting", "performance"], "prop-trade-analysis": ["backtesting", "tradeAnalysis"], "prop-ai-coach": ["backtesting", "aiCoach"], tradingview: "tradingView" },
+  pageFeatures: { checkout: "generalSettings", accounts: "generalSettings", dashboard: "dashboard", trades: "trades", journal: "trades", performance: ["analysis", "performance"], "trade-analysis": "tradeAnalysis", "ai-coach": "aiCoach", backtesting: "backtesting", "prop-firm-session": "backtesting", "prop-chart": "backtesting", "prop-performance": ["backtesting", "performance"], "prop-trade-analysis": ["backtesting", "tradeAnalysis"], "prop-ai-coach": ["backtesting", "aiCoach"], tradingview: "tradingView" },
   current: "dashboard",
 
   updatePlanNavigation() {
