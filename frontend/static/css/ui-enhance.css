@@ -1763,3 +1763,23 @@ body.resizing-chart-bottom-panel .tv-bottom-resize-handle::after {
 .golden-vip-pass .subscription-secondary { display:block; margin-top:12px; --plan-color:#dcb750; padding:9px 18px; }
 .subscription-gate .subscription-secondary { margin:8px 8px 0 0; padding:10px 16px; }
 
+
+
+.legacy-account-card { display:none !important; }
+.account-hub-launcher { display:flex;flex-direction:column;gap:8px;margin:12px 14px;padding:15px;text-align:left;border:1px solid var(--border-soft,#293448);border-radius:12px;background:var(--bg-card,#111723);color:var(--text-primary,#e9efff);cursor:pointer; }
+.account-hub-launcher span { color:var(--text-secondary,#97a7c1);font-size:10px;letter-spacing:.12em; }
+.account-hub-launcher b { font-size:12px;overflow:hidden;text-overflow:ellipsis; }
+.classic-account-grid,.checkout-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin:24px 0; }
+.classic-account-card { padding:28px;border:1px solid var(--border-soft,#293448);border-radius:18px;background:var(--bg-card,#111723);display:flex;flex-direction:column;gap:16px;min-width:0; }
+.classic-account-card.selected { border-color:#4388ff;box-shadow:inset 0 0 0 1px #4388ff33; }
+.classic-account-card h3 { font-size:26px;margin:0; }.classic-account-card>strong { font-size:24px; }
+.classic-account-actions { display:flex;gap:8px;flex-wrap:wrap; }.classic-prop-create { margin-top:32px; }
+.classic-accounts input,.classic-accounts select,.checkout-page select { padding:10px;border:1px solid var(--border-soft,#293448);border-radius:8px;background:var(--bg-card,#111723);color:var(--text-primary,#e9efff);max-width:100%; }
+.checkout-grid>.subscription-card { gap:18px; }.checkout-row { display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--border-soft,#293448); }.checkout-total { font-size:22px; }
+.checkout-page label { display:flex;flex-direction:column;gap:8px; }.checkout-page #checkoutStatus { min-height:54px;line-height:1.6; }
+@media(max-width:760px) { .classic-account-grid,.checkout-grid { grid-template-columns:1fr; }.classic-account-card { padding:20px; } }
+
+
+.sidebar.collapsed .account-hub-launcher { padding:10px 4px; min-width:0; overflow:hidden; }
+.sidebar.collapsed .account-hub-launcher b { display:none; }
+.sidebar.collapsed .account-hub-launcher span { font-size:8px; letter-spacing:0; }

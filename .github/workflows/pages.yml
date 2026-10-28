@@ -36,6 +36,7 @@ jobs:
           node tests/billing_navigation.test.js
           node tests/subscription_page.test.js
           node tests/billing_core.test.js
+          node tests/checkout_accounts.test.js
           node tests/billing_checkout.test.js
           node tests/trades_sync.test.js
           node tests/fxn_asian_session_range.test.js

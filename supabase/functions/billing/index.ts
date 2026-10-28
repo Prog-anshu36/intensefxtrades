@@ -58,6 +58,12 @@ Deno.serve(async req => {
       if(error)throw new Error('Could not save the purchase. No charge was made.');
       return reply({key_id:keyId,order_id:order.id,amount:q.amount,currency:q.currency,product:q.product,months:q.months});
     }
+    if(body.action==='status'){
+      if(!/^order_[a-zA-Z0-9]+$/.test(body.order_id||''))return reply({error:'Invalid order reference.'},400);
+      const {data:order}=await admin.from('billing_orders').select('status').eq('user_id',user.id).eq('razorpay_order_id',body.order_id).maybeSingle();
+      if(!order)return reply({error:'Purchase not found for this account.'},404);
+      return reply({verified:order.status==='fulfilled'});
+    }
     if(body.action==='verify'){
       if(!/^order_[a-zA-Z0-9]+$/.test(body.order_id||'') || !/^pay_[a-zA-Z0-9]+$/.test(body.payment_id||''))return reply({error:'Invalid payment reference.'},400);
       const {data:order}=await admin.from('billing_orders').select('*').eq('user_id',user.id).eq('razorpay_order_id',body.order_id).maybeSingle();
@@ -69,4 +75,3 @@ Deno.serve(async req => {
     return reply({error:'Unsupported payment action.'},400);
   }catch(error){return reply({error:error instanceof Error?error.message:'Payment request failed.'},400);}
 });
-

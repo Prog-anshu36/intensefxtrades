@@ -154,9 +154,12 @@ function renderAccountControls() {
   name.textContent = `${active.name || "Account"} ${active.type ? `(${active.type})` : ""}`;
   balance.textContent = Fmt.moneyPlain(Store.state.balance || active.balance || 0);
   avatar.textContent = accountInitials(active.name);
+  const hub = document.getElementById("accountHubSummary");
+  if (hub) hub.textContent = `${active.name || "Choose account"} →`;
 }
 
 function initAccountControls() {
+  document.getElementById("accountHubBtn")?.addEventListener("click", () => Router.go("accounts"));
   const select = document.getElementById("accountSelect");
   const addBtn = document.getElementById("addAccountBtn");
   const resetBtn = document.getElementById("resetAccountBtn");

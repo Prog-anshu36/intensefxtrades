@@ -25,10 +25,10 @@ const PageSubscription = {
     return `<section class="subscription-page">
       ${feature ? `<div class="subscription-gate" style="--plan-color:${required.color}"><span class="subscription-kicker">PLAN ACCESS</span><h2>${this.escape(feature.label)} is included with ${required.name} · ${required.tier}</h2><p>${this.escape(this.message || `Your current plan is ${current.name} · ${current.tier}. Upgrade options will appear here when checkout is connected.`)}</p><button class="subscription-secondary" id="subscriptionGateBack">Back to workspace</button></div>` : ""}
       <header class="subscription-heading"><div><span class="subscription-kicker">INTENSEFXTRADES PLANS</span><h2>Choose your trading workspace</h2><p>Permissions follow your verified plan. Choose 1, 3 or 12 months of prepaid access. No automatic renewal. Prices are in INR; no term discount is applied.</p></div><div class="subscription-current" style="--plan-color:${current.color}"><i></i><span><small>CURRENT PLAN</small><b>${current.name} · ${current.tier}</b><em>${this.escape(status)}</em></span></div></header>
-      <section class="vip-key-panel" aria-label="Redeem VIP key"><div><span class="subscription-kicker">VIP ACCESS</span><h3>Have a VIP key?</h3><p>Redeem a privately issued key through your signed-in account.</p></div><div class="vip-key-entry"><label class="sr-only" for="vipKeyInput">VIP key</label><input id="vipKeyInput" type="password" autocomplete="off" placeholder="Enter VIP key"><button id="vipKeyRedeem" type="button">Redeem key</button><span id="vipKeyMessage" data-kind="${this.vipMessageKind}" role="status" aria-live="polite">${this.escape(this.vipMessage)}</span></div></section>
+      <section class="vip-key-panel" aria-label="Redeem VIP key"><div><span class="subscription-kicker">VIP ACCESS</span><h3>Have a VIP key?</h3><p>Redeem your access code while signed in. Shared codes grant one month once per account.</p></div><div class="vip-key-entry"><label class="sr-only" for="vipKeyInput">VIP key</label><input id="vipKeyInput" type="password" autocomplete="off" placeholder="Enter VIP key"><button id="vipKeyRedeem" type="button">Redeem key</button><span id="vipKeyMessage" data-kind="${this.vipMessageKind}" role="status" aria-live="polite">${this.escape(this.vipMessage)}</span></div></section>
       <label class="subscription-term">Access duration <select id="subscriptionTerm" aria-label="Access duration">${[[1,'1 month'],[3,'3 months'],[12,'12 months · Annual']].map(([n,label])=>`<option value="${n}" ${n===this.termMonths?'selected':''}>${label}</option>`).join('')}</select></label>
       <div class="subscription-cards">${sys.ORDER.map(code => this.card(sys.PLANS[code], current)).join("")}</div>
-      <section class="vip-key-panel golden-vip-pass" aria-label="Golden VIP Pass" style="--plan-color:#efc75e;border-color:#8b7138"><div><span class="subscription-kicker">GOLDEN VIP PASS</span><h3>Every supported feature. Full access.</h3><p>A separate pass, not a fifth plan. Includes all Elite features and full supported history.</p></div><div><strong>₹${sys.purchaseQuote('golden_vip',this.termMonths).amount.toLocaleString('en-IN')} / ${this.termMonths} month${this.termMonths===1?'':'s'}</strong><button type="button" class="subscription-secondary" data-subscription-plan="golden_vip" aria-pressed="${this.selectedPlan==='golden_vip'}">${this.selectedPlan==='golden_vip'?'Selected':'Choose Golden VIP'}</button></div></section>
+      <section class="vip-key-panel golden-vip-pass" aria-label="Golden VIP Pass" style="--plan-color:#efc75e;border-color:#8b7138"><div><span class="subscription-kicker">GOLDEN VIP PASS</span><h3>Every supported feature. Full access.</h3><p>A separate pass, not a fifth plan. Includes all Elite features and full supported history.</p></div><div><strong>₹${sys.purchaseQuote('golden_vip',this.termMonths).amount.toLocaleString('en-IN')} / ${this.termMonths} month${this.termMonths===1?'':'s'}</strong><button type="button" class="subscription-secondary" data-subscription-plan="golden_vip" aria-pressed="${this.selectedPlan==='golden_vip'}">${this.selectedPlan==='golden_vip'?'Selected':'Buy Golden VIP'}</button></div></section>
       ${this.renderSelection(sys,current)}
       ${this.renderComparison(sys)}
       <div class="subscription-manage"><div><b>Prepaid access · no auto-renewal</b><span>${verified?.current_period_end ? `Access ends ${this.escape(new Date(verified.current_period_end).toLocaleDateString('en-IN'))}.` : 'Blue Free has no expiry.'} Same-product renewal extends your remaining term. A different-product purchase starts a new term without prorating.</span></div></div>
@@ -39,7 +39,7 @@ const PageSubscription = {
     const isCurrent = plan.code === current.code;
     const price = `₹${window.SubscriptionSystem.purchaseQuote(plan.code,this.termMonths).amount.toLocaleString("en-IN")}`;
     const unavailable = plan.code !== "blue";
-    return `<article class="subscription-card ${isCurrent ? "is-current" : ""}" style="--plan-color:${plan.color}"><div class="subscription-card-top"><span class="subscription-plan-name"><i></i>${plan.name}</span>${isCurrent ? `<span class="subscription-current-tag">CURRENT</span>` : ""}</div><h3>${plan.tier}</h3><div class="subscription-price">${price}${plan.price === 0 ? `<small> forever</small>` : `<small> / ${this.termMonths} month${this.termMonths===1?"":"s"}</small>`}</div><ul>${plan.bullets.map(item => `<li><span>✓</span>${this.escape(item)}</li>`).join("")}</ul><button class="subscription-cta ${isCurrent ? "selected" : ""}" data-subscription-plan="${plan.code}" aria-pressed="${this.selectedPlan === plan.code}">${this.selectedPlan === plan.code ? "Selected" : isCurrent ? "Use current plan" : `Choose ${plan.tier}`}</button>${unavailable ? `<small class="subscription-no-checkout">Prepaid access · no automatic renewal</small>` : ""}</article>`;
+    return `<article class="subscription-card ${isCurrent ? "is-current" : ""}" style="--plan-color:${plan.color}"><div class="subscription-card-top"><span class="subscription-plan-name"><i></i>${plan.name}</span>${isCurrent ? `<span class="subscription-current-tag">CURRENT</span>` : ""}</div><h3>${plan.tier}</h3><div class="subscription-price">${price}${plan.price === 0 ? `<small> forever</small>` : `<small> / ${this.termMonths} month${this.termMonths===1?"":"s"}</small>`}</div><ul>${plan.bullets.map(item => `<li><span>✓</span>${this.escape(item)}</li>`).join("")}</ul><button class="subscription-cta ${isCurrent ? "selected" : ""}" data-subscription-plan="${plan.code}" aria-pressed="${this.selectedPlan === plan.code}">${plan.code === "blue" ? "Continue Free" : `Buy ${plan.tier}`}</button>${unavailable ? `<small class="subscription-no-checkout">Prepaid access · no automatic renewal</small>` : ""}</article>`;
   },
   renderSelection(sys,current) {
     const selected=this.selectedPlan==='golden_vip'?sys.GOLDEN_PASS:sys.PLANS[this.selectedPlan];
@@ -58,13 +58,7 @@ const PageSubscription = {
   },
   afterRender(container) {
     container.querySelector('#subscriptionTerm')?.addEventListener('change', event=>{this.termMonths=Number(event.target.value);this.paymentMessage='';Router.go('subscription');});
-    container.querySelector('#subscriptionPay')?.addEventListener('click', async()=>{
-      if(this.checkoutBusy)return;
-      this.checkoutBusy=true;this.paymentMessage='Checking secure checkout…';Router.go('subscription');
-      try{await window.IntenseFXPayments.checkout(this.selectedPlan,this.termMonths);this.paymentMessage='Payment verified. Your access is active.';}
-      catch(error){this.paymentMessage=error.message || 'Checkout is unavailable.';}
-      finally{this.checkoutBusy=false;if(Router.current==='subscription')Router.go('subscription');}
-    });
+    container.querySelector('#subscriptionPay')?.addEventListener('click',()=>{PageCheckout.selectProduct(this.selectedPlan,this.termMonths);Router.go('checkout');});
     container.querySelector("#subscriptionGateBack")?.addEventListener("click", () => { this.pendingFeature = null; Router.go("dashboard"); });
     container.querySelector("#subscriptionContinue")?.addEventListener("click", () => Router.go("dashboard"));
     const keyInput = container.querySelector("#vipKeyInput");
@@ -95,9 +89,10 @@ const PageSubscription = {
       const code = button.dataset.subscriptionPlan;
       if (!window.SubscriptionSystem.PLANS[code] && code!=="golden_vip") return;
       this.selectedPlan = code;
-      Router.go("subscription");
+      if(code==='blue'){Router.go('dashboard');return;}
+      PageCheckout.selectProduct(code,this.termMonths);
+      Router.go('checkout');
     }));
   },
   escape(value) { return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]); },
 };
-
