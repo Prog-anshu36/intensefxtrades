@@ -69,4 +69,9 @@ const call=async(path,method='GET',body=null)=>{
   owner='owner-green';
   for(let i=0;i<3;i++)assert.equal((await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000,plan_code:'green'})).status,201);
   assert.equal((await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000,plan_code:'green'})).status,409,'Green quota is three sessions');
+  owner='owner-batch';
+  const batchChallenge=await call('/api/prop-challenge','POST',{model:'pro',starting_balance:5000,plan_code:'golden'});
+  const batchResult=await call('/api/prop-challenge/'+batchChallenge.value.id+'/next-candle?count=5','POST',{});
+  assert.equal(batchResult.value.new_candles.length,5,'accelerated replay processes a batch of candles');
+  assert.equal(batchResult.value.trading_days.length,5,'each historical day is still evaluated in sequence');
 })().catch(error=>{console.error(error);process.exitCode=1;});
