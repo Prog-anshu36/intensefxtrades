@@ -12,12 +12,40 @@ for (const feature of ['dashboard', 'trades', 'generalSettings', 'tradingView'])
 for (const feature of ['analysis', 'performance', 'backtesting', 'replay', 'tradeAnalysis', 'aiCoach', 'technicalIndicators', 'premiumXauusd']) assert.equal(system.canAccessFeature(feature), false);
 assert.equal(system.canCreateAccount([{ archived: true }]), false, 'archived accounts count against Blue limit');
 assert.equal(system.canCreateAccount([]), true);
+assert.equal(system.getUserPlan().demoAccountLimit, 1);
+assert.equal(system.getUserPlan().performanceSessionLimit, 1);
+assert.equal(system.getMaxPlaybackSpeed(), 1);
+assert.equal(system.canCreateDemoAccount([]), true);
+assert.equal(system.canCreateDemoAccount([{type:'Demo'}]), false);
+assert.equal(system.canCreatePerformanceSession(0), true);
+assert.equal(system.canCreatePerformanceSession(1), false);
 
 window.IntenseFXAuth.getSubscription = () => ({ plan_code: 'green', status: 'active' });
 assert.equal(system.getUserPlan().code, 'green');
 assert.equal(system.canAccessFeature('backtesting'), true);
 assert.equal(system.canAccessFeature('replay'), false);
 assert.equal(system.canAccessFeature('tradeAnalysis'), false);
+assert.equal(system.getUserPlan().demoAccountLimit, 3);
+assert.equal(system.getUserPlan().performanceSessionLimit, 3);
+assert.equal(system.getMaxPlaybackSpeed(), 3);
+assert.equal(system.canCreateDemoAccount([{type:'Demo'},{type:'Demo'},{type:'Demo'}]), false);
+assert.equal(system.canCreatePerformanceSession(3), false);
+
+window.IntenseFXAuth.getSubscription = () => ({ plan_code: 'purple', status: 'active' });
+assert.equal(system.getUserPlan().demoAccountLimit, 5);
+assert.equal(system.getUserPlan().performanceSessionLimit, 5);
+assert.equal(system.getMaxPlaybackSpeed(), 5);
+
+window.IntenseFXAuth.getSubscription = () => ({ plan_code: 'red', status: 'active' });
+assert.equal(system.getUserPlan().demoAccountLimit, 10);
+assert.equal(system.getUserPlan().performanceSessionLimit, 10);
+assert.equal(system.getMaxPlaybackSpeed(), 10);
+
+window.IntenseFXAuth.getSubscription = () => ({ plan_code: 'red', product_code:'golden_vip', status: 'active' });
+assert.equal(system.getUserPlan().demoAccountLimit, 50);
+assert.equal(system.getUserPlan().performanceSessionLimit, 50);
+assert.equal(system.getMaxPlaybackSpeed(), 100);
+assert.equal(system.getUserPlan().sameDayChallenge, true);
 
 const start = Date.UTC(2023, 0, 1), end = Date.UTC(2025, 0, 1);
 window.IntenseFXAuth.getSubscription = () => ({ plan_code: 'purple', status: 'active' });
