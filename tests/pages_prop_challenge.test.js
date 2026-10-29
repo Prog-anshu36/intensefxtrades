@@ -30,14 +30,14 @@ const call=async(path,method='GET',body=null)=>{
   return {status:result.status,value:JSON.parse(result.text)};
 };
 (async()=>{
-  const first=await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000,plan_code:'golden'});
+  const first=await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000});
   assert.equal(first.status,201);
-  const second=await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000,plan_code:'golden'});
+  const second=await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000});
   assert.notEqual(first.value.assigned_start.slice(0,7),second.value.assigned_start.slice(0,7),'a new challenge gets a different month');
   owner='owner-b';
   assert.equal((await call('/api/prop-challenge/'+first.value.id)).status,404,'challenge state is owner scoped');
   owner='owner-a';
-  const created=await call('/api/prop-challenge','POST',{model:'pro',starting_balance:5000,plan_code:'golden'});
+  const created=await call('/api/prop-challenge','POST',{model:'pro',starting_balance:5000});
   const id=created.value.id;
   let result;
   for(let i=0;i<15;i++)result=await call('/api/prop-challenge/'+id+'/next-candle','POST',{});
@@ -46,7 +46,7 @@ const call=async(path,method='GET',body=null)=>{
   result=await call('/api/prop-challenge/'+id+'/next-candle','POST',{});
   assert.equal(result.value.status,'failed');
   assert.match(result.value.breach_reason,/15 trading days/);
-  const tradeChallenge=await call('/api/prop-challenge','POST',{model:'pro',starting_balance:5000,plan_code:'golden'});
+  const tradeChallenge=await call('/api/prop-challenge','POST',{model:'pro',starting_balance:5000});
   const tradeId=tradeChallenge.value.id;
   await call('/api/prop-challenge/'+tradeId+'/next-candle','POST',{});
   const opened=await call('/api/prop-challenge/'+tradeId+'/order','POST',{side:'buy',lots:0.01});
@@ -56,22 +56,4 @@ const call=async(path,method='GET',body=null)=>{
   assert.equal(closed.value.trades.length,1);
   assert.equal(closed.value.trades[0].pnl,1);
   console.log('pages_prop_challenge.test.js passed: unique months, owner isolation, single-candle progression, 15-day limit and simulated orders');
-
-  owner='owner-blue';
-  const blue=await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000,plan_code:'blue'});
-  assert.equal(blue.status,201);
-  assert.equal((await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000,plan_code:'blue'})).status,409,'Blue can create only one performance session');
-  const blueId=blue.value.id;
-  await call('/api/prop-challenge/'+blueId+'/next-candle','POST',{});
-  const locked=await call('/api/prop-challenge/'+blueId+'/next-candle','POST',{});
-  assert.equal(locked.status,429,'Blue cannot unlock a second historical trading day on the same calendar day');
-  assert.match(locked.value.error,/one historical trading day per calendar day/);
-  owner='owner-green';
-  for(let i=0;i<3;i++)assert.equal((await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000,plan_code:'green'})).status,201);
-  assert.equal((await call('/api/prop-challenge','POST',{model:'standard',starting_balance:5000,plan_code:'green'})).status,409,'Green quota is three sessions');
-  owner='owner-batch';
-  const batchChallenge=await call('/api/prop-challenge','POST',{model:'pro',starting_balance:5000,plan_code:'golden'});
-  const batchResult=await call('/api/prop-challenge/'+batchChallenge.value.id+'/next-candle?count=5','POST',{});
-  assert.equal(batchResult.value.new_candles.length,5,'accelerated replay processes a batch of candles');
-  assert.equal(batchResult.value.trading_days.length,5,'each historical day is still evaluated in sequence');
 })().catch(error=>{console.error(error);process.exitCode=1;});

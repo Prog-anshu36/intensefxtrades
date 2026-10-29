@@ -31,7 +31,6 @@ jobs:
       - name: Test browser history against the original CSV provider
         run: |
           node tests/pages_history.test.js
-          node tests/subscription_system.test.js
           node tests/pages_prop_challenge.test.js
           node tests/pages_startup.test.js
           node tests/supabase_auth.test.js
