@@ -24,8 +24,8 @@
   };
   const PLANS = {
     blue: { code: "blue", name: "Blue", tier: "Free", color: COLORS.blue, price: 0,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "performanceSession"]), accountLimit: 1, demoAccountLimit: 1, performanceSessionLimit: 1, maxPlaybackSpeed: 1, sameDayChallenge: false,
-      bullets: ["Dashboard, trades and journal", "Chart workspace", "One demo trading account", "One Prop Firm Session · 1× speed · one historical day per calendar day"] },
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "performanceSession", "backtesting"]), accountLimit: 1, demoAccountLimit: 1, performanceSessionLimit: 1, maxPlaybackSpeed: 1, sameDayChallenge: false,
+      bullets: ["Dashboard, trades and journal", "Chart workspace", "One demo account for limited classic backtesting", "One Prop Firm Session · 1× speed · one historical day per calendar day"] },
     green: { code: "green", name: "Green", tier: "Starter", color: COLORS.green, price: 49,
       features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "performanceSession", "backtesting", "additionalAccount"]), accountLimit: Infinity, demoAccountLimit: 3, performanceSessionLimit: 3, maxPlaybackSpeed: 3, sameDayChallenge: true,
       bullets: ["Everything in Blue", "Analysis and classic backtesting", "Up to 3 demo accounts and 3 performance sessions", "Historical playback up to 3× · complete all 15 days in one sitting"] },
