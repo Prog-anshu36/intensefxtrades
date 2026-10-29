@@ -80,6 +80,20 @@
     },
     selected() { return this.attempts.find(a => a.id === this.selectedId) || null; },
     practiceAttempt() { return this.attempts.find(a => !a.archived && (a.status === "active" || a.status === "phase-ready")) || null; },
+    performanceSessionCount() {
+      const user=encodeURIComponent(window.Store?.state?.active_user_id||"local");
+      const prefix=`tfb_prop_firm_practice_v1:${user}:`;
+      let count=0,found=false;
+      try {
+        for(let i=0;i<localStorage.length;i++){
+          const key=localStorage.key(i);
+          if(!key||!key.startsWith(prefix))continue;
+          const saved=JSON.parse(localStorage.getItem(key)||"{}");
+          if(Array.isArray(saved.attempts)){count+=saved.attempts.length;found=true;}
+        }
+      } catch (_) {}
+      return found?count:this.attempts.length;
+    },
     rulesFor(attempt) { return attempt?.rules || MODELS[attempt?.model || this.model]; },
     rename(id, name) {
       const attempt = this.attempts.find(a => a.id === id);
@@ -141,7 +155,7 @@
     },
     create(model = this.model, size = this.size, options = {}) {
       this.load();
-      if (window.SubscriptionSystem?.canCreatePerformanceSession && !window.SubscriptionSystem.canCreatePerformanceSession(this.attempts.length)) {
+      if (window.SubscriptionSystem?.canCreatePerformanceSession && !window.SubscriptionSystem.canCreatePerformanceSession(this.performanceSessionCount())) {
         const plan = window.SubscriptionSystem.getUserPlan();
         return { ok: false, message: `Your ${plan.name} plan allows up to ${plan.performanceSessionLimit} performance session(s). Archive status does not free a slot.` };
       }
@@ -332,8 +346,8 @@
     },
     renderCreation() {
       const plan=window.SubscriptionSystem?.getUserPlan?.();
-      const atLimit=Boolean(plan && !window.SubscriptionSystem.canCreatePerformanceSession(this.attempts.length));
-      const quota=plan?`Plan quota: ${this.attempts.length}/${plan.performanceSessionLimit} performance sessions · ${plan.name}`:'';
+      const atLimit=Boolean(plan && !window.SubscriptionSystem.canCreatePerformanceSession(this.performanceSessionCount()));
+      const quota=plan?`Plan quota: ${this.performanceSessionCount()}/${plan.performanceSessionLimit} performance sessions · ${plan.name}`:'';
       return `<section class="propfirm-card propfirm-create"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">CREATE PERFORMANCE SESSION</span><h3>Add a practice session</h3><p>Create independent XAUUSD evaluation sessions. Your plan controls how many you can create.</p><p class="propfirm-muted">${escape(quota)}</p></div><span class="propfirm-badge">XAUUSD PRACTICE</span></div><div class="propfirm-plan-grid">${Object.entries(MODELS).map(([code, model]) => `<button type="button" class="propfirm-plan-card ${code === "pro" ? "pro" : "standard"} ${this.model === code ? "selected" : ""}" data-select-model="${code}" aria-pressed="${this.model === code}"><span class="propfirm-plan-kicker">${code === "pro" ? "2 STEP PRO" : "2 STEP STANDARD"}</span><b class="propfirm-plan-title">${code === "pro" ? "Lean, Fast Efficient" : "Maximum Drawdown Space"}</b><span class="propfirm-plan-summary">${code === "pro" ? "Lower daily loss limit · built for focused traders" : "More breathing room · higher overall drawdown"}</span><span class="propfirm-plan-metrics"><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Daily loss limit <b>${code === "standard" ? this.standardDailyLoss : model.dailyLossPct}%</b></span><span>Max drawdown <b>${model.maxLossPct}% static</b></span><span>Leverage reference <b>up to 1:100</b></span><span>Min. trading days <b>${code === "standard" ? this.standardMinDays : model.minDays} / phase</b></span></span><span class="propfirm-plan-select">${this.model === code ? "Selected" : "Select this model"} <i>→</i></span></button>`).join("")}</div><div class="propfirm-create-grid"><label>Challenge model<select id="propFirmModel"><option value="standard" ${this.model === "standard" ? "selected" : ""}>2 Step Standard</option><option value="pro" ${this.model === "pro" ? "selected" : ""}>2 Step Pro</option></select></label><label>Virtual starting balance<select id="propFirmSize">${MODELS[this.model].sizes.map(size => `<option value="${size}" ${Number(this.size) === size ? "selected" : ""}>${money(size)}</option>`).join("")}</select></label><label ${this.model !== 'standard' ? 'hidden' : ''}>Standard daily loss<select id="propStandardLoss"><option value="3" ${this.standardDailyLoss === 3 ? 'selected' : ''}>3%</option><option value="5" ${this.standardDailyLoss === 5 ? 'selected' : ''}>5%</option></select></label><label ${this.model !== 'standard' ? 'hidden' : ''}>Minimum trading days<select id="propStandardDays"><option value="0" ${this.standardMinDays === 0 ? 'selected' : ''}>0 per phase</option><option value="3" ${this.standardMinDays === 3 ? 'selected' : ''}>3 per phase</option></select></label><button class="propfirm-primary" id="propFirmStart" ${atLimit?'disabled':''}>Create performance session <span>→</span></button></div><div class="propfirm-rule-preview" id="propFirmRulePreview">${this.model === "standard" ? `Phase 1 target 8% · Phase 2 target 5% · Daily loss ${this.standardDailyLoss}% · Max loss 10% · ${this.standardMinDays} minimum trading days per phase` : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · No minimum trading days"} · 14 calendar days per phase</div></section>`;
     },
     renderAccounts() {
