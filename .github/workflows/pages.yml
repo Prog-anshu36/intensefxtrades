@@ -52,6 +52,8 @@ jobs:
           node tests/tool_timeframe_matrix.test.js
           node tests/chart_replay_integration.test.js
           node tests/chart_pointer_integration.test.js
+      - name: Verify website pages, assets and app links
+        run: python scripts/check_marketing_site.py _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

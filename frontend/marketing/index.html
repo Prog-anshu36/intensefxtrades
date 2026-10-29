@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" class="js-off">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>IntenseFX Trades — Practise first. Analyse every move.</title>
+<meta name="description" content="Trading journal, analysis, backtesting and simulated prop-firm practice. Practise the process, analyse every move, build discipline.">
+<meta name="theme-color" content="#03050b">
+<meta property="og:title" content="IntenseFX Trades — Practise first. Analyse every move."><meta property="og:description" content="Trading journal, analysis, backtesting and simulated prop-firm practice. Practise the process, analyse every move, build discipline."><meta property="og:type" content="website">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233d7eff'/%3E%3Ctext x='16' y='21' font-family='Arial' font-weight='800' font-size='12' text-anchor='middle' fill='white'%3EIFT%3C/text%3E%3C/svg%3E">
+<link rel="preload" href="assets/fonts/sora-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/site.css?v=a6c6d876">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav"><div class="wrap"><a class="brand" href="index.html" aria-label="IntenseFX Trades — home"><span class="brand-mark" aria-hidden="true">IFT</span><span class="brand-word">intensefx<b>TRADES</b></span></a><button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-panel" aria-label="Open menu"><span></span><span></span><span></span></button><div class="nav-panel" id="nav-panel"><nav aria-label="Primary"><ul class="nav-links"><li><a href="index.html" aria-current="page">Home</a></li><li><a href="prop-firm-practice.html">Prop Firm Practice</a></li><li><a href="features.html">Features</a></li><li><a href="about.html">About Us</a></li><li><a href="faq-contact.html">FAQ &amp; Contact</a></li></ul></nav><div class="nav-actions"><a class="btn btn-ghost btn-sm" href="../" rel="noopener">Sign In</a><a class="btn btn-sm" href="../" rel="noopener">Create Account</a></div></div></div></header>
+<main id="main" class="has-hero">
+<!-- HOME: lightweight 3D hero + three short sections -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <canvas id="spark" aria-hidden="true"></canvas>
+
+  <!-- Decorative 3D scene. Panels are real application screenshots; P/L figures are illustrative only. -->
+  <div class="hero-stage" data-parallax aria-hidden="true">
+    <div class="layer l-dash"><div class="float" style="--dur:11s"><div class="panel fade-bottom"><img src="assets/img/home/hero-dashboard.webp" width="1376" height="480" alt="Dashboard of a demo workspace showing profit and loss and an equity chart" loading="eager" decoding="async" fetchpriority="high"></div></div></div>
+
+    <div class="layer l-login"><div class="float" style="--dur:9s"><div class="panel"><img src="assets/img/home/hero-login.webp" width="485" height="695" alt="IntenseFX Trades sign-in card" loading="eager" decoding="async" fetchpriority="high"></div></div></div>
+    <div class="layer l-prop"><div class="float" style="--dur:10s;--delay:-3s"><div class="panel"><img src="assets/img/home/hero-prop-overview.webp" width="1025" height="720" alt="Prop Firm Session practice account overview" loading="eager" decoding="async" fetchpriority="high"></div></div></div>
+    <div class="layer l-reg"><div class="float" style="--dur:8s;--delay:-2s"><div class="panel fade-top"><img src="assets/img/home/hero-account-creation.webp" width="485" height="720" alt="Create account form" loading="lazy" decoding="async"></div></div></div>
+    <div class="layer l-sel"><div class="float" style="--dur:7.5s;--delay:-5s"><div class="panel"><img src="assets/img/home/hero-account-selection.webp" width="222" height="156" alt="Demo account selector" loading="lazy" decoding="async"></div></div></div>
+
+    <div class="layer pl-wrap" style="left:19%;top:57%;--d0:30"><div class="float" style="--dur:6s"><span class="pl pos" style="--rot:-6deg">+₹2,450</span></div></div>
+    <div class="layer pl-wrap" style="right:20%;top:55%;--d0:24"><div class="float" style="--dur:7s;--delay:-2s"><span class="pl neg" style="--rot:5deg">−₹680</span></div></div>
+    <div class="layer pl-wrap" style="left:10%;top:64%;--d0:38"><div class="float" style="--dur:8s;--delay:-1s"><span class="pl pos" style="--rot:4deg;--s:1.15">+3.2%</span></div></div>
+    <div class="layer pl-wrap" style="right:9%;top:67%;--d0:34"><div class="float" style="--dur:6.5s;--delay:-4s"><span class="pl neg" style="--rot:-4deg">−1.4%</span></div></div>
+    <div class="layer pl-wrap" style="left:33%;top:74%;--d0:18"><div class="float" style="--dur:9s"><span class="pl lab" style="--rot:-3deg">WIN RATE</span></div></div>
+    <div class="layer pl-wrap" style="right:30%;top:66%;--d0:14"><div class="float" style="--dur:10s;--delay:-6s"><span class="pl lab" style="--rot:3deg">P/L</span></div></div>
+    <div class="layer pl-wrap" style="right:19%;top:80%;--d0:12"><div class="float" style="--dur:11s;--delay:-3s"><span class="pl lab" style="--rot:-2deg;opacity:.8">TRADE ANALYSIS</span></div></div>
+  </div>
+
+  <div class="hero-copy">
+    <span class="logo-stage"><span class="logo-lockup" data-logo-slot="INTENSEFX_OFFICIAL_LOGO"><span class="brand-mark" aria-hidden="true">IFT</span><span class="brand-word">intensefx<b>TRADES</b></span></span><span class="ph-tag" title="Official logo not supplied yet">Placeholder logo</span></span>
+    <h1 id="hero-title">Why risk it before you've <em>practised it?</em></h1>
+    <p class="sub">Practise the process. Analyse every move. Build your trading discipline.</p>
+    <div class="cta-row">
+      <a class="btn" href="features.html">Explore the platform <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg></a>
+      <a class="btn btn-ghost" href="prop-firm-practice.html">Practise first</a>
+    </div>
+  </div>
+  <p class="hero-note">Floating figures are illustrative design elements, not user results. Screenshots show a demo workspace with simulated sample data.</p>
+</section>
+
+<section class="sec glow-bg" aria-labelledby="intro-t">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow rv">The platform</p>
+      <h2 class="tag rv" id="intro-t">Practice is a process. <em>Not a gamble.</em></h2>
+      <p class="lede rv">IntenseFX Trades is a trading journal, analysis, backtesting and simulated prop-firm practice platform. Everything in it is practice: no real money, no broker connection.</p>
+    </div>
+    <div class="trio">
+      <div class="rv"><div class="n">01</div><h3>Practise</h3><p>Replay real historical XAUUSD candles step by step and place simulated orders on a chart workspace.</p></div>
+      <div class="rv" style="--d:.1s"><div class="n">02</div><h3>Analyse</h3><p>Turn trade records into patterns with performance analytics, trade analysis and a rule-based coach.</p></div>
+      <div class="rv" style="--d:.2s"><div class="n">03</div><h3>Review</h3><p>Journal every trade: emotion, mistake, lesson, checklist. Build the habit of looking back.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec-tight" aria-labelledby="prev-t">
+  <div class="wrap">
+    <div class="sec-head"><p class="eyebrow rv">A quick look inside</p><h2 class="tag rv" id="prev-t" style="font-size:clamp(26px,3.4vw,44px)">Four screens. <em>One workflow.</em></h2></div>
+    <div class="tabs rv" data-tabs>
+      <div class="tablist" role="tablist" aria-label="Feature preview" aria-orientation="vertical">
+        <button class="tab" role="tab" id="t-dash" aria-controls="p-dash" aria-selected="true"><strong>Dashboard</strong><span>P&amp;L, win rate, equity chart and monthly calendar for your workspace.</span></button>
+        <button class="tab" role="tab" id="t-perf" aria-controls="p-perf" aria-selected="false" tabindex="-1"><strong>Performance</strong><span>Profit factor, expectancy, drawdown and breakdowns by session, symbol and strategy.</span></button>
+        <button class="tab" role="tab" id="t-bt" aria-controls="p-bt" aria-selected="false" tabindex="-1"><strong>Backtesting</strong><span>Replay XAUUSD history with drawing tools and simulated orders.</span></button>
+        <button class="tab" role="tab" id="t-coach" aria-controls="p-coach" aria-selected="false" tabindex="-1"><strong>AI Coach</strong><span>A rule-based review of your trading record, calculated locally.</span></button>
+        <a class="btn btn-ghost btn-sm" style="margin-top:14px" href="features.html">See every feature <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg></a>
+      </div>
+      <div class="tabpanels">
+        <div role="tabpanel" id="p-dash" aria-labelledby="t-dash" class="shot" data-tilt><button type="button" class="zoom" aria-label="Enlarge screenshot: Dashboard"><img src="assets/img/features/dashboard.webp" width="1753" height="924" alt="Dashboard with total, unrealised and realised P&amp;L, win rate and an equity chart (demo workspace)" loading="eager" decoding="async" fetchpriority="high"><span class="zoom-hint" aria-hidden="true">Enlarge ⤢</span></button></div>
+        <div role="tabpanel" id="p-perf" aria-labelledby="t-perf" class="shot" hidden><button type="button" class="zoom" aria-label="Enlarge screenshot: Performance analytics"><img src="assets/img/features/performance.webp" width="1794" height="782" alt="Performance analytics with net profit, win rate, profit factor and equity curve (demo workspace)" loading="lazy" decoding="async"><span class="zoom-hint" aria-hidden="true">Enlarge ⤢</span></button></div>
+        <div role="tabpanel" id="p-bt" aria-labelledby="t-bt" class="shot" hidden><button type="button" class="zoom" aria-label="Enlarge screenshot: Backtesting"><img src="assets/img/features/backtesting.webp" width="1732" height="853" alt="Backtesting workspace replaying XAUUSD candles with position boxes" loading="lazy" decoding="async"><span class="zoom-hint" aria-hidden="true">Enlarge ⤢</span></button></div>
+        <div role="tabpanel" id="p-coach" aria-labelledby="t-coach" class="shot" hidden><button type="button" class="zoom" aria-label="Enlarge screenshot: AI Coach"><img src="assets/img/features/ai-coach.webp" width="1730" height="735" alt="AI Coach scores and insights (demo workspace)" loading="lazy" decoding="async"><span class="zoom-hint" aria-hidden="true">Enlarge ⤢</span></button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" aria-labelledby="prop-t">
+  <div class="wrap">
+    <div class="split">
+      <div class="copy">
+        <p class="eyebrow rv">Prop Firm Practice</p>
+        <h2 class="tag rv" id="prop-t" style="font-size:clamp(26px,3.6vw,48px)">Why buy another challenge <em>before you're ready?</em></h2>
+        <p class="lede rv">Rehearse prop-firm-style rules in a simulated practice account, then review every decision before real money is involved.</p>
+        <div class="cta-row rv"><a class="btn" href="prop-firm-practice.html">Explore Prop Firm Practice <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg></a></div>
+      </div>
+      <div class="stack-art rv" aria-hidden="false">
+        <div class="shot"><img src="assets/img/prop/prop-overview.webp" width="1280" height="720" alt="Prop Firm Session practice account overview" loading="lazy" decoding="async"></div>
+        <div class="shot"><img src="assets/img/prop/prop-chart.webp" width="1280" height="720" alt="Prop Practice Chart for XAUUSD with replay controls" loading="lazy" decoding="async"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec final" aria-labelledby="fin-t">
+  <div class="wrap">
+    <p class="eyebrow rv">Start practising</p>
+    <h2 class="tag rv" id="fin-t">Your next trade deserves <em>preparation.</em></h2>
+    <p class="lede rv">Begin on the free plan, or compare what each plan unlocks.</p>
+    <div class="cta-row rv"><a class="btn" href="../" rel="noopener">Create free account <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg></a><a class="btn btn-ghost" href="features.html#pricing">Compare plans</a></div>
+  </div>
+</section>
+
+</main>
+<footer class="footer"><div class="wrap">
+<div class="foot-grid">
+<div><a class="brand" href="index.html" aria-label="IntenseFX Trades — home"><span class="brand-mark" aria-hidden="true">IFT</span><span class="brand-word">intensefx<b>TRADES</b></span></a><p class="foot-about">A trading journal, analysis, backtesting and simulated prop-firm practice platform. Practice tools only — not a broker.</p></div>
+<div><h4>Explore</h4><ul><li><a href="index.html">Home</a></li><li><a href="prop-firm-practice.html">Prop Firm Practice</a></li><li><a href="features.html">Features</a></li><li><a href="about.html">About Us</a></li><li><a href="faq-contact.html">FAQ &amp; Contact</a></li></ul></div>
+<div><h4>Product</h4><ul><li><a href="features.html#pricing">Plans &amp; pricing</a></li><li><a href="../">Sign in to the app</a></li><li><a href="../">Create account</a></li></ul></div>
+<div><h4>Legal</h4><ul><li><a href="legal.html#terms">Terms &amp; Conditions</a></li><li><a href="legal.html#privacy">Privacy Policy</a></li><li><a href="legal.html#disclaimer">Trading Disclaimer</a></li><li><a href="legal.html#risk">Risk Disclosure</a></li></ul></div>
+</div>
+<div class="foot-risk"><p><strong>Risk notice.</strong> IntenseFX Trades provides simulated practice, journaling and analysis tools for educational and informational purposes. It is not a broker, exchange, investment adviser or order-routing service, and it does not manage or connect to any real or external prop-firm account. Simulated and historical results are not real trading results and do not predict future performance. Trading carries a high risk of loss. Nothing here is financial advice, and no result, challenge pass or funded account is guaranteed.</p></div>
+<div class="foot-bottom"><span>© 2026 IntenseFX Trades. All rights reserved.</span><span>Screenshots show a demo workspace with simulated sample data.</span></div>
+</div></footer>
+<script src="assets/js/site.js?v=a6c6d876" defer></script>
+</body>
+</html>
