@@ -23,11 +23,9 @@ from werkzeug.security import check_password_hash, generate_password_hash
 try:
     from .xauusd_data_provider import LocalXAUUSDDataProvider
     from .trade_importer import parse_trades, inspect_columns
-    from .prop_challenge_engine import register_historical_challenge_routes
 except ImportError:
     from xauusd_data_provider import LocalXAUUSDDataProvider
     from trade_importer import parse_trades, inspect_columns
-    from prop_challenge_engine import register_historical_challenge_routes
 
 local_xauusd = LocalXAUUSDDataProvider()
 
@@ -43,9 +41,6 @@ app = Flask(
 )
 CORS(app)
 app.secret_key = os.environ.get("TRADEFXBOOK_SECRET", "tradefxbook-local-secret")
-
-# Dedicated server-side historical challenge assignment/candle API.
-register_historical_challenge_routes(app, local_xauusd)
 
 _lock = threading.Lock()
 
