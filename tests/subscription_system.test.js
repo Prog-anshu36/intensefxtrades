@@ -3,8 +3,9 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync('frontend/static/js/subscription.js', 'utf8');
-const window = { IntenseFXAuth: { getSubscription: () => null } };
-vm.runInNewContext(source, { window, Date, Number, String, Boolean, Set, Object });
+const window = { IntenseFXAuth: { getSubscription: () => null }, addEventListener() {} };
+const document = { addEventListener() {}, querySelectorAll() { return []; } };
+vm.runInNewContext(source, { window, document, Date, Number, String, Boolean, Set, Object });
 const system = window.SubscriptionSystem;
 
 assert.equal(system.getUserPlan().code, 'blue');
