@@ -18,6 +18,11 @@
     return '<section class="propfirm-card propfirm-empty"><b>Select a prop practice round</b><p>Start a round or select one from practice history to open its independent chart and analysis.</p><button type="button" class="propfirm-primary" data-prop-route="prop-firm-session">Open Prop Firm Session →</button></section>';
   }
   const Workspace = {
+    scopeFor(attempt = PropFirmSession.selected()) { return attempt ? `prop:${keyFor(attempt)}` : null; },
+    activeStorage() {
+      const scope = this.scopeFor();
+      return scope ? ChartAccountState.storageFor(scope) : null;
+    },
     hasState(attempt) { return !!contexts.get(keyFor(attempt))?.loaded; },
     stateForAttempt(attempt) { return contexts.get(keyFor(attempt))?.store.state || emptyState(attempt?.startingBalance || 5000); },
     async ensure(attempt) {

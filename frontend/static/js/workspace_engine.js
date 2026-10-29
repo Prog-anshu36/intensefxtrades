@@ -16,6 +16,7 @@ const WorkspaceEngine = (() => {
     ["analysis", "Analysis", "performance"],
     ["journal-review", "Journal Review", "journal"],
   ];
+  const PROP_WORKSPACES = [["prop-practice", "Prop Practice Chart", "prop-chart"]];
 
   const state = {
     workspaces: {},
@@ -36,7 +37,12 @@ const WorkspaceEngine = (() => {
     return window.Router?.current?.startsWith("prop-") ? window.PropPracticeWorkspace?.activeChart?.() : (typeof PageBacktesting !== "undefined" ? PageBacktesting : null);
   }
 
-  function workspaceStorage() {
+  function isPropPage(page = window.Router?.current) {
+    return String(page || "").startsWith("prop-");
+  }
+
+  function workspaceStorage(page = window.Router?.current) {
+    if (isPropPage(page)) return window.PropPracticeWorkspace?.activeStorage?.() || localStorage;
     return window.ChartAccountState?.storageForCurrent() || localStorage;
   }
 
@@ -76,14 +82,16 @@ const WorkspaceEngine = (() => {
     };
   }
 
-  function initState() {
+  function initState(page = window.Router?.current) {
     try { workspaceStorage().removeItem('tfb_broker_connections_v1'); } catch {}
     state.workspaces = safeJsonGet(KEY, {});
     if (!Object.keys(state.workspaces).length) {
-      DEFAULT_WORKSPACES.forEach(([id, name, page]) => { state.workspaces[id] = defaultWorkspace(id, name, page); });
+      const defaults = isPropPage(page) ? PROP_WORKSPACES : DEFAULT_WORKSPACES;
+      defaults.forEach(([id, name, route]) => { state.workspaces[id] = defaultWorkspace(id, name, route); });
     }
-    state.activeId = workspaceStorage().getItem(ACTIVE_KEY) || "backtesting";
-    if (!state.workspaces[state.activeId]) state.activeId = Object.keys(state.workspaces)[0] || "backtesting";
+    const fallbackId = isPropPage(page) ? "prop-practice" : "backtesting";
+    state.activeId = workspaceStorage().getItem(ACTIVE_KEY) || fallbackId;
+    if (!state.workspaces[state.activeId]) state.activeId = Object.keys(state.workspaces)[0] || fallbackId;
     state.notificationSettings = { ...state.notificationSettings, ...safeJsonGet(PREF_KEY, {}).notificationSettings };
   }
 
@@ -104,9 +112,17 @@ const WorkspaceEngine = (() => {
         "ai-coach": "AI Coach",
         backtesting: "Backtesting",
         tradingview: "TradingView",
+        "prop-firm-session": "Prop Firm Session",
+        "prop-chart": "Prop Practice Chart",
+        "prop-performance": "Prop Performance",
+        "prop-trade-analysis": "Prop Trade Analysis",
+        "prop-ai-coach": "Prop AI Coach",
       };
       activeTab.title = pageTitles[page] || (page.charAt(0).toUpperCase() + page.slice(1));
     }
+    const routeTitle = window.Router?.pages?.[page]?.title;
+    const pageTitle = document.getElementById("pageTitle");
+    if (routeTitle && pageTitle) pageTitle.textContent = routeTitle;
     ws.updatedAt = Date.now();
     save();
     renderTabs();
@@ -773,7 +789,26 @@ const WorkspaceEngine = (() => {
     });
 
     window.addEventListener("ui:context-action", (e) => handleContextAction(e.detail?.action));
-    window.addEventListener("tfb:route-change", (e) => syncRoute(e.detail?.page));
+    let workspaceKind = isPropPage() ? "prop" : "standard";
+    window.addEventListener("tfb:route-change", (e) => {
+      const page = e.detail?.page;
+      const nextKind = isPropPage(page) ? "prop" : "standard";
+      if (nextKind !== workspaceKind) {
+        workspaceKind = nextKind;
+        state.pageBackStack = [];
+        initState(page);
+      }
+      syncRoute(page);
+    });
+    window.addEventListener("tfb:prop-account-change", () => {
+      if (!isPropPage()) return;
+      state.pageBackStack = [];
+      state.dragWindow = null;
+      state.resizeWindow = null;
+      initState(Router.current);
+      syncRoute(Router.current);
+      renderTabs();
+    });
     window.addEventListener("tfb:chart-account-change", () => {
       state.pageBackStack = [];
       state.dragWindow = null;
