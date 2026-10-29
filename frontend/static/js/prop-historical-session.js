@@ -211,7 +211,7 @@
       for(let i=0;i<=4;i++){const y=pad.t+plotH*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(width-pad.r,y);ctx.stroke();ctx.fillText((high-span*i/4).toFixed(2),pad.l+3,y-4);}
       const step=plotW/data.length,bodyW=Math.max(2,step*.58);
       const yFor=v=>pad.t+(high-Number(v))/span*plotH;
-      data.forEach((c,i)=>{const x=pad.l+step*(i+.5),up=Number(c.close)>=Number(c.open),col=up?"#28c99a":"#f06478";ctx.strokeStyle=col;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x,yFor(c.high));ctx.lineTo(x,yFor(c.low));ctx.stroke();const y1=yFor(c.open),y2=yFor(c.close);ctx.fillRect(x-bodyW/2,Math.min(y1,y2),bodyW,Math.max(1,Math.abs(y2-y1));});
+      data.forEach((c,i)=>{const x=pad.l+step*(i+.5),up=Number(c.close)>=Number(c.open),col=up?"#28c99a":"#f06478";ctx.strokeStyle=col;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x,yFor(c.high));ctx.lineTo(x,yFor(c.low));ctx.stroke();const y1=yFor(c.open),y2=yFor(c.close);ctx.fillRect(x-bodyW/2,Math.min(y1,y2),bodyW,Math.max(1,Math.abs(y2-y1)));});
       ctx.fillStyle="#8a96aa";ctx.fillText("Only revealed candles are drawn",pad.l,height-6);
     },
     cleanup() { this.stopMarket();this.container=null; },
