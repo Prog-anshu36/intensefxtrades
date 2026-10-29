@@ -29,8 +29,11 @@ const PageAccounts = {
     }));
     container.querySelector('#hubCreateAccount')?.addEventListener('submit',event=>{
       event.preventDefault();
-      if(!window.SubscriptionSystem.canCreateAccount(Store.state.accounts||[])){this.message='Your current plan has reached its account limit. Archived accounts also count.';Router.go('accounts');return;}
       const form=event.currentTarget,read=name=>form.elements.namedItem(name).value;
+      const accountType=read('type');
+      const existing=Store.state.accounts||[];
+      if(accountType.toLowerCase()==='demo'&&!window.SubscriptionSystem.canCreateDemoAccount(existing)){const plan=window.SubscriptionSystem.getUserPlan();this.message=`Your ${plan.name} plan allows up to ${plan.demoAccountLimit} demo account(s). Archived demo accounts also count.`;Router.go('accounts');return;}
+      if(accountType.toLowerCase()!=='demo'&&!window.SubscriptionSystem.canCreateAccount(existing)){this.message='Your current plan has reached its trading account limit. Archived accounts also count.';Router.go('accounts');return;}
       const balance=Number(read('balance')),name=read('name').trim(),currency=read('currency');
       if(!name||!Number.isFinite(balance)||balance<=0){this.message='Enter a name and a positive starting balance.';Router.go('accounts');return;}
       this.mutate(()=>API.createAccount({name,type:read('type'),starting_balance:balance,currency,currency_symbol:({USD:'$',INR:'₹',EUR:'€',GBP:'£'})[currency]}));
