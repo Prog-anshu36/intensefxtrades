@@ -1,0 +1,39 @@
+name: Historical Prop Firm Session tests
+on:
+  push:
+    branches: [feat/locked-historical-prop-challenges]
+  pull_request:
+    paths:
+      - 'backend/prop_challenge_engine.py'
+      - 'frontend/static/js/pages-prop-challenge.js'
+      - 'frontend/static/js/pages-worker.js'
+      - 'frontend/static/js/prop-historical-session.js'
+      - 'frontend/static/css/prop-practice.css'
+      - 'frontend/templates/index.html'
+      - 'scripts/build_static_pages.py'
+      - 'tests/test_prop_challenge_engine.py'
+      - 'tests/pages_prop_challenge.test.js'
+      - '.github/workflows/prop-challenge-tests.yml'
+jobs:
+  challenge-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install backend test dependency
+        run: python -m pip install flask
+      - name: Compile challenge engine
+        run: python -m py_compile backend/prop_challenge_engine.py
+      - name: Test server challenge engine
+        run: python -m unittest discover -s tests -p 'test_prop_challenge_engine.py'
+      - name: Test browser challenge engine
+        run: node tests/pages_prop_challenge.test.js
+      - name: Check Prop Firm Session JavaScript syntax
+        run: |
+          node --check frontend/static/js/prop-historical-session.js
+          node --check --input-type=module < frontend/static/js/pages-worker.js

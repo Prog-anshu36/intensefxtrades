@@ -6,7 +6,7 @@ const {loadPyodide}=require('../deployment-check/node_modules/pyodide');
  await py.loadPackage(['micropip','markupsafe','pycryptodome']);
  await py.runPythonAsync("import micropip\nawait micropip.install(['flask==3.1.2','flask-cors==6.0.1'])");
  py.FS.mkdirTree('/workspace/backend');
- for(const name of ['app.py','trade_importer.py','xauusd_data_provider.py'])py.FS.writeFile('/workspace/backend/'+name,fs.readFileSync('backend/'+name,'utf8'));
+ for(const name of ['app.py','trade_importer.py','xauusd_data_provider.py','prop_challenge_engine.py'])py.FS.writeFile('/workspace/backend/'+name,fs.readFileSync('backend/'+name,'utf8'));
  await py.runPythonAsync(fs.readFileSync('frontend/pages-runtime.py','utf8'));
  const call=(path,body,method=body?'POST':'GET',headers={})=>{
   py.globals.set('_request_json',JSON.stringify({path,method,headers,body:body?JSON.stringify(body):null}));

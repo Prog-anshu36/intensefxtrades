@@ -1,5 +1,6 @@
 /* Local Python trading API and bounded real history, off the UI thread. */
 await import(new URL('./pages-history.js'+new URL(import.meta.url).search,import.meta.url));
+const {createPropChallengeService}=await import(new URL('./pages-prop-challenge.js'+new URL(import.meta.url).search,import.meta.url));
 const base=new URL('../../',import.meta.url);
 // Keep the original browser-workspace namespace after the public application
 // moved from the repository root to /app/. The URL base is still /app/ for
@@ -11,6 +12,9 @@ const status=text=>postMessage({type:'status',text});
 function openDatabase(){return new Promise((resolve,reject)=>{const scope=workspaceScope?':user:'+workspaceScope:':device';const r=indexedDB.open('intensefxtrades-browser-v1:'+storageBase+scope,1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();resolve(r.result);};r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('Browser storage is blocked by another tab. Close older app tabs and retry.'));});}
 function readState(){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readonly'),r=tx.objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}
 function saveState(value){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readwrite');tx.objectStore('workspace').put(value,'state');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error || Error('Browser storage write failed'));});}
+function readWorkspaceValue(key){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readonly'),r=tx.objectStore('workspace').get(key);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}
+function saveWorkspaceValue(key,value){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readwrite');tx.objectStore('workspace').put(value,key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Browser storage write failed'));});}
+const propChallengeAPI=createPropChallengeService({history,read:()=>readWorkspaceValue('prop-challenges'),write:value=>saveWorkspaceValue('prop-challenges',value),owner:()=>workspaceScope||'device'});
 async function initialize(){
   status('Starting your private browser workspace…');
   db=await openDatabase();lastSaved=await readState();
@@ -20,7 +24,7 @@ async function initialize(){
   await python.loadPackage(['micropip','markupsafe','pycryptodome']);
   await python.runPythonAsync("import micropip\nawait micropip.install(['flask==3.1.2', 'flask-cors==6.0.1'])");
   python.FS.mkdirTree('/workspace/backend');
-  for(const name of ['backend/app.py','backend/trade_importer.py','backend/xauusd_data_provider.py','pages_runtime.py']){
+  for(const name of ['backend/app.py','backend/trade_importer.py','backend/xauusd_data_provider.py','backend/prop_challenge_engine.py','pages_runtime.py']){
     const r=await fetch(new URL('python/'+name,base),{cache:'no-cache'});if(!r.ok)throw Error('Browser trading engine source could not be loaded.');
     python.FS.writeFile('/workspace/'+name,await r.text());
   }
@@ -38,6 +42,7 @@ async function handle(data){
     python.runPython('client = backend.app.test_client()');
     return{status:200,headers:{'Content-Type':'application/json'},text:'{"ok":true}'};
   }
+  if(data.path.startsWith('/api/prop-challenge'))return await propChallengeAPI.handle(data);
   if(data.path.startsWith('/api/market/')){
     const url=new URL(data.path,base);
     const value=url.pathname.endsWith('/dataset-info')?(await history.info()).info:await history.history(url.searchParams);
