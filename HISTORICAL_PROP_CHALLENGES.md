@@ -1,6 +1,6 @@
 # Historical Prop Firm Session
 
-The Prop Firm Session now uses a dedicated server-backed historical challenge flow. Ordinary Backtesting and its replay engine are not changed by this feature.
+The Prop Firm Session now uses a dedicated historical challenge flow. Local Flask runs use the SQLite-backed Python engine; the browser-only GitHub Pages edition uses a matching worker engine backed by the real bounded history reader and device-local IndexedDB. Ordinary Backtesting and its replay engine are not changed by this feature.
 
 ## Challenge rules and market feed
 
@@ -8,10 +8,10 @@ The Prop Firm Session now uses a dedicated server-backed historical challenge fl
 - The assigned dataset stays attached to that challenge. A different challenge for the same owner receives a different eligible month; creation fails if no unused eligible month remains.
 - The server reveals exactly one next candle per market request and persists only candles that have already been revealed. The Prop Firm Session UI has no rewind, seek, candle-jump, or speed controls; its market advances automatically at a fixed rate.
 - The challenge-wide limit is 15 unique historical trading days. Attempting to reveal a 16th trading day fails the challenge. If the assigned month ends before the challenge passes, it fails.
-- The existing Standard / Pro targets, daily loss, maximum loss, and minimum actual trading-day rules are checked server-side. Risk checks include the adverse high/low of each revealed candle.
+- The existing Standard / Pro targets, daily loss, maximum loss, and minimum actual trading-day rules are checked by the challenge engine. On a hosted Flask deployment these checks run in the backend; on GitHub Pages they run in the browser worker because the public edition has no hosted server. Risk checks include the adverse high/low of each revealed candle.
 - Only one XAUUSD position may be open at a time. Orders use the last revealed candle's close; the server validates lot size, stop loss, and take profit, evaluates stop/target hits, records closed trades, and calculates simulated P/L using 100 oz per lot.
 - Phase 2 continues through the same assigned historical month. The 15-trading-day challenge limit does not reset.
-- Challenge records and revealed candles are persisted in SQLite. Challenge ownership is based on the Flask-authenticated session identity (or configured single-owner Basic Auth), not a client-supplied owner header.
+- Challenge records and revealed candles are persisted in SQLite. Local Flask challenge ownership uses the authenticated Flask session (or configured single-owner Basic Auth), not a client-supplied owner header. GitHub Pages challenges are isolated by the browser profile's user/device scope and stay on that device.
 
 ## API
 
@@ -31,4 +31,4 @@ The engine uses the local data provider only. It does not synthesize prices or s
 
 The new UI is loaded only for the Prop Firm Session route. The ordinary Backtesting page and its replay controls remain unchanged. The existing Prop Practice Chart and analysis routes are not replaced by this historical challenge UI.
 
-This is a simulated evaluation, not a real prop-firm account or certification. The app must be deployed with its authentication/session configuration and local XAUUSD CSV data available for users to run challenges.
+This is a simulated evaluation, not a real prop-firm account or certification. GitHub Pages is a browser-only practice environment: its static historical dataset and client-side state are not a tamper-proof prop-firm security boundary. The local Flask deployment uses the SQLite backend and requires its local XAUUSD CSV data.
