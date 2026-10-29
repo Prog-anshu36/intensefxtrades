@@ -16,6 +16,7 @@ export function createPropChallengeService({history, read, write, owner}) {
     const equity = c.starting_balance + c.realized_pnl + floating;
     return {
       id:c.id,model:c.model,starting_balance:c.starting_balance,phase:c.phase,status:c.status,rules:c.rules,
+      plan_code:c.plan_code||"blue",max_playback_speed:c.max_playback_speed||1,same_day_challenge:Boolean(c.same_day_challenge),
       assigned_start:iso(c.start_ms),assigned_end:iso(c.end_ms),cursor:iso(c.cursor_ms),
       trading_days:c.trading_days,phase_days:c.phase_days,trading_day_limit:MAX_DAYS,
       breach_reason:c.breach_reason,realized_pnl:Number(c.realized_pnl.toFixed(2)),equity:Number(equity.toFixed(2)),
