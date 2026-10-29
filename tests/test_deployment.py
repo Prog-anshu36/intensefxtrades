@@ -25,15 +25,11 @@ class DeploymentTests(unittest.TestCase):
             with patch.dict(os.environ,{'TRADEFXBOOK_DATA_DIR':str(source)}):
                 provider=LocalXAUUSDDataProvider(root=Path(folder)/'source')
                 pages.build(Path(folder)/'site',provider)
-            text=(Path(folder)/'site/app/index.html').read_text(encoding='utf-8')
+            text=(Path(folder)/'site/index.html').read_text(encoding='utf-8')
             self.assertIn('./static/js/pages-bridge.js',text)
             self.assertNotIn('src="/static/',text)
-            self.assertFalse((Path(folder)/'site/app/python/backend/store.json').exists())
-            self.assertTrue((Path(folder)/'site/app/python/backend/app.py').exists())
-            self.assertIn('Practise first', (Path(folder)/'site/index.html').read_text(encoding='utf-8'))
-            self.assertIn('location.replace', (Path(folder)/'site/site/index.html').read_text(encoding='utf-8'))
-            self.assertIn('../features.html', (Path(folder)/'site/site/features.html').read_text(encoding='utf-8'))
-            self.assertIn('href="app/"', (Path(folder)/'site/index.html').read_text(encoding='utf-8'))
+            self.assertFalse((Path(folder)/'site/python/backend/store.json').exists())
+            self.assertTrue((Path(folder)/'site/python/backend/app.py').exists())
 
     def test_owner_gate_and_health(self):
         with patch.dict(os.environ, {'TRADEFXBOOK_OWNER_USER':'trader', 'TRADEFXBOOK_OWNER_PASSWORD':'test-only-password'}):
