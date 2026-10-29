@@ -92,7 +92,7 @@
     },
     bind() {
       const root = this.container;
-      root.querySelectorAll("#phsOpenCreate").forEach(button=>button.addEventListener("click",()=>{this.creating=true;this.error="";this.mount();}));
+      root.querySelectorAll("#phsOpenCreate").forEach(button=>button.addEventListener("click",()=>{this.stopMarket();this.creating=true;this.error="";this.mount();}));
       root.querySelector("#phsCloseCreate")?.addEventListener("click",()=>{this.creating=false;this.mount();});
       root.querySelector("#phsCreateBackdrop")?.addEventListener("click",e=>{if(e.target===e.currentTarget){this.creating=false;this.mount();}});
       root.querySelector("#phsModel")?.addEventListener("change",e=>{this.model=e.target.value;if(this.model==="standard"&&this.balance===200000)this.balance=5000;this.mount();});
@@ -138,6 +138,7 @@
       try {
         const result=await this.request("/"+encodeURIComponent(this.selected.id)+"/next-candle",{method:"POST",body:"{}"});
         this.selected=result;
+        this.syncChallengeList();
         if(result.new_candle) {
           this.candles.push(result.new_candle);
           if(this.candles.length>180)this.candles=this.candles.slice(-180);
@@ -150,6 +151,11 @@
       } catch(error) {
         this.stopMarket();this.error=error.message;this.mount();
       } finally {this.busy=false;}
+    },
+    syncChallengeList() {
+      if(!this.selected)return;
+      const index=this.challenges.findIndex(item=>item.id===this.selected.id);
+      if(index>=0)this.challenges[index]={...this.challenges[index],...this.selected};
     },
     updateLive() {
       if(!this.container||!this.selected)return;
@@ -177,14 +183,14 @@
       const take=this.container.querySelector("#phsTP")?.value||null;
       try {
         this.selected=await this.request("/"+encodeURIComponent(this.selected.id)+"/order",{method:"POST",body:JSON.stringify({side,lots,stop_loss:stop,take_profit:take})});
-        this.lots=lots;this.notice=`${side.toUpperCase()} order placed at the last revealed market price.`;this.error="";this.mount();
+        this.syncChallengeList();this.lots=lots;this.notice=`${side.toUpperCase()} order placed at the last revealed market price.`;this.error="";this.mount();
       } catch(error) {this.error=error.message;this.mount();}
     },
     async closePosition() {
       if(!this.selected)return;
       try {
         this.selected=await this.request("/"+encodeURIComponent(this.selected.id)+"/close",{method:"POST",body:"{}"});
-        this.notice="Position closed at the last revealed market price.";this.error="";
+        this.syncChallengeList();this.notice="Position closed at the last revealed market price.";this.error="";
         if(this.selected.status!=="active")this.stopMarket();
         this.mount();
       } catch(error){this.error=error.message;this.mount();}
@@ -193,7 +199,7 @@
       if(!this.selected)return;
       try {
         this.selected=await this.request("/"+encodeURIComponent(this.selected.id)+"/advance-phase",{method:"POST",body:"{}"});
-        this.notice="Phase 2 started. The same assigned historical month continues; the 15-day limit does not reset.";this.error="";
+        this.syncChallengeList();this.notice="Phase 2 started. The same assigned historical month continues; the 15-day limit does not reset.";this.error="";
         this.mount();
       } catch(error){this.error=error.message;this.mount();}
     },
