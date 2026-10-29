@@ -25,6 +25,7 @@ assert.equal(system.canCreatePerformanceSession(1), false);
 window.IntenseFXAuth.getSubscription = () => ({ plan_code: 'green', status: 'active' });
 assert.equal(system.getUserPlan().code, 'green');
 assert.equal(system.canAccessFeature('backtesting'), true);
+assert.equal(system.canAccessFeature('performanceSession'), true, 'Green includes Prop Firm Session');
 assert.equal(system.canAccessFeature('replay'), false);
 assert.equal(system.canAccessFeature('tradeAnalysis'), false);
 assert.equal(system.getUserPlan().demoAccountLimit, 3);
@@ -34,6 +35,7 @@ assert.equal(system.canCreateDemoAccount([{type:'Demo'},{type:'Demo'},{type:'Dem
 assert.equal(system.canCreatePerformanceSession(3), false);
 
 window.IntenseFXAuth.getSubscription = () => ({ plan_code: 'purple', status: 'active' });
+assert.equal(system.canAccessFeature('performanceSession'), true, 'Purple includes Prop Firm Session');
 assert.equal(system.getUserPlan().demoAccountLimit, 5);
 assert.equal(system.getUserPlan().performanceSessionLimit, 5);
 assert.equal(system.getMaxPlaybackSpeed(), 5);
