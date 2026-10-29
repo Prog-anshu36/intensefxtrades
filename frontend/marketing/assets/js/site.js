@@ -1,6 +1,14 @@
 /* IntenseFX Trades marketing site — progressive enhancement. No dependencies.
    Everything here degrades gracefully: pages are readable with JS off. */
 (() => {
+  // Preserve old shared app links after the marketing website became the root.
+  // Authentication callbacks that still target the former root are forwarded too.
+  const appRoutes = new Set(["dashboard", "trades", "journal", "performance", "trade-analysis", "ai-coach", "backtesting", "prop-firm-session", "prop-chart", "tradingview", "settings", "subscription", "checkout", "password-reset"]);
+  const rootRoute = location.hash.slice(1).split("?")[0].toLowerCase();
+  if (appRoutes.has(rootRoute) || new URLSearchParams(location.search).has("code")) {
+    location.replace(`app/${location.search}${location.hash}`);
+    return;
+  }
   "use strict";
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));

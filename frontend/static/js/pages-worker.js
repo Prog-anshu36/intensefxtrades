@@ -1,10 +1,14 @@
 /* Local Python trading API and bounded real history, off the UI thread. */
 await import(new URL('./pages-history.js'+new URL(import.meta.url).search,import.meta.url));
 const base=new URL('../../',import.meta.url);
+// Keep the original browser-workspace namespace after the public application
+// moved from the repository root to /app/. The URL base is still /app/ for
+// assets, while returning users retain their existing accounts and chart state.
+const storageBase=base.pathname.replace(/app\/?$/,'');
 const history=new globalThis.PagesHistory(base);
 let python,ready,db,lastSaved=null,workspaceScope='';
 const status=text=>postMessage({type:'status',text});
-function openDatabase(){return new Promise((resolve,reject)=>{const scope=workspaceScope?':user:'+workspaceScope:':device';const r=indexedDB.open('intensefxtrades-browser-v1:'+base.pathname+scope,1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();resolve(r.result);};r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('Browser storage is blocked by another tab. Close older app tabs and retry.'));});}
+function openDatabase(){return new Promise((resolve,reject)=>{const scope=workspaceScope?':user:'+workspaceScope:':device';const r=indexedDB.open('intensefxtrades-browser-v1:'+storageBase+scope,1);r.onupgradeneeded=()=>r.result.createObjectStore('workspace');r.onsuccess=()=>{r.result.onversionchange=()=>r.result.close();resolve(r.result);};r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('Browser storage is blocked by another tab. Close older app tabs and retry.'));});}
 function readState(){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readonly'),r=tx.objectStore('workspace').get('state');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error);});}
 function saveState(value){return new Promise((resolve,reject)=>{const tx=db.transaction('workspace','readwrite');tx.objectStore('workspace').put(value,'state');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error || Error('Browser storage write failed'));});}
 async function initialize(){
@@ -57,7 +61,7 @@ self.onmessage=event=>{if(event.data?.type==='workspace-scope'){if(ready||db){co
     // background tab should never prevent another tab from starting.
     await (ready ||= initialize());
     const scope=workspaceScope?':user:'+workspaceScope:':device';
-    const result=navigator.locks?await navigator.locks.request('intensefxtrades-state:'+base.pathname+scope,{signal:AbortSignal.timeout(15000)},()=>handle(request)):await handle(request);
+    const result=navigator.locks?await navigator.locks.request('intensefxtrades-state:'+storageBase+scope,{signal:AbortSignal.timeout(15000)},()=>handle(request)):await handle(request);
     postMessage({id,result});
   }catch(error){console.error(error);postMessage({id,error:error.message || String(error)});}
 });};
