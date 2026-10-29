@@ -29,6 +29,7 @@ const PageAccounts = {
     }));
     container.querySelector('#hubCreateAccount')?.addEventListener('submit',event=>{
       event.preventDefault();
+      if(!window.SubscriptionSystem.canCreateAccount(Store.state.accounts||[])){this.message='Your current plan has reached its trading account limit. Archived accounts also count.';Router.go('accounts');return;}
       const form=event.currentTarget,read=name=>form.elements.namedItem(name).value;
       const accountType=read('type');
       const existing=Store.state.accounts||[];
