@@ -63,6 +63,8 @@ p{margin:0 0 1em}
 .brand-word{font:700 17px/1 var(--font-display);letter-spacing:-.02em}
 .brand-word b{color:var(--blue-2);font-weight:700}
 .brand img{height:34px;width:auto}
+.brand-logo{height:34px;width:34px;border-radius:9px;object-fit:cover;flex:0 0 auto}
+.ph-tag{display:none}
 .nav-links{display:flex;gap:4px;margin:0 auto;padding:0;list-style:none}
 .nav-links a{display:block;padding:10px 14px;border-radius:999px;color:var(--ink-2);text-decoration:none;font:500 14px/1 var(--font-body);position:relative;transition:color .2s,background .2s}
 .nav-links a:hover{color:#fff;background:rgba(61,126,255,.1)}
