@@ -1,5 +1,7 @@
 name: Historical Prop Firm Session tests
 on:
+  push:
+    branches: [feat/locked-historical-prop-challenges]
   pull_request:
     paths:
       - 'backend/prop_challenge_engine.py'
