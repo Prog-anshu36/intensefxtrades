@@ -10,6 +10,7 @@ const system = window.SubscriptionSystem;
 
 assert.equal(system.getUserPlan().code, 'blue');
 for (const feature of ['dashboard', 'trades', 'generalSettings', 'tradingView']) assert.equal(system.canAccessFeature(feature), true);
+assert.equal(system.canAccessFeature('performanceSession'), true, 'Blue includes one limited Prop Firm Session');
 for (const feature of ['analysis', 'performance', 'backtesting', 'replay', 'tradeAnalysis', 'aiCoach', 'technicalIndicators', 'premiumXauusd']) assert.equal(system.canAccessFeature(feature), false);
 assert.equal(system.canCreateAccount([{ archived: true }]), false, 'archived accounts count against Blue limit');
 assert.equal(system.canCreateAccount([]), true);
