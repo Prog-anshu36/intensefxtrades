@@ -32,4 +32,4 @@ jobs:
       - name: Check Prop Firm Session JavaScript syntax
         run: |
           node --check frontend/static/js/prop-historical-session.js
-          node --check frontend/static/js/pages-worker.js
+          node --check --input-type=module < frontend/static/js/pages-worker.js
