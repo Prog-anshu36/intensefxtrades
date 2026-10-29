@@ -69,7 +69,7 @@
         const savedId = (()=>{try{return localStorage.getItem("ift_historical_prop_selected")}catch(_){return null}})();
         const chosen = this.challenges.find(c=>c.id===savedId) || this.challenges.find(c=>["active","phase-ready"].includes(c.status)) || this.challenges[0] || null;
         if (chosen) await this.loadChallenge(chosen.id, false);
-        else this.mount();
+        this.mount();
       } catch (error) {
         this.error = error.message;
         this.mount();
