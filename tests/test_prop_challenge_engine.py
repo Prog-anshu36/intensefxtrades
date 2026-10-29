@@ -71,9 +71,9 @@ class HistoricalChallengeTests(unittest.TestCase):
             session["user_id"] = "owner-a"
             before = datetime.fromisoformat(item["cursor"]).timestamp()
             batch = self.store.next_candle(item["id"])
+            self.assertEqual(len(self.store.recent_candles(item["id"], 120)), 1)
         self.assertIsNotNone(batch["new_candle"])
         self.assertGreater(datetime.fromisoformat(batch["cursor"]).timestamp(), before)
-        self.assertEqual(len(self.store.recent_candles(item["id"], 120)), 1)
 
     def test_challenge_fails_after_fifteen_trading_days(self):
         item = self.create_as()
