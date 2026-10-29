@@ -185,6 +185,11 @@
     document.addEventListener("click", (event) => { if (popover && !popover.hidden && !popover.contains(event.target) && !pill?.contains(event.target)) popover.hidden = true; });
     el("authProfileSave")?.addEventListener("click", saveProfile);
     el("authSignout")?.addEventListener("click", signOut);
+    const sidebarLogout = el("sidebarLogoutBtn");
+    if (sidebarLogout) {
+      if (!configured) sidebarLogout.style.display = "none";
+      else sidebarLogout.addEventListener("click", () => { if (state.session) signOut(); });
+    }
   }
   async function submitAuthForm(event) {
     event.preventDefault();
@@ -324,7 +329,11 @@
           }, 0);
         }
       });
-      if (!state.session) showGate();
+      if (!state.session) {
+        const requestedMode = window.location.hash.replace("#", "");
+        showGate(undefined, requestedMode === "signup" ? "signup" : "login");
+        if (requestedMode === "login" || requestedMode === "signup") history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
       return { configured: true, session: state.session };
     } catch (error) {
       showGate(explainError(error));
