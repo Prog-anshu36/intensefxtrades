@@ -3,7 +3,7 @@ const scope={globalThis:null,URL,Date,Map,Number,Math,Error,Array,Response,Blob,
 vm.createContext(scope);vm.runInContext(fs.readFileSync('frontend/static/js/pages-history.js','utf8'),scope);
 let reads=0;
 const fetcher=async url=>{reads++;const file=path.join('_site',new URL(url).pathname.replace('/intensefxtrades/',''));return new Response(fs.readFileSync(file),{status:200});};
-const provider=new scope.PagesHistory('https://example.test/intensefxtrades/app/',fetcher);
+const provider=new scope.PagesHistory('https://example.test/intensefxtrades/',fetcher);
 (async()=>{
  const cases=[...['1m','3m','5m','15m','30m','1h','4h','1d','1w','1M'].map(timeframe=>({timeframe,limit:100})),{timeframe:'1m',start:'2025-01-01',end:'2025-01-31',limit:100},{timeframe:'5m',anchor:'2025-01-02T12:00:00Z',limit:100}];
  const info=await provider.info();

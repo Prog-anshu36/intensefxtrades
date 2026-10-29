@@ -52,37 +52,20 @@ def export_history(provider,output,chunk_size=5000):
 
 def build(output=ROOT/'_site',provider=None,assets_only=False):
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
-    app=output/'app';app.mkdir(parents=True,exist_ok=True)
-    shutil.copytree(ROOT/'frontend/static',app/'static',dirs_exist_ok=True)
+    shutil.copytree(ROOT/'frontend/static',output/'static',dirs_exist_ok=True)
     text=(ROOT/'frontend/templates/index.html').read_text(encoding='utf-8').replace('"/static/','"./static/')
     version=hashlib.sha256(b''.join(p.relative_to(ROOT).as_posix().encode()+p.read_bytes() for p in sorted((ROOT/'frontend/static').rglob('*')) if p.is_file())).hexdigest()[:12]
     text=text.replace('<script src="./static/js/api.js', f'<script src="./static/js/pages-bridge.js?v={version}"></script>\n<script src="./static/js/api.js',1)
     # Publish matching CSS/JS together; old browser cache must not mask fixes.
     text=re.sub(r'((?:src|href)="\./static/[^"?]+)(?:\?[^\"]*)?"', lambda m:m[1]+'?v='+version+'"', text)
     text=text.replace('<title>intensefxTRADES</title>','<title>intensefxTRADES</title>\n<meta name="description" content="Free real-CSV XAUUSD backtesting. Trades and journals are saved on this device.">')
-    (app/'index.html').write_text(text,encoding='utf-8')
+    (output/'index.html').write_text(text,encoding='utf-8')
     (output/'.nojekyll').write_text('',encoding='utf-8')
-    # The public root is the informational website. The full trading workspace
-    # is self-contained under /app/ so its worker, Python runtime and bounded
-    # history assets continue to resolve from one stable base URL.
-    marketing=ROOT/'frontend'/'marketing'
-    if marketing.exists():
-        shutil.copytree(marketing,output,dirs_exist_ok=True)
-    legacy=output/'site';legacy.mkdir(parents=True,exist_ok=True)
-    for old_page in ('index.html','features.html','prop-firm-practice.html','about.html','faq-contact.html','legal.html'):
-        target='../' if old_page=='index.html' else '../'+old_page
-        (legacy/old_page).write_text(
-            '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<title>IntenseFX Trades</title><link rel="canonical" href="{target}">'
-            f'<script>location.replace("{target}"+location.search+location.hash)</script>'
-            f'<p><a href="{target}">Open the IntenseFX Trades website</a></p>',
-            encoding='utf-8'
-        )
-    python=app/'python/backend';python.mkdir(parents=True,exist_ok=True)
+    python=output/'python/backend';python.mkdir(parents=True,exist_ok=True)
     for name in ('app.py','trade_importer.py','xauusd_data_provider.py'):
         shutil.copy2(ROOT/'backend'/name,python/name)
-    shutil.copy2(ROOT/'frontend/pages-runtime.py',app/'python/pages_runtime.py')
-    if not assets_only: export_history(provider or LocalXAUUSDDataProvider(),app/'history')
+    shutil.copy2(ROOT/'frontend/pages-runtime.py',output/'python/pages_runtime.py')
+    if not assets_only: export_history(provider or LocalXAUUSDDataProvider(),output/'history')
 
 
 if __name__=='__main__':

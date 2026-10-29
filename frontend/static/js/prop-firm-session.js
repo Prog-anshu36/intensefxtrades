@@ -181,15 +181,7 @@
       this.save();
       return { ok: true, attempt };
     },
-    activate(attemptId) {
-      this.workspaceError = null;
-      this.selectedId = attemptId;
-      this.currentMarketTime = timestamp(this.selected()?.lastMarketTimestamp);
-      this.save();
-      if (typeof window.dispatchEvent === "function" && typeof CustomEvent === "function") {
-        window.dispatchEvent(new CustomEvent("tfb:prop-account-change", { detail: { attemptId } }));
-      }
-    },
+    activate(attemptId) { this.workspaceError = null; this.selectedId = attemptId; this.currentMarketTime = timestamp(this.selected()?.lastMarketTimestamp); this.save(); },
     evaluate(attempt = this.selected() || this.practiceAttempt(), state = this.tradingState(attempt)) {
       if (!attempt || attempt.archived || attempt.status !== "active") return { attempt, failed: false, liquidate: [] };
       const model = this.rulesFor(attempt);
