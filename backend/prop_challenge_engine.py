@@ -54,6 +54,9 @@ class HistoricalChallengeStore:
                 daily_start_equity REAL NOT NULL DEFAULT 0, last_candle_json TEXT NOT NULL DEFAULT 'null',
                 created_at TEXT NOT NULL, updated_at TEXT NOT NULL)""")
             db.execute("CREATE INDEX IF NOT EXISTS prop_challenge_owner_idx ON prop_challenge_sessions(owner, created_at)")
+            db.execute("""CREATE TABLE IF NOT EXISTS prop_challenge_revealed(
+                challenge_id TEXT NOT NULL, time INTEGER NOT NULL, candle_json TEXT NOT NULL,
+                PRIMARY KEY(challenge_id,time))""")
     def connect(self):
         db = sqlite3.connect(str(self.path), timeout=15)
         db.row_factory = sqlite3.Row
@@ -110,7 +113,8 @@ class HistoricalChallengeStore:
             "cursor": iso(row["cursor_ms"]), "trading_days": json.loads(row["trading_days"]),
             "phase_days": json.loads(row["phase_days"]), "trading_day_limit": MAX_TRADING_DAYS,
             "breach_reason": row["reason"], "realized_pnl": round(row["realized_pnl"], 2),
-            "equity": round(equity, 2), "position": position, "trades": trades,
+            "equity": round(equity, 2), "daily_start_equity": round(float(row["daily_start_equity"] or row["balance"]), 2),
+            "position": position, "trades": trades,
             "last_candle": last, "created_at": row["created_at"],
             "progress_pct": round(max(0, min(100, len(json.loads(row["trading_days"])) / MAX_TRADING_DAYS * 100)), 2),
         }
@@ -158,6 +162,18 @@ class HistoricalChallengeStore:
         with LOCK, self.connect() as db:
             rows = db.execute("SELECT * FROM prop_challenge_sessions WHERE owner=? ORDER BY created_at DESC", (owner,)).fetchall()
             return [self.public(row) for row in rows]
+
+    def recent_candles(self, cid, limit=120):
+        try:
+            limit = max(1, min(500, int(limit)))
+        except (TypeError, ValueError):
+            limit = 120
+        with LOCK, self.connect() as db:
+            row = self.row_for(db, cid)
+            if not row:
+                return None
+            found = db.execute("SELECT candle_json FROM prop_challenge_revealed WHERE challenge_id=? ORDER BY time DESC LIMIT ?", (cid, limit)).fetchall()
+            return list(reversed([json.loads(item["candle_json"]) for item in found]))
 
     def get(self, cid):
         with LOCK, self.connect() as db:
@@ -239,6 +255,7 @@ class HistoricalChallengeStore:
             if status == "failed" and position:
                 realized, trades, position = self._close_position(row, float(candle["close"]), t, trades, position)
             cursor = t + 1
+            db.execute("INSERT OR IGNORE INTO prop_challenge_revealed(challenge_id,time,candle_json) VALUES(?,?,?)", (cid, t, json.dumps(candle)))
             updated = self._save(db, row, cursor_ms=cursor, trading_days=json.dumps(days),
                 phase_days=json.dumps(phase_days), current_day=current_day, daily_start_equity=daily_start,
                 realized_pnl=realized, position_json=json.dumps(position), trades_json=json.dumps(trades),
@@ -358,6 +375,14 @@ def register_historical_challenge_routes(app, provider):
         try:
             item = store.get(cid)
             return (jsonify(item), 200) if item else (jsonify({"error": "Challenge not found."}), 404)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 401
+
+    @bp.get("/api/prop-challenge/<cid>/candles")
+    def recent_candles(cid):
+        try:
+            items = store.recent_candles(cid, request.args.get("limit", 120))
+            return (jsonify({"candles": items}), 200) if items is not None else (jsonify({"error": "Challenge not found."}), 404)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 401
 
