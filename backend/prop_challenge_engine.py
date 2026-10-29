@@ -73,18 +73,20 @@ class HistoricalChallengeStore:
             raise ValueError("Sign in before creating a historical challenge.")
         return str(value)[:160]
 
-    def pick_month(self):
+    def pick_month(self, owner):
         info = self.provider.info()
         frame = info.get("timeframes", {}).get("1m")
         if not frame or frame.get("first_timestamp") is None or frame.get("last_timestamp") is None:
             raise ValueError("Verified local XAUUSD 1-minute data is unavailable.")
         now = datetime.now(UTC)
+        with self.connect() as db:
+            used = {(int(r[0]), int(r[1])) for r in db.execute("SELECT start_ms,end_ms FROM prop_challenge_sessions WHERE owner=?", (owner,)).fetchall()}
         candidates = []
         for offset in range(48, 61):
             total = now.year * 12 + (now.month - 1) - offset
             year, month0 = divmod(total, 12)
             lo, hi = month_bounds(year, month0 + 1)
-            if lo >= frame["first_timestamp"] and hi <= frame["last_timestamp"] and hi < int(now.timestamp() * 1000):
+            if lo >= frame["first_timestamp"] and hi <= frame["last_timestamp"] and hi < int(now.timestamp() * 1000) and (lo, hi) not in used:
                 candidates.append((lo, hi))
         self.rng.shuffle(candidates)
         for lo, hi in candidates:
@@ -138,7 +140,7 @@ class HistoricalChallengeStore:
         allowed = [5000, 10000, 25000, 50000, 100000] + ([200000] if model == "pro" else [])
         if balance not in allowed:
             raise ValueError("Unsupported account size for this model.")
-        lo, hi = self.pick_month()
+        lo, hi = self.pick_month(owner)
         now_ms = int(datetime.now(UTC).timestamp() * 1000)
         now = iso(now_ms)
         cid = str(uuid.uuid4())
@@ -150,6 +152,12 @@ class HistoricalChallengeStore:
                 VALUES(?,?,?,?,1,'active',?,?,?,?, '[]','[]',0,'null','[]','',?, 'null',?,?)""",
                 (cid, owner, model, balance, json.dumps(RULES[model]), lo, hi, lo, balance, now, now))
             return self.public(db.execute("SELECT * FROM prop_challenge_sessions WHERE id=?", (cid,)).fetchone())
+
+    def list(self):
+        owner = self.owner()
+        with LOCK, self.connect() as db:
+            rows = db.execute("SELECT * FROM prop_challenge_sessions WHERE owner=? ORDER BY created_at DESC", (owner,)).fetchall()
+            return [self.public(row) for row in rows]
 
     def get(self, cid):
         with LOCK, self.connect() as db:
@@ -327,6 +335,13 @@ def register_historical_challenge_routes(app, provider):
                             "last_timestamp": info.get("last_timestamp")})
         except (OSError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 503
+
+    @bp.get("/api/prop-challenge")
+    def list_challenges():
+        try:
+            return jsonify({"challenges": store.list()})
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 401
 
     @bp.post("/api/prop-challenge")
     def create():
