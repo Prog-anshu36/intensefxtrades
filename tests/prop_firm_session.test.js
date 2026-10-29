@@ -106,3 +106,9 @@ first.deadlineAt = new Date(Date.now() - 1).toISOString();
 assert.equal(page.canTradeAt(day(10), 'XAUUSD').ok, false);
 assert.equal(first.status, 'expired');
 console.log('Concurrent accounts, independent dates, invalid-candle and pre-order expiry checks passed');
+sandbox.SubscriptionSystem = {
+  canCreatePerformanceSession: count => count < 2,
+  getUserPlan: () => ({name:'Blue',performanceSessionLimit:2}),
+};
+assert.equal(page.performanceSessionCount(), 2);
+assert.equal(page.create('standard',5000).ok, false, 'performance session creation respects the plan quota');
