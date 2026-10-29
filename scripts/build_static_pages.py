@@ -79,7 +79,7 @@ def build(output=ROOT/'_site',provider=None,assets_only=False):
             encoding='utf-8'
         )
     python=app/'python/backend';python.mkdir(parents=True,exist_ok=True)
-    for name in ('app.py','trade_importer.py','xauusd_data_provider.py'):
+    for name in ('app.py','trade_importer.py','xauusd_data_provider.py','prop_challenge_engine.py'):
         shutil.copy2(ROOT/'backend'/name,python/name)
     shutil.copy2(ROOT/'frontend/pages-runtime.py',app/'python/pages_runtime.py')
     if not assets_only: export_history(provider or LocalXAUUSDDataProvider(),app/'history')
