@@ -200,12 +200,19 @@ class HistoricalChallengeStore:
     def _evaluate(self, row, realized, position, candle, phase_days, daily_start, current_day):
         rules = json.loads(row["rules"])
         equity = row["balance"] + realized + self.floating(position, candle)
+        # Evaluate floating risk at the adverse extreme of each revealed candle,
+        # not only at its close, so a temporary intrabar breach cannot be hidden.
+        risk_candle = candle
+        if position and candle:
+            adverse = candle["low"] if position["side"] == "buy" else candle["high"]
+            risk_candle = {**candle, "close": adverse}
+        risk_equity = row["balance"] + realized + self.floating(position, risk_candle)
         daily_floor = daily_start * (1 - rules["daily_loss_pct"] / 100)
         max_floor = row["balance"] * (1 - rules["max_loss_pct"] / 100)
-        if equity <= max_floor:
-            return "failed", f"Maximum loss limit breached. Equity {equity:.2f} reached floor {max_floor:.2f}."
-        if equity <= daily_floor:
-            return "failed", f"Daily loss limit breached on {current_day}. Equity {equity:.2f} reached floor {daily_floor:.2f}."
+        if risk_equity <= max_floor:
+            return "failed", f"Maximum loss limit breached. Adverse equity {risk_equity:.2f} reached floor {max_floor:.2f}."
+        if risk_equity <= daily_floor:
+            return "failed", f"Daily loss limit breached on {current_day}. Adverse equity {risk_equity:.2f} reached floor {daily_floor:.2f}."
         target = row["balance"] * rules["targets"][str(row["phase"])] / 100
         if position is None and realized >= target and len(phase_days) >= rules["min_days"]:
             return ("passed" if row["phase"] == 2 else "phase-ready"), ""
@@ -240,8 +247,6 @@ class HistoricalChallengeStore:
                 daily_start = row["balance"] + realized + self.floating(position, row and json.loads(row["last_candle_json"]))
                 if day not in days:
                     days.append(day)
-                if day not in phase_days:
-                    phase_days.append(day)
             # Stop/target execution is conservative if both levels fall inside one candle.
             if position:
                 stop = position.get("stop_loss")
@@ -293,7 +298,11 @@ class HistoricalChallengeStore:
                 raise ValueError("Take profit must be above entry for Buy and below entry for Sell.")
             position = {"side": side, "lots": lots, "entry": price, "opened_at": iso(int(candle["time"])),
                         "stop_loss": stop, "take_profit": take}
-            updated = self._save(db, row, position_json=json.dumps(position))
+            phase_days = json.loads(row["phase_days"])
+            trade_day = candle_day(int(candle["time"]))
+            if trade_day not in phase_days:
+                phase_days.append(trade_day)
+            updated = self._save(db, row, position_json=json.dumps(position), phase_days=json.dumps(phase_days))
             return self.public(updated)
 
     @staticmethod
