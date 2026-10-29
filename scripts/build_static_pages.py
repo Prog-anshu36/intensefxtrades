@@ -67,6 +67,13 @@ def build(output=ROOT/'_site',provider=None,assets_only=False):
     if not (marketing/'index.html').is_file():
         raise FileNotFoundError('Marketing website missing: frontend/marketing/index.html')
     shutil.copytree(marketing,output,dirs_exist_ok=True)
+    # Marketing sources historically lived under /site/ and linked to ../ for
+    # the app. At the public root those calls-to-action must target /app/.
+    for page in output.glob('*.html'):
+        page.write_text(
+            page.read_text(encoding='utf-8').replace('href="../', 'href="app/'),
+            encoding='utf-8'
+        )
     legacy=output/'site';legacy.mkdir(parents=True,exist_ok=True)
     for old_page in ('index.html','features.html','prop-firm-practice.html','about.html','faq-contact.html','legal.html'):
         target='../' if old_page=='index.html' else '../'+old_page

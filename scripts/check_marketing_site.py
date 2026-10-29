@@ -19,7 +19,7 @@ def check(output):
     output = Path(output).resolve()
     for name in ('index.html', 'features.html', 'prop-firm-practice.html',
                  'about.html', 'faq-contact.html', 'legal.html', '404.html'):
-        page = output / 'site' / name
+        page = output / name
         parser = Links()
         parser.feed(page.read_text(encoding='utf-8'))
         app_links = 0
@@ -30,7 +30,7 @@ def check(output):
             target = (page.parent / unquote(url.path)).resolve()
             if not target.is_relative_to(output) or not target.exists():
                 raise ValueError(f'{name}: missing local target {link}')
-            if target == output:
+            if target == output / 'app':
                 app_links += 1
                 if not (target / 'index.html').is_file():
                     raise ValueError('Application entry point missing')
