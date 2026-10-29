@@ -32,19 +32,3 @@ The engine uses the local data provider only. It does not synthesize prices or s
 The new UI is loaded only for the Prop Firm Session route. The ordinary Backtesting page and its replay controls remain unchanged. The existing Prop Practice Chart and analysis routes are not replaced by this historical challenge UI.
 
 This is a simulated evaluation, not a real prop-firm account or certification. GitHub Pages is a browser-only practice environment: its static historical dataset and client-side state are not a tamper-proof prop-firm security boundary. The local Flask deployment uses the SQLite backend and requires its local XAUUSD CSV data.
-
-## Subscription-tier practice limits
-
-The browser app now applies this tier matrix to historical performance sessions and demo accounts:
-
-| Plan | Demo accounts | Performance sessions | Maximum historical playback | Challenge progression |
-|---|---:|---:|---:|---|
-| Blue / Free | 1 | 1 | 1× | One historical trading day per calendar day |
-| Green | 3 | 3 | 3× | All 15 historical trading days can be practised in one sitting |
-| Purple | 5 | 5 | 5× | All 15 historical trading days can be practised in one sitting |
-| Red | 10 | 10 | 10× | All 15 historical trading days can be practised in one sitting |
-| Golden VIP | 50 | 50 | 100× | All 15 historical trading days can be practised in one sitting |
-
-Accelerated playback requests a bounded batch of candles. The engine still processes candles chronologically and evaluates order exits, daily loss, maximum loss, and challenge state candle by candle; it does not skip risk checks. The 15-historical-trading-day challenge limit remains separate from the real-world daily unlock rule for Blue.
-
-**Deployment/security limitation:** GitHub Pages runs the practice service in the browser. Tier values are currently passed from the client into that local service and are therefore not tamper-proof. The current repository documentation also records that cloud authentication and paid-plan activation are not yet fully connected. Do not treat these browser-side quotas as secure paid entitlements until plan verification is moved to a trusted authenticated backend.
