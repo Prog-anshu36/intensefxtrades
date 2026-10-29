@@ -21,7 +21,7 @@ export function createPropChallengeService({history, read, write, owner}) {
       breach_reason:c.breach_reason,realized_pnl:Number(c.realized_pnl.toFixed(2)),equity:Number(equity.toFixed(2)),
       daily_start_equity:Number((c.daily_start_equity||c.starting_balance).toFixed(2)),
       position:c.position,trades:c.trades,last_candle:c.last_candle,
-      created_at:c.created_at,progress_pct:Math.round(Math.min(100,c.trading_days.length/MAX_DAYS*10000)/100)
+      created_at:c.created_at,progress_pct:Math.round(Math.min(100,c.trading_days.length/MAX_DAYS*100)*100)/100
     };
   };
   const floating = (position,candle) => {
