@@ -117,9 +117,9 @@ export function createPropChallengeService({history, read, write, owner}) {
           const candle=found[0],time=Number(candle.time),day=dayKey(time);
           const isNewDay=!c.trading_days.includes(day);
           if(isNewDay&&c.trading_days.length>=MAX_DAYS){c.status="failed";c.breach_reason="Challenge not passed within 15 trading days.";break;}
-          if(isNewDay&&!c.same_day_challenge&&c.trading_days.length>0){
+          if(isNewDay&&!c.same_day_challenge){
             const today=new Date().toISOString().slice(0,10);
-            if(c.last_real_access_date===today){
+            if(c.trading_days.length>0&&c.last_real_access_date===today){
               c.updated_at=iso(Date.now());await saveState(state);
               return error(429,"Free plan unlocks one historical trading day per calendar day. Return tomorrow to continue, or upgrade to unlock all 15 days in one sitting.");
             }
