@@ -10,6 +10,7 @@
     tradingView: { label: "Chart workspace", required: "blue" },
     analysis: { label: "Analysis", required: "green" },
     performance: { label: "Performance", required: "green" },
+    performanceSession: { label: "Prop Firm Session", required: "blue" },
     backtesting: { label: "Backtesting", required: "green" },
     replay: { label: "Replay", required: "purple" },
     tradeAnalysis: { label: "Trading Analysis", required: "purple" },
@@ -23,17 +24,17 @@
   };
   const PLANS = {
     blue: { code: "blue", name: "Blue", tier: "Free", color: COLORS.blue, price: 0,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView"]), accountLimit: 1, demoAccountLimit: 1, performanceSessionLimit: 1, maxPlaybackSpeed: 1, sameDayChallenge: false,
-      bullets: ["Dashboard, trades and journal", "Chart workspace", "One demo trading account"] },
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "performanceSession"]), accountLimit: 1, demoAccountLimit: 1, performanceSessionLimit: 1, maxPlaybackSpeed: 1, sameDayChallenge: false,
+      bullets: ["Dashboard, trades and journal", "Chart workspace", "One demo trading account", "One Prop Firm Session · 1× speed · one historical day per calendar day"] },
     green: { code: "green", name: "Green", tier: "Starter", color: COLORS.green, price: 49,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "additionalAccount"]), accountLimit: Infinity, demoAccountLimit: 3, performanceSessionLimit: 3, maxPlaybackSpeed: 3, sameDayChallenge: true,
-      bullets: ["Everything in Blue", "Analysis and performance", "Backtesting", "Additional trading accounts"] },
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "performanceSession", "backtesting", "additionalAccount"]), accountLimit: Infinity, demoAccountLimit: 3, performanceSessionLimit: 3, maxPlaybackSpeed: 3, sameDayChallenge: true,
+      bullets: ["Everything in Blue", "Analysis and classic backtesting", "Up to 3 demo accounts and 3 performance sessions", "Historical playback up to 3× · complete all 15 days in one sitting"] },
     purple: { code: "purple", name: "Purple", tier: "Pro", color: COLORS.purple, price: 149,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount"]), accountLimit: Infinity, demoAccountLimit: 5, performanceSessionLimit: 5, maxPlaybackSpeed: 5, sameDayChallenge: true,
-      bullets: ["Everything in Green", "Replay and technical indicators", "Trading Analysis", "Replay history limited to one year"] },
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "performanceSession", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount"]), accountLimit: Infinity, demoAccountLimit: 5, performanceSessionLimit: 5, maxPlaybackSpeed: 5, sameDayChallenge: true,
+      bullets: ["Everything in Green", "Replay and technical indicators", "Up to 5 demo accounts and 5 performance sessions", "Historical playback up to 5× · complete all 15 days in one sitting"] },
     red: { code: "red", name: "Red", tier: "Elite", color: COLORS.red, price: 199,
       features: new Set(Object.keys(FEATURES)), accountLimit: Infinity, demoAccountLimit: 10, performanceSessionLimit: 10, maxPlaybackSpeed: 10, sameDayChallenge: true,
-      bullets: ["Everything in Purple", "AI Coach and premium settings", "Full supported XAUUSD history", "All available replay history"] },
+      bullets: ["Everything in Purple", "AI Coach and premium settings", "Up to 10 demo accounts and 10 performance sessions", "Historical playback up to 10× · complete all 15 days in one sitting"] },
   };
   const ORDER = ["blue", "green", "purple", "red"];
   const GOLDEN_PASS = { code: 'golden_vip', name: 'Golden VIP', tier: 'Pass', color: '#efc75e', price: 249, features: new Set(Object.keys(FEATURES)) };
