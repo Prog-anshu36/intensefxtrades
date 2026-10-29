@@ -23,16 +23,16 @@
   };
   const PLANS = {
     blue: { code: "blue", name: "Blue", tier: "Free", color: COLORS.blue, price: 0,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView"]), accountLimit: 1,
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView"]), accountLimit: 1, demoAccountLimit: 1, performanceSessionLimit: 1, maxPlaybackSpeed: 1, sameDayChallenge: false,
       bullets: ["Dashboard, trades and journal", "Chart workspace", "One demo trading account"] },
     green: { code: "green", name: "Green", tier: "Starter", color: COLORS.green, price: 49,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "additionalAccount"]), accountLimit: Infinity,
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "additionalAccount"]), accountLimit: Infinity, demoAccountLimit: 3, performanceSessionLimit: 3, maxPlaybackSpeed: 3, sameDayChallenge: true,
       bullets: ["Everything in Blue", "Analysis and performance", "Backtesting", "Additional trading accounts"] },
     purple: { code: "purple", name: "Purple", tier: "Pro", color: COLORS.purple, price: 149,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount"]), accountLimit: Infinity,
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount"]), accountLimit: Infinity, demoAccountLimit: 5, performanceSessionLimit: 5, maxPlaybackSpeed: 5, sameDayChallenge: true,
       bullets: ["Everything in Green", "Replay and technical indicators", "Trading Analysis", "Replay history limited to one year"] },
     red: { code: "red", name: "Red", tier: "Elite", color: COLORS.red, price: 199,
-      features: new Set(Object.keys(FEATURES)), accountLimit: Infinity,
+      features: new Set(Object.keys(FEATURES)), accountLimit: Infinity, demoAccountLimit: 10, performanceSessionLimit: 10, maxPlaybackSpeed: 10, sameDayChallenge: true,
       bullets: ["Everything in Purple", "AI Coach and premium settings", "Full supported XAUUSD history", "All available replay history"] },
   };
   const ORDER = ["blue", "green", "purple", "red"];
@@ -79,7 +79,7 @@
   function getUserPlan() {
     const subscription = window.IntenseFXAuth?.getSubscription?.();
     const plan = PLANS[normalizePlan(subscription)];
-    return plan.code === 'red' && subscription?.product_code === 'golden_vip' ? { ...plan, name: GOLDEN_PASS.name, tier: GOLDEN_PASS.tier, color: GOLDEN_PASS.color, productCode: 'golden_vip' } : plan;
+    return plan.code === 'red' && subscription?.product_code === 'golden_vip' ? { ...plan, name: GOLDEN_PASS.name, tier: GOLDEN_PASS.tier, color: GOLDEN_PASS.color, productCode: 'golden_vip', demoAccountLimit: 50, performanceSessionLimit: 50, maxPlaybackSpeed: 100, sameDayChallenge: true } : plan;
   }
   function getUserEntitlements(plan = getUserPlan()) { return new Set(plan.features); }
   function canAccessFeature(feature, plan = getUserPlan()) { return Boolean(plan?.features.has(feature)); }
@@ -88,6 +88,15 @@
     const count = Array.isArray(existingAccounts) ? existingAccounts.length : Number(existingAccounts || 0);
     return count < plan.accountLimit;
   }
+  function canCreateDemoAccount(existingAccounts = [], plan = getUserPlan()) {
+    const demos = Array.isArray(existingAccounts) ? existingAccounts.filter(account => String(account?.type || "Demo").toLowerCase() === "demo").length : Number(existingAccounts || 0);
+    return demos < Number(plan.demoAccountLimit ?? plan.accountLimit);
+  }
+  function canCreatePerformanceSession(existingCount = 0, plan = getUserPlan()) {
+    const count = Array.isArray(existingCount) ? existingCount.length : Number(existingCount || 0);
+    return count < Number(plan.performanceSessionLimit ?? 1);
+  }
+  function getMaxPlaybackSpeed(plan = getUserPlan()) { return Number(plan.maxPlaybackSpeed || 1); }
   function getPermittedReplayRange(instrument, availability, plan = getUserPlan()) {
     const start = timestampMillis(availability?.start ?? availability?.first_timestamp);
     const end = timestampMillis(availability?.end ?? availability?.last_timestamp);
@@ -155,7 +164,7 @@
   document.addEventListener("DOMContentLoaded", () => protectFeatureControls());
 
   window.SubscriptionSystem = { PLANS, FEATURES, ORDER, GOLDEN_PASS, purchaseQuote, normalizePlan, getUserPlan, getUserEntitlements,
-    canAccessFeature, requiredPlan, canCreateAccount, getPermittedReplayRange, canAccessHistoricalData, canAccessReplayRange,
+    canAccessFeature, requiredPlan, canCreateAccount, canCreateDemoAccount, canCreatePerformanceSession, getMaxPlaybackSpeed, getPermittedReplayRange, canAccessHistoricalData, canAccessReplayRange,
     guardFeature, protectFeatureControls, getVipPlanCode, redeemVipKey, requestUpgrade };
 })();
 
