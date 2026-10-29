@@ -8,7 +8,7 @@
   const dayLabel = value => value ? new Date(value).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}) : "—";
 
   const HistoricalPropFirmSession = {
-    challenges: [], selected: null, candles: [], creating: false, running: false,
+    challenges: [], selected: null, candles: [], creating: false, running: false, speed: 1,
     timer: null, busy: false, container: null, error: "", notice: "", model: "standard", balance: 5000, lots: 0.01,
     async request(path, options = {}) {
       const response = await fetch(API_ROOT + path, {
@@ -25,9 +25,15 @@
     render() { return this.pageMarkup(); },
     pageMarkup() {
       const selected = this.selected;
+      const plan = window.SubscriptionSystem?.getUserPlan?.() || {code:"blue",name:"Blue",performanceSessionLimit:1,maxPlaybackSpeed:1,sameDayChallenge:false};
+      const maxSessions = Number(plan.performanceSessionLimit || 1);
+      const maxSpeed = Number(plan.maxPlaybackSpeed || 1);
+      const atSessionLimit = this.challenges.length >= maxSessions;
+      const speedChoices = [1,2,3,5,10,100].filter(value => value <= maxSpeed);
+      if (!speedChoices.includes(this.speed)) this.speed = speedChoices[speedChoices.length-1] || 1;
       const active = selected?.status === "active";
       const options = this.challenges.map(item => `<option value="${escapeHtml(item.id)}" ${item.id===selected?.id?"selected":""}>${escapeHtml(item.model.toUpperCase())} · ${money(item.starting_balance)} · ${escapeHtml(dayLabel(item.assigned_start))} · ${escapeHtml(item.status)}</option>`).join("");
-      const createForm = `<div class="phs-create-backdrop" id="phsCreateBackdrop" ${this.creating?"":"hidden"}><section class="phs-create-card" role="dialog" aria-modal="true" aria-label="Create historical prop challenge"><header><div><span class="phs-kicker">NEW EVALUATION</span><h2>Create a historical challenge</h2></div><button class="phs-quiet" id="phsCloseCreate" type="button" aria-label="Close">×</button></header><p>Each challenge receives a different real XAUUSD month from 48–60 months ago. The first 15 trading days are available; future candles stay hidden.</p><div class="phs-form-grid"><label>Challenge model<select id="phsModel"><option value="standard" ${this.model==="standard"?"selected":""}>2-Step Standard</option><option value="pro" ${this.model==="pro"?"selected":""}>2-Step Pro</option></select></label><label>Starting balance<select id="phsBalance">${(this.model==="pro"?[5000,10000,25000,50000,100000,200000]:[5000,10000,25000,50000,100000]).map(v=>`<option value="${v}" ${v===Number(this.balance)?"selected":""}>${money(v)}</option>`).join("")}</select></label></div><button type="button" class="phs-primary" id="phsCreateButton">Assign historical month →</button><p class="phs-muted">Uses the project's local XAUUSD 1-minute dataset. No synthetic price data is generated.</p></section></div>`;
+      const createForm = `<div class="phs-create-backdrop" id="phsCreateBackdrop" ${this.creating?"":"hidden"}><section class="phs-create-card" role="dialog" aria-modal="true" aria-label="Create historical prop challenge"><header><div><span class="phs-kicker">NEW EVALUATION</span><h2>Create a historical challenge</h2></div><button class="phs-quiet" id="phsCloseCreate" type="button" aria-label="Close">×</button></header><p>Each challenge receives a different real XAUUSD month from 48–60 months ago. The first 15 trading days are available; future candles stay hidden.</p><div class="phs-form-grid"><label>Challenge model<select id="phsModel"><option value="standard" ${this.model==="standard"?"selected":""}>2-Step Standard</option><option value="pro" ${this.model==="pro"?"selected":""}>2-Step Pro</option></select></label><label>Starting balance<select id="phsBalance">${(this.model==="pro"?[5000,10000,25000,50000,100000,200000]:[5000,10000,25000,50000,100000]).map(v=>`<option value="${v}" ${v===Number(this.balance)?"selected":""}>${money(v)}</option>`).join("")}</select></label></div><button type="button" class="phs-primary" id="phsCreateButton" ${atSessionLimit?"disabled":""}>${atSessionLimit?"Plan session limit reached":"Assign historical month →"}</button><p class="phs-muted">${escapeHtml(plan.name)} plan · ${this.challenges.length}/${maxSessions} performance sessions used. Existing sessions count toward your limit.</p><p class="phs-muted">Uses real XAUUSD 1-minute history. Paid tiers can complete the 15-day challenge in one sitting; Blue unlocks one historical trading day per calendar day.</p></section></div>`;
       if (!selected) return `<main class="phs-page"><header class="phs-header"><div><span class="phs-kicker">INTENSEFXTRADES · EVALUATION MODE</span><h1>Prop Firm Session</h1><p>Practice against a hidden historical XAUUSD month with a strict 15-trading-day limit.</p></div><span class="phs-lock-tag">LOCKED MARKET DATA</span></header><section class="phs-empty"><div class="phs-empty-icon">15</div><span class="phs-kicker">HISTORICAL EVALUATION</span><h2>Trade the market. Not the future.</h2><p>Create a challenge to receive a randomly assigned historical month from 4–5 years ago. Candles appear one at a time; no replay, seek, or future-data controls are available in this session.</p><button type="button" class="phs-primary" id="phsOpenCreate">Create challenge →</button><p class="phs-muted">${escapeHtml(this.error || "Real historical XAUUSD data · Engine-checked risk rules · Maximum 15 trading days")}</p></section>${createForm}</main>`;
       const rules = this.rules();
       const pnl = Number(selected.realized_pnl)||0;
@@ -42,7 +48,7 @@
       return `<main class="phs-page"><header class="phs-header"><div><span class="phs-kicker">INTENSEFXTRADES · HISTORICAL EVALUATION</span><h1>Prop Firm Session</h1><p>Assigned month: <strong>${escapeHtml(monthText)}</strong> · XAUUSD · 1-minute candles</p></div><span class="phs-lock-tag"><i></i> FUTURE DATA LOCKED</span></header>
         <section class="phs-toolbar"><label>Challenge history<select id="phsChallengeSelect">${options}</select></label><div class="phs-toolbar-actions"><span class="phs-status" data-status="${escapeHtml(selected.status)}">${statusText}</span><button type="button" class="phs-secondary" id="phsOpenCreate">+ New challenge</button></div></section>
         <section class="phs-stats"><article><span>Account balance</span><b>${money(Number(selected.starting_balance)+pnl)}</b><small>Starting ${money(selected.starting_balance)}</small></article><article><span>Live equity</span><b data-phs="equity">${money(equity)}</b><small>Realized P/L <em data-phs="pnl">${money(pnl)}</em></small></article><article><span>Trading days</span><b data-phs="days">${selected.trading_days.length} / 15</b><small>Challenge-wide limit</small></article><article><span>Profit target</span><b>${money(target)}</b><small>Phase ${selected.phase} · ${Number(rules.targets?.[String(selected.phase)]||0)}% target</small></article></section>
-        <section class="phs-layout"><div class="phs-chart-card"><div class="phs-chart-head"><div><span class="phs-kicker">LIVE HISTORICAL FEED</span><h2>XAUUSD <small>1m</small></h2><p data-phs="candleTime">${selected.last_candle?escapeHtml(new Date(selected.last_candle.time).toLocaleString()):"Waiting for first candle"}</p></div><div class="phs-price"><span>Last price</span><b data-phs="price">${price(selected.last_candle?.close)}</b></div></div><canvas id="phsChart" aria-label="Revealed historical XAUUSD candles" role="img"></canvas><div class="phs-chart-footer"><span><i class="phs-dot"></i><span data-phs="marketState">${this.running?"Market running":"Market not started"}</span></span><span data-phs="candleCount">${this.candles.length} revealed candles</span><button type="button" class="phs-primary" id="phsStartMarket" ${!active||this.running?"disabled":""}>${this.running?"Market running…":"Start market"}</button></div><p class="phs-muted">The market advances automatically at a fixed rate. You cannot rewind, seek, change speed, or load unrevealed candles.</p></div>
+        <section class="phs-layout"><div class="phs-chart-card"><div class="phs-chart-head"><div><span class="phs-kicker">LIVE HISTORICAL FEED</span><h2>XAUUSD <small>1m</small></h2><p data-phs="candleTime">${selected.last_candle?escapeHtml(new Date(selected.last_candle.time).toLocaleString()):"Waiting for first candle"}</p></div><div class="phs-price"><span>Last price</span><b data-phs="price">${price(selected.last_candle?.close)}</b></div></div><canvas id="phsChart" aria-label="Revealed historical XAUUSD candles" role="img"></canvas><div class="phs-chart-footer"><span><i class="phs-dot"></i><span data-phs="marketState">${this.running?"Market running":"Market not started"}</span></span><span data-phs="candleCount">${this.candles.length} revealed candles</span><label class="phs-speed-control">Replay speed<select id="phsSpeed" ${this.running?"disabled":""}>${speedChoices.map(value=>`<option value="${value}" ${value===this.speed?"selected":""}>${value}×</option>`).join("")}</select></label><button type="button" class="phs-primary" id="phsStartMarket" ${!active||this.running?"disabled":""}>${this.running?"Market running…":"Start market"}</button></div><p class="phs-muted">Playback cap: ${maxSpeed}×. Every candle is evaluated in order; accelerated playback batches candle processing but does not skip risk checks.</p></div>
           <aside class="phs-side"><section class="phs-card"><h3>Place XAUUSD order</h3><label>Lot size<input id="phsLots" type="number" min="0.01" max="100" step="0.01" value="${escapeHtml(this.lots)}" ${!active||selected.position?"disabled":""}></label><div class="phs-form-grid"><label>Stop loss price <input id="phsSL" type="number" min="0.01" step="0.01" placeholder="Optional" ${!active||selected.position?"disabled":""}></label><label>Take profit price <input id="phsTP" type="number" min="0.01" step="0.01" placeholder="Optional" ${!active||selected.position?"disabled":""}></label></div><div class="phs-order-buttons"><button type="button" class="phs-buy" id="phsBuy" ${!active||!!selected.position||!selected.last_candle?"disabled":""}>Buy</button><button type="button" class="phs-sell" id="phsSell" ${!active||!!selected.position||!selected.last_candle?"disabled":""}>Sell</button></div><div class="phs-position" data-phs="position">${this.positionMarkup(selected.position,selected.last_candle)}</div><button type="button" class="phs-secondary phs-close-position" id="phsClosePosition" ${!active||!selected.position?"disabled":""}>Close position at current market</button><p class="phs-muted">Simulated XAUUSD contract: 100 oz per lot. The challenge engine validates orders and loss limits against revealed candles.</p></section>
           <section class="phs-card"><h3>Risk limits</h3><div class="phs-risk-row"><span>Daily loss</span><b data-phs="dailyLoss">${money(dailyLoss)} / ${money(dailyLimit)}</b></div><div class="phs-risk-track"><i data-phs="dailyTrack" style="width:${Math.min(100,dailyLoss/Math.max(1,dailyLimit)*100)}%"></i></div><div class="phs-risk-row"><span>Maximum loss</span><b data-phs="maxLoss">${money(maxLoss)} / ${money(maxLossLimit)}</b></div><div class="phs-risk-track"><i data-phs="maxTrack" style="width:${Math.min(100,maxLoss/Math.max(1,maxLossLimit)*100)}%"></i></div><p class="phs-muted">${rules.daily_loss_pct}% daily loss · ${rules.max_loss_pct}% maximum loss · ${rules.min_days} minimum trading days per phase</p></section></aside></section>
         <section class="phs-card phs-history"><div class="phs-section-title"><div><span class="phs-kicker">CHALLENGE LEDGER</span><h2>Trade history</h2></div><span data-phs="tradeCount">${selected.trades.length} closed trades</span></div><div data-phs="trades">${this.tradesMarkup(selected.trades)}</div></section>
@@ -98,6 +104,7 @@
       root.querySelector("#phsModel")?.addEventListener("change",e=>{this.model=e.target.value;if(this.model==="standard"&&this.balance===200000)this.balance=5000;this.mount();});
       root.querySelector("#phsBalance")?.addEventListener("change",e=>{this.balance=Number(e.target.value);});
       root.querySelector("#phsCreateButton")?.addEventListener("click",()=>this.createChallenge());
+      root.querySelector("#phsSpeed")?.addEventListener("change",e=>{const max=window.SubscriptionSystem?.getMaxPlaybackSpeed?.()||1;this.speed=Math.min(max,Math.max(1,Number(e.target.value)||1));this.mount();});
       root.querySelector("#phsChallengeSelect")?.addEventListener("change",e=>this.loadChallenge(e.target.value));
       root.querySelector("#phsStartMarket")?.addEventListener("click",()=>this.startMarket());
       root.querySelector("#phsBuy")?.addEventListener("click",()=>this.placeOrder("buy"));
@@ -108,12 +115,16 @@
     },
     async createChallenge() {
       const button=this.container.querySelector("#phsCreateButton");
+      const plan=window.SubscriptionSystem?.getUserPlan?.()||{code:"blue",performanceSessionLimit:1};
+      if(!window.SubscriptionSystem?.canCreatePerformanceSession?.(this.challenges.length) && window.SubscriptionSystem){this.error=`Your ${plan.name} plan allows up to ${plan.performanceSessionLimit} performance session(s).`;this.mount();return;}
+      if(this.challenges.length>=Number(plan.performanceSessionLimit||1)){this.error=`Your ${plan.name||"Blue"} plan has reached its performance session limit.`;this.mount();return;}
       this.model=this.container.querySelector("#phsModel")?.value||this.model;
       this.balance=Number(this.container.querySelector("#phsBalance")?.value||this.balance);
       if(button){button.disabled=true;button.textContent="Assigning a real historical month…";}
       this.error="";this.notice="";
       try {
-        const item=await this.request("",{method:"POST",body:JSON.stringify({model:this.model,starting_balance:this.balance})});
+        const planCode=plan.productCode==="golden_vip"?"golden":plan.code||"blue";
+        const item=await this.request("",{method:"POST",body:JSON.stringify({model:this.model,starting_balance:this.balance,plan_code:planCode})});
         this.challenges=await this.request("",{method:"GET"}).then(r=>r.challenges||[]);
         this.selected=item;this.candles=[];
         try{localStorage.setItem("ift_historical_prop_selected",item.id)}catch(_){}
@@ -136,11 +147,12 @@
       if(this.busy||!this.running||!this.selected)return;
       this.busy=true;
       try {
-        const result=await this.request("/"+encodeURIComponent(this.selected.id)+"/next-candle",{method:"POST",body:"{}"});
+        const result=await this.request("/"+encodeURIComponent(this.selected.id)+"/next-candle?count="+encodeURIComponent(this.speed),{method:"POST",body:"{}"});
         this.selected=result;
         this.syncChallengeList();
-        if(result.new_candle) {
-          this.candles.push(result.new_candle);
+        const revealed=Array.isArray(result.new_candles)?result.new_candles:(result.new_candle?[result.new_candle]:[]);
+        if(revealed.length) {
+          this.candles.push(...revealed);
           if(this.candles.length>180)this.candles=this.candles.slice(-180);
         }
         if(result.status!=="active") {
