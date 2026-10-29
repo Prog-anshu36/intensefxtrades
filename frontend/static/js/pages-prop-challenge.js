@@ -16,6 +16,7 @@ export function createPropChallengeService({history, read, write, owner}) {
     const equity = c.starting_balance + c.realized_pnl + floating;
     return {
       id:c.id,model:c.model,starting_balance:c.starting_balance,phase:c.phase,status:c.status,rules:c.rules,
+      plan_code:c.plan_code||"blue",max_playback_speed:c.max_playback_speed||1,same_day_challenge:Boolean(c.same_day_challenge),
       assigned_start:iso(c.start_ms),assigned_end:iso(c.end_ms),cursor:iso(c.cursor_ms),
       trading_days:c.trading_days,phase_days:c.phase_days,trading_day_limit:MAX_DAYS,
       breach_reason:c.breach_reason,realized_pnl:Number(c.realized_pnl.toFixed(2)),equity:Number(equity.toFixed(2)),
@@ -84,8 +85,13 @@ export function createPropChallengeService({history, read, write, owner}) {
         if(!RULES[model])return error(409,"Unsupported challenge model.");
         const allowed=[5000,10000,25000,50000,100000,...(model==="pro"?[200000]:[])];
         if(!allowed.includes(balance))return error(409,"Unsupported account size for this model.");
-        const state=await loadState(),manifest=await history.info(),range=await pickMonth(state,manifest),now=Date.now();
+        const planCode=String(body.plan_code||"blue").toLowerCase();
+        const tier=planCode==="golden"?{limit:50,speed:100,sameDay:true}:planCode==="red"?{limit:10,speed:10,sameDay:true}:planCode==="purple"?{limit:5,speed:5,sameDay:true}:planCode==="green"?{limit:3,speed:3,sameDay:true}:{limit:1,speed:1,sameDay:false};
+        const state=await loadState(),owned=state.challenges.filter(c=>c.owner===owner());
+        if(owned.length>=tier.limit)return error(409,`Your ${planCode==="golden"?"Golden":planCode[0].toUpperCase()+planCode.slice(1)} plan allows up to ${tier.limit} performance session(s). Existing sessions count toward the limit.`);
+        const manifest=await history.info(),range=await pickMonth(state,manifest),now=Date.now();
         const challenge={id:crypto.randomUUID(),owner:owner(),model,starting_balance:balance,phase:1,status:"active",rules:RULES[model],
+          plan_code:planCode,max_playback_speed:tier.speed,same_day_challenge:tier.sameDay,last_real_access_date:"",
           start_ms:range.start,end_ms:range.end,cursor_ms:range.start,trading_days:[],phase_days:[],breach_reason:"",
           realized_pnl:0,position:null,trades:[],current_day:"",daily_start_equity:balance,last_candle:null,revealed:[],
           created_at:iso(now),updated_at:iso(now)};
@@ -102,24 +108,39 @@ export function createPropChallengeService({history, read, write, owner}) {
         return ok({candles:c.revealed.slice(-limit)});
       }
       if(action==="next-candle"&&method==="POST"){
-        if(c.status!=="active")return ok({...publicChallenge(c),new_candle:null});
-        const params=new URLSearchParams({symbol:"XAUUSD",timeframe:"1m",start:String(c.cursor_ms),end:String(c.end_ms),limit:"1"});
-        const found=(await history.history(params)).candles||[];
-        if(!found.length){c.status="failed";c.breach_reason="The assigned historical month ended before the challenge was passed.";await saveState(state);return ok({...publicChallenge(c),new_candle:null});}
-        const candle=found[0],time=Number(candle.time),day=dayKey(time);
-        if(!c.trading_days.includes(day)&&c.trading_days.length>=MAX_DAYS){c.status="failed";c.breach_reason="Challenge not passed within 15 trading days.";await saveState(state);return ok({...publicChallenge(c),new_candle:null});}
-        let position=c.position,trades=c.trades,realized=c.realized_pnl,currentDay=c.current_day,dailyStart=c.daily_start_equity;
-        if(day!==currentDay){currentDay=day;dailyStart=c.starting_balance+realized+floating(position,c.last_candle);if(!c.trading_days.includes(day))c.trading_days.push(day);}
-        if(position){
-          const stop=position.stop_loss,take=position.take_profit;
-          const hitStop=stop!=null&&(position.side==="buy"?candle.low<=stop:candle.high>=stop);
-          const hitTake=take!=null&&(position.side==="buy"?candle.high>=take:candle.low<=take);
-          if(hitStop||hitTake){const closed=closePosition(c,hitStop?stop:take,time,position,trades,realized);position=closed.position;trades=closed.trades;realized=closed.realized;}
+        if(c.status!=="active")return ok({...publicChallenge(c),new_candle:null,new_candles:[]});
+        const requested=Math.max(1,Math.min(Number(c.max_playback_speed)||1,Math.floor(Number(url.searchParams.get("count")||1))));
+        const batch=[];
+        for(let index=0;index<requested&&c.status==="active";index++){
+          const params=new URLSearchParams({symbol:"XAUUSD",timeframe:"1m",start:String(c.cursor_ms),end:String(c.end_ms),limit:"1"});
+          const found=(await history.history(params)).candles||[];
+          if(!found.length){c.status="failed";c.breach_reason="The assigned historical month ended before the challenge was passed.";break;}
+          const candle=found[0],time=Number(candle.time),day=dayKey(time);
+          const isNewDay=!c.trading_days.includes(day);
+          if(isNewDay&&c.trading_days.length>=MAX_DAYS){c.status="failed";c.breach_reason="Challenge not passed within 15 trading days.";break;}
+          if(isNewDay&&!c.same_day_challenge){
+            const today=new Date().toISOString().slice(0,10);
+            if(c.trading_days.length>0&&c.last_real_access_date===today){
+              c.updated_at=iso(Date.now());await saveState(state);
+              return error(429,"Free plan unlocks one historical trading day per calendar day. Return tomorrow to continue, or upgrade to unlock all 15 days in one sitting.");
+            }
+            c.last_real_access_date=today;
+          }
+          let position=c.position,trades=c.trades,realized=c.realized_pnl,currentDay=c.current_day,dailyStart=c.daily_start_equity;
+          if(day!==currentDay){currentDay=day;dailyStart=c.starting_balance+realized+floating(position,c.last_candle);if(isNewDay)c.trading_days.push(day);}
+          if(position){
+            const stop=position.stop_loss,take=position.take_profit;
+            const hitStop=stop!=null&&(position.side==="buy"?candle.low<=stop:candle.high>=stop);
+            const hitTake=take!=null&&(position.side==="buy"?candle.high>=take:candle.low<=take);
+            if(hitStop||hitTake){const closed=closePosition(c,hitStop?stop:take,time,position,trades,realized);position=closed.position;trades=closed.trades;realized=closed.realized;}
+          }
+          const [status,reason]=evaluate(c,realized,position,candle,c.phase_days,dailyStart,currentDay);
+          if(status==="failed"&&position){const closed=closePosition(c,candle.close,time,position,trades,realized);position=closed.position;trades=closed.trades;realized=closed.realized;}
+          c.cursor_ms=time+1;c.current_day=currentDay;c.daily_start_equity=dailyStart;c.position=position;c.trades=trades;c.realized_pnl=realized;c.last_candle=candle;c.status=status;c.breach_reason=reason;c.revealed.push(candle);if(c.revealed.length>500)c.revealed=c.revealed.slice(-500);
+          batch.push(candle);
         }
-        const [status,reason]=evaluate(c,realized,position,candle,c.phase_days,dailyStart,currentDay);
-        if(status==="failed"&&position){const closed=closePosition(c,candle.close,time,position,trades,realized);position=closed.position;trades=closed.trades;realized=closed.realized;}
-        c.cursor_ms=time+1;c.current_day=currentDay;c.daily_start_equity=dailyStart;c.position=position;c.trades=trades;c.realized_pnl=realized;c.last_candle=candle;c.status=status;c.breach_reason=reason;c.revealed.push(candle);if(c.revealed.length>500)c.revealed=c.revealed.slice(-500);
-        await saveState(state);return ok({...publicChallenge(c),new_candle:candle});
+        await saveState(state);
+        return ok({...publicChallenge(c),new_candle:batch.at(-1)||null,new_candles:batch});
       }
       if(action==="order"&&method==="POST"){
         if(c.status!=="active")return error(409,"This challenge is not active.");
