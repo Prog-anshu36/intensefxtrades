@@ -23,20 +23,20 @@
   };
   const PLANS = {
     blue: { code: "blue", name: "Blue", tier: "Free", color: COLORS.blue, price: 0,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView"]), accountLimit: 1,
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView"]), accountLimit: 1, replaySpeedCap: 1,
       bullets: ["Dashboard, trades and journal", "Chart workspace", "One demo trading account"] },
     green: { code: "green", name: "Green", tier: "Starter", color: COLORS.green, price: 49,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "additionalAccount"]), accountLimit: Infinity,
-      bullets: ["Everything in Blue", "Analysis and performance", "Backtesting", "Additional trading accounts"] },
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "additionalAccount"]), accountLimit: Infinity, replaySpeedCap: 3,
+      bullets: ["Everything in Blue", "Analysis and performance", "Backtesting up to 3x speed", "Additional trading accounts"] },
     purple: { code: "purple", name: "Purple", tier: "Pro", color: COLORS.purple, price: 149,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount"]), accountLimit: Infinity,
-      bullets: ["Everything in Green", "Replay and technical indicators", "Trading Analysis", "Replay history limited to one year"] },
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount"]), accountLimit: Infinity, replaySpeedCap: 5,
+      bullets: ["Everything in Green", "Replay and technical indicators up to 5x speed", "Trading Analysis", "Replay history limited to one year"] },
     red: { code: "red", name: "Red", tier: "Elite", color: COLORS.red, price: 199,
-      features: new Set(Object.keys(FEATURES)), accountLimit: Infinity,
-      bullets: ["Everything in Purple", "AI Coach and premium settings", "Full supported XAUUSD history", "All available replay history"] },
+      features: new Set(Object.keys(FEATURES)), accountLimit: Infinity, replaySpeedCap: 10,
+      bullets: ["Everything in Purple", "AI Coach and premium settings", "Replay and backtesting up to 10x speed", "All available replay history"] },
   };
   const ORDER = ["blue", "green", "purple", "red"];
-  const GOLDEN_PASS = { code: 'golden_vip', name: 'Golden VIP', tier: 'Pass', color: '#efc75e', price: 249, features: new Set(Object.keys(FEATURES)) };
+  const GOLDEN_PASS = { code: 'golden_vip', name: 'Golden VIP', tier: 'Pass', color: '#efc75e', price: 249, features: new Set(Object.keys(FEATURES)), replaySpeedCap: 100 };
   function purchaseQuote(product, months = 1) {
     const item = product === 'golden_vip' ? GOLDEN_PASS : PLANS[product];
     if (!item || ![1,3,12].includes(months)) throw new Error('Choose a valid access term.');
@@ -87,6 +87,14 @@
   function canCreateAccount(existingAccounts = [], plan = getUserPlan()) {
     const count = Array.isArray(existingAccounts) ? existingAccounts.length : Number(existingAccounts || 0);
     return count < plan.accountLimit;
+  }
+  // Replay/backtest playback speed ceiling for the current plan. Backtesting and
+  // any live replay chart session each read this independently (per instance).
+  function getReplaySpeedCap(plan = getUserPlan()) { return plan?.replaySpeedCap ?? PLANS.blue.replaySpeedCap; }
+  // Cheapest plan (including the Golden VIP pass) whose cap covers the requested speed.
+  function planForReplaySpeed(speed) {
+    for (const code of ORDER) if (PLANS[code].replaySpeedCap >= speed) return PLANS[code];
+    return GOLDEN_PASS;
   }
   function getPermittedReplayRange(instrument, availability, plan = getUserPlan()) {
     const start = timestampMillis(availability?.start ?? availability?.first_timestamp);
@@ -156,6 +164,6 @@
 
   window.SubscriptionSystem = { PLANS, FEATURES, ORDER, GOLDEN_PASS, purchaseQuote, normalizePlan, getUserPlan, getUserEntitlements,
     canAccessFeature, requiredPlan, canCreateAccount, getPermittedReplayRange, canAccessHistoricalData, canAccessReplayRange,
-    guardFeature, protectFeatureControls, getVipPlanCode, redeemVipKey, requestUpgrade };
+    guardFeature, protectFeatureControls, getVipPlanCode, redeemVipKey, requestUpgrade, getReplaySpeedCap, planForReplaySpeed };
 })();
 

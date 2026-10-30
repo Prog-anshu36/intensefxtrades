@@ -1715,6 +1715,17 @@ body.settings-watermark-off .tv-chart-watermark { display: none !important; }
   background: #1c2030;
   color: #fff;
 }
+.replay-speed-presets button.locked {
+  color: #6b7284;
+  background: #121419;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+.replay-speed-presets button.locked:hover {
+  border-color: #efc75e;
+  color: #efc75e;
+  background: #121419;
+}
 .replay-date-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 58px;

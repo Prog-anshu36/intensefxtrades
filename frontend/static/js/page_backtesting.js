@@ -903,6 +903,7 @@ const PageBacktesting = {
     const current = this.candles[this.idx];
     const replayDate = current ? new Date(current.date.getTime() - current.date.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
     const speeds = [0.25, 0.5, 1, 2, 5, 10, 20, 50, 100];
+    const speedCap = window.SubscriptionSystem?.getReplaySpeedCap?.() ?? 1;
     const progressMax = Math.max(0, this.candles.length - 1);
     const progressPct = progressMax > 0 ? Math.round((this.idx / progressMax) * 100) : 0;
     return `<div class="tv-panel tv-replay-panel">
@@ -923,7 +924,7 @@ const PageBacktesting = {
         <span class="mono" id="replaySpeedLabel">${this.speed.toFixed(1)}x</span>
       </div>
       <div class="replay-speed-presets">
-        ${speeds.map((speed) => `<button class="${Math.abs(this.speed - speed) < 0.01 ? "active" : ""}" data-replay-speed="${speed}">${speed}x</button>`).join("")}
+        ${speeds.map((speed) => `<button class="${Math.abs(this.speed - speed) < 0.01 ? "active" : ""} ${speed > speedCap ? "locked" : ""}" data-replay-speed="${speed}" ${speed > speedCap ? `title="${window.SubscriptionSystem?.planForReplaySpeed?.(speed)?.name || "Upgrade"} plan or higher"` : ""}>${speed}x${speed > speedCap ? " 🔒" : ""}</button>`).join("")}
       </div>
       <div class="replay-date-row">
         <input type="datetime-local" id="replayDateInput" value="${replayDate}">
@@ -1382,6 +1383,7 @@ const PageBacktesting = {
     const progressPct = progressMax > 0 ? Math.round((this.idx / progressMax) * 100) : 0;
     const session = this.currentSessionStats();
     const openCount = this.store.state.active_trades.filter((t) => t.symbol === this.symbol).length;
+    const speedCap = window.SubscriptionSystem?.getReplaySpeedCap?.() ?? 1;
     return `<div class="tv-fullscreen-replay" id="fullscreenReplayDock">
       <button class="replay-btn" id="fsExitFullscreen" title="Exit fullscreen">Exit fullscreen</button>
       <span class="tv-fullscreen-replay-state">${this.playing ? "Replay running" : this.replayActive ? "Replay ready" : "Live mode"}${session ? ` · ${this.escapeHtml(session.shortName)}` : ""}</span>
@@ -1391,7 +1393,7 @@ const PageBacktesting = {
       <button class="replay-btn" id="fsBtnBack10" title="Back 10 candles">-10</button>
       <button class="replay-btn" id="fsBtnF10" title="Forward 10 candles">+10</button>
       <select id="fsReplaySpeed" title="Replay speed">
-        ${[0.25, 0.5, 1, 2, 5, 10, 20, 50, 100].map((speed) => `<option value="${speed}" ${Math.abs(this.speed - speed) < 0.01 ? "selected" : ""}>${speed}x</option>`).join("")}
+        ${[0.25, 0.5, 1, 2, 5, 10, 20, 50, 100].map((speed) => `<option value="${speed}" ${speed > speedCap ? "disabled" : ""} ${Math.abs(this.speed - speed) < 0.01 ? "selected" : ""}>${speed}x${speed > speedCap ? " 🔒" : ""}</option>`).join("")}
       </select>
       <button class="replay-btn" id="fsReplayReset" title="Restart replay">Reset</button>
       <button class="replay-btn" id="fsReplayLive" title="Exit replay and go live">Live</button>
@@ -5819,7 +5821,13 @@ const PageBacktesting = {
 
   setReplaySpeed(speed, options = {}) {
     if (!Number.isFinite(speed) || speed <= 0) return;
-    this.speed = Math.max(0.25, Math.min(100, speed));
+    const requested = Math.max(0.25, Math.min(100, speed));
+    const cap = window.SubscriptionSystem?.getReplaySpeedCap?.() ?? 1;
+    this.speed = Math.min(requested, cap);
+    if (requested > cap && !options.silent) {
+      const required = window.SubscriptionSystem?.planForReplaySpeed?.(requested);
+      toast(`${requested}x replay speed needs ${required ? `${required.name} · ${required.tier}` : "a higher plan"}. Capped at ${cap}x on your current plan.`, "info");
+    }
     this.syncReplayBuffers();
     this.emitReplayEvent("ReplaySpeedChanged", { speed: this.speed });
     this.persistReplayState({ immediate: true });
