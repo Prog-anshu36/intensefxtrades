@@ -134,8 +134,10 @@ const PageBacktesting = {
     this.loadRealHistory();
   },
 
-  async loadRealHistory() {
+  async loadRealHistory(attempt = 0) {
     this.stopPlay();
+    clearTimeout(this._historyRetryTimer);
+    this._historyRetryTimer = null;
     const requestId = this._historyRequest = (this._historyRequest || 0) + 1;
     const symbol = this.symbol;
     const timeframe = this.timeframe;
@@ -144,6 +146,12 @@ const PageBacktesting = {
     const options = MarketData.isLocal(symbol) && anchorTs != null ? { anchor: anchorTs - this.candleDuration() } : {};
     const result = await MarketData.history(symbol, timeframe, this.historyCountForTimestamp(timeframe, anchorTs), options);
     if (symbol !== this.symbol || timeframe !== this.timeframe || requestId !== this._historyRequest) return;
+    if (result.error && MarketData.isLocal(symbol) && attempt < 2) {
+      this._historyRetryTimer = setTimeout(() => {
+        if (requestId === this._historyRequest && this.container) this.loadRealHistory(attempt + 1);
+      }, 1200 * (attempt + 1));
+      return;
+    }
     this.datasetInfo = result;
     this._olderExhausted = false;
     this._historyError = result.error || null;
@@ -384,7 +392,7 @@ const PageBacktesting = {
               <div>
                 <b>${this.symbolName()}</b>
                 <span>${this.timeframe} · ${this.assetClass()} · intensefxTRADES</span>
-                ${this._historyError ? `<span role="status">XAUUSD historical dataset could not be loaded.</span>` : ""}
+                ${this._historyError ? `<span role="status">XAUUSD historical dataset could not be loaded. <button type="button" class="tv-inline-retry" id="retryChartHistoryBtn">Retry</button></span>` : ""}
               </div>
               ${current ? `<div class="tv-ohlc">
                 O <b>${Fmt.price(current.open, meta.decimals)}</b>
@@ -4244,6 +4252,7 @@ const PageBacktesting = {
     container.insertAdjacentHTML('beforeend', this.renderDrawingHelp());
     if(this.drawingObjectsOpen && !this.drawingSettingsOpen){ this.drawingManagerHidden=false;container.querySelector('#chartCard')?.insertAdjacentHTML('beforeend',this.renderDrawingManager()); }
     container.querySelector('#drawingObjectsBtn')?.addEventListener('click',()=>{this.drawingObjectsOpen=!this.drawingObjectsOpen;this.rerender();});
+    container.querySelector('#retryChartHistoryBtn')?.addEventListener('click',()=>{this._historyError=null;this.loadRealHistory();this.rerender();});
     container.querySelector('#drawingHelpBtn')?.addEventListener('click',()=>{this.drawingHelpOpen=!this.drawingHelpOpen;this.rerender();});
     container.querySelector('#closeDrawingHelpBtn')?.addEventListener('click',()=>{this.drawingHelpOpen=false;this.rerender();});
     container.querySelector('#drawingHelpSearch')?.addEventListener('input',event=>{const query=event.target.value.toLowerCase().trim();container.querySelectorAll('[data-help-search]').forEach(row=>row.hidden=!row.dataset.helpSearch.includes(query));});
@@ -6660,7 +6669,9 @@ const PageBacktesting = {
     this.stopPlay();
     clearTimeout(this._persistReplayTimer);
     clearTimeout(this._flashTimer);
+    clearTimeout(this._historyRetryTimer);
     this._persistReplayTimer = null;
+    this._historyRetryTimer = null;
     this._historyInterrupted = this.dataSource === "loading";
     if (this._drawRaf) cancelAnimationFrame(this._drawRaf);
     this._drawRaf = null;

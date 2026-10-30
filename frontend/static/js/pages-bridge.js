@@ -12,13 +12,13 @@
   const setStatus=text=>{const el=document.querySelector('#appSplash .splash-label');if(el)el.textContent=text;};
   function failWorker(error){
     workerFailure=error;clearTimeout(workerTimer);rejectWorker(error);
-    for(const item of pending.values()){clearTimeout(item.timer);item.reject(error);}pending.clear();
+    for(const item of pending.values()){item.cleanup();item.reject(error);}pending.clear();
     setStatus(error.message);
   }
   worker.onmessage=({data})=>{
     if(data.type==='worker-ready'){clearTimeout(workerTimer);resolveWorker();return;}
     if(data.type==='status'){setStatus(data.text);return;}
-    const item=pending.get(data.id);if(!item)return;pending.delete(data.id);clearTimeout(item.timer);
+    const item=pending.get(data.id);if(!item)return;pending.delete(data.id);item.cleanup();
     if(data.error){const status=document.getElementById('pagesStorageStatus');if(status)status.textContent=data.error;console.error('Browser API:',data.error);item.reject(Error(data.error));}else item.resolve(data.result);
   };
   worker.onerror=event=>failWorker(Error(event.message || 'Browser trading engine failed to start.'));
@@ -29,8 +29,13 @@
     if(options.signal?.aborted)throw new DOMException('Aborted','AbortError');
     const id=++nextId;
     const result=await new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{pending.delete(id);reject(Error('Workspace startup or request timed out. Check your connection and retry.'));},180000);
-      pending.set(id,{resolve,reject,timer});
+      let timer;
+      const cleanup=()=>{clearTimeout(timer);options.signal?.removeEventListener('abort',onAbort);};
+      const fail=error=>{if(!pending.delete(id))return;cleanup();reject(error);};
+      const onAbort=()=>fail(new DOMException('Aborted','AbortError'));
+      timer=setTimeout(()=>fail(Error('Workspace startup or request timed out. Check your connection and retry.')),180000);
+      options.signal?.addEventListener('abort',onAbort,{once:true});
+      pending.set(id,{resolve,reject,timer,cleanup});
       worker.postMessage({id,path,method:options.method||'GET',body:options.body||null,contentType:new Headers(options.headers).get('Content-Type')||'application/json',headers:Object.fromEntries(new Headers(options.headers))});
     });
     if(options.signal?.aborted)throw new DOMException('Aborted','AbortError');
