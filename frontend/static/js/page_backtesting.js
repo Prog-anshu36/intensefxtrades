@@ -1088,7 +1088,7 @@ const PageBacktesting = {
           <button class="tv-control-btn" data-zoom-y="out" title="Zoom out vertically">-</button>
         </div>
         <div class="tv-control-group">
-          ${replayAllowed ? `<button class="tv-control-btn tv-control-btn-wide ${this.tool === "scissors" ? "active" : ""}" id="scissorsToolBtn" title="Choose the candle where replay should begin">Set start</button>` : `<button class="tv-control-btn tv-control-btn-wide" data-plan-feature="replay">Replay · Pro</button>`}
+          ${replayAllowed ? `<button class="tv-control-btn tv-control-btn-wide ${this.tool === "scissors" ? "active" : ""}" id="scissorsToolBtn" title="Scroll anywhere on the chart, then click a candle to cut there and start a random replay">✂️ Scissors</button>` : `<button class="tv-control-btn tv-control-btn-wide" data-plan-feature="replay">Replay · Pro</button>`}
           <button class="tv-control-btn tv-control-btn-wide ${!this.replayActive && this.tool !== "scissors" ? "active" : ""}" id="liveChartBtn" title="Exit replay and show latest live chart">Live</button>
           <button class="tv-control-btn" id="fitAllBtn" title="Fit all loaded candles">Fit</button>
           <button class="tv-control-btn" id="resetViewBtn" title="Reset zoom & price scale">1:1</button>
@@ -1392,6 +1392,7 @@ const PageBacktesting = {
       <button class="replay-btn" id="fsBtnNext" title="Next candle">Next</button>
       <button class="replay-btn" id="fsBtnBack10" title="Back 10 candles">-10</button>
       <button class="replay-btn" id="fsBtnF10" title="Forward 10 candles">+10</button>
+      <button class="replay-btn ${this.tool === "scissors" ? "playing active" : ""}" id="fsScissorsToolBtn" title="Scroll anywhere on the chart, then click a candle to cut there and start a random replay">✂️ Scissors</button>
       <select id="fsReplaySpeed" title="Replay speed">
         ${[0.25, 0.5, 1, 2, 5, 10, 20, 50, 100].map((speed) => `<option value="${speed}" ${speed > speedCap ? "disabled" : ""} ${Math.abs(this.speed - speed) < 0.01 ? "selected" : ""}>${speed}x${speed > speedCap ? " 🔒" : ""}</option>`).join("")}
       </select>
@@ -4385,6 +4386,7 @@ const PageBacktesting = {
     container.querySelector("#resetViewBtn")?.addEventListener("click", () => this.resetChartView());
     container.querySelector("#goLatestBtn")?.addEventListener("click", () => this.goToLatest());
     container.querySelector("#scissorsToolBtn")?.addEventListener("click", () => this.toggleScissorsTool());
+    container.querySelector("#fsScissorsToolBtn")?.addEventListener("click", () => this.toggleScissorsTool());
     container.querySelector("#liveChartBtn")?.addEventListener("click", () => this.exitReplayToLive());
     container.querySelector("#chartReplayBtn")?.addEventListener("click", () => this.togglePlay());
     container.querySelector("#chartReplayResetBtn")?.addEventListener("click", () => this.resetReplay());
@@ -6182,6 +6184,7 @@ const PageBacktesting = {
       this.pendingDrawing = null;
       this.updateToolChrome();
       this.container?.querySelector("#scissorsToolBtn")?.classList.remove("active");
+      this.container?.querySelector("#fsScissorsToolBtn")?.classList.remove("active", "playing");
     }
     if (this.idx >= this.candles.length - 1 && !MarketData.isLocal(this.symbol)) {
       this.idx = Math.max(80, this.candles.length - this.visibleCount);
@@ -6261,6 +6264,7 @@ const PageBacktesting = {
     const bookmarkEl = this.container?.querySelector("#replayBookmarkCount");
     const playBtns = this.container?.querySelectorAll("#btnPlay, #chartReplayBtn, #replayJumpBtn, #fsBtnPlay");
     const scissorsBtn = this.container?.querySelector("#scissorsToolBtn");
+    const fsScissorsBtn = this.container?.querySelector("#fsScissorsToolBtn");
     const liveBtn = this.container?.querySelector("#liveChartBtn");
     const latestBtn = this.container?.querySelector("#goLatestBtn");
     if (price && c) price.textContent = Fmt.price(c.close, meta.decimals);
@@ -6278,6 +6282,8 @@ const PageBacktesting = {
     const replayHead = this.container?.querySelector("#replayStateLabel");
     if (replayHead) replayHead.textContent = this.replayStateText();
     scissorsBtn?.classList.toggle("active", this.tool === "scissors");
+    fsScissorsBtn?.classList.toggle("playing", this.tool === "scissors");
+    fsScissorsBtn?.classList.toggle("active", this.tool === "scissors");
     liveBtn?.classList.toggle("active", !this.replayActive && this.tool !== "scissors");
     latestBtn?.classList.toggle("active", this.autoFollow);
     playBtns?.forEach((btn) => {
