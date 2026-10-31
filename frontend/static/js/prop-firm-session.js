@@ -9,6 +9,18 @@
     pro: { name: "2 Step Pro", dailyLossPct: 3, maxLossPct: 6, targets: { 1: 6, 2: 6 }, minDays: 0, sizes: [5000, 10000, 25000, 50000, 100000, 200000] },
   };
 
+  // A real prop firm evaluation trades one fixed, unseen stretch of history — never
+  // a window the trader chose. Each account is sealed to one random calendar month
+  // between 2021 and 2025 (inclusive), from the supported local XAUUSD dataset.
+  function randomEvaluationWindow() {
+    const years = [2021, 2022, 2023, 2024, 2025];
+    const year = years[Math.floor(Math.random() * years.length)];
+    const month = Math.floor(Math.random() * 12); // 0-11
+    const start = Date.UTC(year, month, 1, 0, 0, 0);
+    const end = Date.UTC(year, month + 1, 1, 0, 0, 0) - 1; // last millisecond of the month
+    return { start, end, label: new Date(start).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) };
+  }
+
   function timestamp(value) {
     if (value == null || value === "") return null;
     if (Number.isFinite(Number(value))) {
@@ -153,7 +165,8 @@
         rules: { ...rules, dailyLossPct, minDays, targets: {...rules.targets} }, archived: false,
         name: `${rules.name} ${this.attempts.length + 1}`, phase: 1, status: "active", startedAt: new Date(now).toISOString(), phaseStartedAt: new Date(now).toISOString(),
         deadlineAt: new Date(now + 14 * DAY_MS).toISOString(), phaseBaselineKeys: this.baselineKeys(state), dailyBaselines: {},
-        lastMarketTimestamp: null, breachReason: "", completedAt: null };
+        lastMarketTimestamp: null, breachReason: "", completedAt: null,
+        evaluationWindow: randomEvaluationWindow() };
       this.attempts.unshift(attempt);
       this.currentMarketTime = null;
       this.selectedId = attempt.id;

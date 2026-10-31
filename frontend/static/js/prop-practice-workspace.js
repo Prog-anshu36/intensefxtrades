@@ -8,7 +8,8 @@
   const emptyState = balance => ({ balance, initial_balance: balance, history: [], active_trades: [], pending_orders: [], journal: [], settings: { symbol: 'XAUUSD', timeframe: '1m' }, practice_workspace: true });
   const keyFor = attempt => `${user()}:${owner()}:${attempt?.id}:phase-${attempt?.phase}`;
   function header(attempt) {
-    return `<div class="prop-workspace-header"><div><span class="propfirm-eyebrow">PROP FIRM PRACTICE · XAUUSD</span><b>${escape(attempt.name || PropFirmRules[attempt.model].name)} · Phase ${attempt.phase} · $${attempt.startingBalance.toLocaleString()}</b><label>Practice account <select id="propWorkspaceAccount" aria-label="Practice account">${PropFirmSession.attempts.map(a => `<option value="${escape(a.id)}" ${a.id === attempt.id ? 'selected' : ''}>${escape(a.name || PropFirmRules[a.model].name)} · Phase ${a.phase}${a.archived ? ' · Archived' : ''}</option>`).join('')}</select></label></div><nav aria-label="Prop practice views">${[['prop-firm-session','Objectives'],['prop-chart','Practice Chart'],['prop-performance','Performance'],['prop-trade-analysis','Trade Analysis'],['prop-ai-coach','AI Coach']].map(([route,label]) => `<button type="button" data-prop-route="${route}" class="${Router.current === route ? 'active' : ''}">${label}</button>`).join('')}</nav></div>`;
+    const windowLabel = attempt.evaluationWindow?.label;
+    return `<div class="prop-workspace-header"><div><span class="propfirm-eyebrow">PROP FIRM PRACTICE · XAUUSD${windowLabel ? ` · SEALED EVALUATION · ${escape(windowLabel)}` : ''}</span><b>${escape(attempt.name || PropFirmRules[attempt.model].name)} · Phase ${attempt.phase} · $${attempt.startingBalance.toLocaleString()}</b><label>Practice account <select id="propWorkspaceAccount" aria-label="Practice account">${PropFirmSession.attempts.map(a => `<option value="${escape(a.id)}" ${a.id === attempt.id ? 'selected' : ''}>${escape(a.name || PropFirmRules[a.model].name)} · Phase ${a.phase}${a.archived ? ' · Archived' : ''}</option>`).join('')}</select></label></div><nav aria-label="Prop practice views">${[['prop-firm-session','Objectives'],['prop-chart','Practice Chart'],['prop-performance','Performance'],['prop-trade-analysis','Trade Analysis'],['prop-ai-coach','AI Coach']].map(([route,label]) => `<button type="button" data-prop-route="${route}" class="${Router.current === route ? 'active' : ''}">${label}</button>`).join('')}</nav></div>`;
   }
   function bindHeader(container) {
     container.querySelectorAll('[data-prop-route]').forEach(button => button.addEventListener('click', () => Router.go(button.dataset.propRoute)));
@@ -87,7 +88,8 @@
       };
       const storage = ChartAccountState.storageFor(`prop:${context.key}`);
       context.chart = createBacktestingWorkspace({ store: context.store, api: context.api, storage,
-        scope: context.key, practiceController: controller, allowedSymbols: ['XAUUSD'] });
+        scope: context.key, practiceController: controller, allowedSymbols: ['XAUUSD'],
+        propFirmMode: true, evaluationWindow: attempt.evaluationWindow });
       return context.chart;
     },
   };

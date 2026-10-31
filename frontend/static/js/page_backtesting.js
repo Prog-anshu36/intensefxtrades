@@ -112,7 +112,7 @@ const PageBacktesting = {
     this.timeframe = settings.timeframe || "1m";
     this.speed = settings.replay_speed || this.speed;
     this.replayActive = !!settings.replay_active;
-    if (!window.SubscriptionSystem?.canAccessFeature("replay")) this.replayActive = false;
+    if (!this.replayFeatureAllowed()) this.replayActive = false;
     this.replayTimestamp = this.replayActive ? (settings.replay_timestamp || null) : null;
     this.candles = MarketData.isLocal(this.symbol) ? [] : MarketData.generate(this.symbol, this.timeframe, this.historyCountForTimestamp(this.timeframe, this.replayTimestamp));
     this.idx = this.replayTimestamp ? this.snapIndexToTimestamp(this.replayTimestamp) : Math.min(settings.current_idx || this.candles.length - 1, this.candles.length - 1);
@@ -142,8 +142,13 @@ const PageBacktesting = {
     const symbol = this.symbol;
     const timeframe = this.timeframe;
     this.dataSource = "loading";
-    const anchorTs = this.replayActive ? (this.replayTimestamp ?? this.candles[this.idx]?.date?.getTime()) : null;
+    const bounds = this.evaluationBounds();
+    // First time this sealed account's chart ever opens: start it exactly at the
+    // locked month's first candle, as if scissors had already cut there.
+    if (bounds && !this.replayActive) this.replayActive = true;
+    const anchorTs = this.replayActive ? (this.replayTimestamp ?? this.candles[this.idx]?.date?.getTime() ?? bounds?.start) : null;
     const options = MarketData.isLocal(symbol) && anchorTs != null ? { anchor: anchorTs - this.candleDuration() } : {};
+    if (bounds) { options.start = bounds.start; options.end = bounds.end; }
     const result = await MarketData.history(symbol, timeframe, this.historyCountForTimestamp(timeframe, anchorTs), options);
     if (symbol !== this.symbol || timeframe !== this.timeframe || requestId !== this._historyRequest) return;
     if (result.error && MarketData.isLocal(symbol) && attempt < 2) {
@@ -152,6 +157,7 @@ const PageBacktesting = {
       }, 1200 * (attempt + 1));
       return;
     }
+    if (bounds) { result.first_timestamp = bounds.start; result.last_timestamp = bounds.end; }
     this.datasetInfo = result;
     this._olderExhausted = false;
     this._historyError = result.error || null;
@@ -922,9 +928,9 @@ const PageBacktesting = {
         <button class="replay-btn ${this.playing ? "playing" : ""}" id="btnPlay" title="Play or pause one historical candle at a time">${this.playing ? "Pause" : "Play"}</button>
         <button class="replay-btn" id="btnBack10" title="Move back ten candles">−10</button>
         <button class="replay-btn" id="btnF10" title="Move forward ten candles">+10</button>
-        <button class="replay-btn" id="btnReplayStart" title="Return to the replay start candle">Start</button>
-        <button class="replay-btn" id="btnEnd" title="Process candles through the dataset end">End</button>
-        <button class="replay-btn" id="btnReplayLive" title="Exit replay and show the latest candle">Live</button>
+        <button class="replay-btn" id="btnReplayStart" title="Return to the evaluation start candle">Start</button>
+        ${this.propFirmMode ? "" : `<button class="replay-btn" id="btnEnd" title="Process candles through the dataset end">End</button>
+        <button class="replay-btn" id="btnReplayLive" title="Exit replay and show the latest candle">Live</button>`}
       </div>
       <div class="speed-row">
         <span>Speed</span>
@@ -934,12 +940,12 @@ const PageBacktesting = {
       <div class="replay-speed-presets">
         ${speeds.map((speed) => `<button class="${Math.abs(this.speed - speed) < 0.01 ? "active" : ""} ${speed > speedCap ? "locked" : ""}" data-replay-speed="${speed}" ${speed > speedCap ? `title="${window.SubscriptionSystem?.planForReplaySpeed?.(speed)?.name || "Upgrade"} plan or higher"` : ""}>${speed}x${speed > speedCap ? " 🔒" : ""}</button>`).join("")}
       </div>
-      <div class="replay-date-row">
+      ${this.propFirmMode ? "" : `<div class="replay-date-row">
         <input type="datetime-local" id="replayDateInput" value="${replayDate}">
         <button class="replay-btn" id="btnReplayDate">Go</button>
-      </div>
+      </div>`}
       <div class="replay-progress-row">
-        <input type="range" id="replayProgress" min="0" max="${progressMax}" value="${this.idx}">
+        <input type="range" id="replayProgress" min="0" max="${progressMax}" value="${this.idx}" ${this.propFirmMode ? "disabled title=\"Jumping ahead isn't available in a sealed Prop Firm evaluation\"" : ""}>
         <span id="replayProgressLabel">${progressPct}%</span>
       </div>
       <div class="replay-grid">
@@ -1076,7 +1082,7 @@ const PageBacktesting = {
 
   renderChartSurface() {
     const current = this.candles[this.idx];
-    const replayAllowed = Boolean(window.SubscriptionSystem?.canAccessFeature("replay"));
+    const replayAllowed = this.replayFeatureAllowed();
     return `
       <canvas id="tvBgCanvas" class="tv-bg-canvas"></canvas>
       <canvas id="tvCanvas" class="tv-canvas"></canvas>
@@ -1096,8 +1102,10 @@ const PageBacktesting = {
           <button class="tv-control-btn" data-zoom-y="out" title="Zoom out vertically">-</button>
         </div>
         <div class="tv-control-group">
-          ${replayAllowed ? `<button class="tv-control-btn tv-control-btn-wide ${this.tool === "scissors" ? "active" : ""}" id="scissorsToolBtn" title="Scroll anywhere on the chart, then click a candle to cut there and start a random replay">✂️ Scissors</button>` : `<button class="tv-control-btn tv-control-btn-wide" data-plan-feature="replay">Replay · Pro</button>`}
-          <button class="tv-control-btn tv-control-btn-wide ${!this.replayActive && this.tool !== "scissors" ? "active" : ""}" id="liveChartBtn" title="Exit replay and show latest live chart">Live</button>
+          ${!replayAllowed ? `<button class="tv-control-btn tv-control-btn-wide" data-plan-feature="replay">Replay · Pro</button>`
+            : this.propFirmMode ? `<span class="tv-control-btn tv-control-btn-wide prop-sealed-badge" title="This is a sealed Prop Firm evaluation month — no cutting to a new start or skipping ahead">\u{1F512} Sealed evaluation</span>`
+            : `<button class="tv-control-btn tv-control-btn-wide ${this.tool === "scissors" ? "active" : ""}" id="scissorsToolBtn" title="Scroll anywhere on the chart, then click a candle to cut there and start a random replay">✂️ Scissors</button>`}
+          ${this.propFirmMode ? "" : `<button class="tv-control-btn tv-control-btn-wide ${!this.replayActive && this.tool !== "scissors" ? "active" : ""}" id="liveChartBtn" title="Exit replay and show latest live chart">Live</button>`}
           <button class="tv-control-btn" id="fitAllBtn" title="Fit all loaded candles">Fit</button>
           <button class="tv-control-btn" id="resetViewBtn" title="Reset zoom & price scale">1:1</button>
           <button class="tv-control-btn ${this.autoFollow ? "active" : ""}" id="goLatestBtn" title="Go to latest candle (Home)" data-shortcut="Home">⏭</button>
@@ -1385,7 +1393,7 @@ const PageBacktesting = {
   },
 
   renderFullscreenReplayDock() {
-    if (!window.SubscriptionSystem?.canAccessFeature("replay")) return "";
+    if (!this.replayFeatureAllowed()) return "";
     const hiddenCount = this.replayActive ? this.hiddenCandles.length : Math.max(0, this.candles.length - this.idx - 1);
     const progressMax = Math.max(0, this.candles.length - 1);
     const progressPct = progressMax > 0 ? Math.round((this.idx / progressMax) * 100) : 0;
@@ -1394,18 +1402,18 @@ const PageBacktesting = {
     const speedCap = window.SubscriptionSystem?.getReplaySpeedCap?.() ?? 1;
     return `<div class="tv-fullscreen-replay" id="fullscreenReplayDock">
       <button class="replay-btn" id="fsExitFullscreen" title="Exit fullscreen">Exit fullscreen</button>
-      <span class="tv-fullscreen-replay-state">${this.playing ? "Replay running" : this.replayActive ? "Replay ready" : "Live mode"}${session ? ` · ${this.escapeHtml(session.shortName)}` : ""}</span>
+      <span class="tv-fullscreen-replay-state">${this.propFirmMode ? "Sealed evaluation" : this.playing ? "Replay running" : this.replayActive ? "Replay ready" : "Live mode"}${session ? ` · ${this.escapeHtml(session.shortName)}` : ""}</span>
       <button class="replay-btn" id="fsBtnPrev" title="Previous candle">Prev</button>
       <button class="replay-btn ${this.playing ? "playing active" : ""}" id="fsBtnPlay" title="Start or pause replay">${this.playing ? "Pause" : "Play"}</button>
       <button class="replay-btn" id="fsBtnNext" title="Next candle">Next</button>
       <button class="replay-btn" id="fsBtnBack10" title="Back 10 candles">-10</button>
       <button class="replay-btn" id="fsBtnF10" title="Forward 10 candles">+10</button>
-      <button class="replay-btn ${this.tool === "scissors" ? "playing active" : ""}" id="fsScissorsToolBtn" title="Scroll anywhere on the chart, then click a candle to cut there and start a random replay">✂️ Scissors</button>
+      ${this.propFirmMode ? "" : `<button class="replay-btn ${this.tool === "scissors" ? "playing active" : ""}" id="fsScissorsToolBtn" title="Scroll anywhere on the chart, then click a candle to cut there and start a random replay">✂️ Scissors</button>`}
       <select id="fsReplaySpeed" title="Replay speed">
         ${[0.25, 0.5, 1, 2, 5, 10, 20, 50, 100].map((speed) => `<option value="${speed}" ${speed > speedCap ? "disabled" : ""} ${Math.abs(this.speed - speed) < 0.01 ? "selected" : ""}>${speed}x${speed > speedCap ? " 🔒" : ""}</option>`).join("")}
       </select>
-      <button class="replay-btn" id="fsReplayReset" title="Restart replay">Reset</button>
-      <button class="replay-btn" id="fsReplayLive" title="Exit replay and go live">Live</button>
+      ${this.propFirmMode ? "" : `<button class="replay-btn" id="fsReplayReset" title="Restart replay">Reset</button>
+      <button class="replay-btn" id="fsReplayLive" title="Exit replay and go live">Live</button>`}
       ${openCount ? `<button class="replay-btn fs-close-all-btn" id="fsCloseAllPositions" title="Close all open positions on ${this.symbol}">Close All (${openCount})</button>` : ""}
       <span class="tv-fullscreen-replay-meta">${progressPct}% · Hidden ${hiddenCount.toLocaleString()}</span>
     </div>`;
@@ -1718,11 +1726,16 @@ const PageBacktesting = {
     if (this._localPageLoading || !this.candles.length || this.dataSource !== "local-csv") return;
     const symbol = this.symbol, timeframe = this.timeframe, generation = this._historyRequest;
     const edge = direction < 0 ? this.candles[0].time : this.candles.at(-1).time;
+    const bounds = this.evaluationBounds();
     if (direction < 0 && this._olderExhausted) return;
     if (direction > 0 && edge >= this.datasetInfo.last_timestamp) return;
+    if (bounds && direction < 0 && edge <= bounds.start) { this._olderExhausted = true; return; }
     this._localPageLoading = true;
     try {
-      const result = await MarketData.history(symbol, timeframe, 2500, direction < 0 ? { end: edge - 1 } : { start: edge + 1 });
+      const rangeOpt = direction < 0 ? { end: edge - 1 } : { start: edge + 1 };
+      // Never fetch a single candle outside the sealed evaluation month.
+      if (bounds) { if (direction < 0) rangeOpt.start = bounds.start; else rangeOpt.end = bounds.end; }
+      const result = await MarketData.history(symbol, timeframe, 2500, rangeOpt);
       if (symbol !== this.symbol || timeframe !== this.timeframe || generation !== this._historyRequest) return;
       if (result.error) { this._historyError = result.error; this.stopPlay(); this.rerender(); return; }
       const rows = result.candles;
@@ -5773,9 +5786,21 @@ const PageBacktesting = {
     return true;
   },
 
+  // Every plan can trade its sealed Prop Firm evaluation month (speed is what the
+  // plan caps there); outside Prop Firm mode, Replay itself stays a Purple+ feature.
+  replayFeatureAllowed() {
+    return this.propFirmMode || Boolean(window.SubscriptionSystem?.canAccessFeature("replay"));
+  },
+
+  // {start,end} ms of the sealed evaluation month, or null outside Prop Firm mode.
+  evaluationBounds() {
+    if (!this.propFirmMode || !this.evaluationWindow) return null;
+    return { start: this.evaluationWindow.start, end: this.evaluationWindow.end };
+  },
+
   canReplayAt(index) {
     const system = window.SubscriptionSystem;
-    if (!system?.canAccessFeature("replay")) { system?.requestUpgrade("replay"); return false; }
+    if (!this.replayFeatureAllowed()) { system?.requestUpgrade("replay"); return false; }
     const candle = this.candles[Math.max(0, Math.min(this.candles.length - 1, Math.round(index ?? this.idx)))];
     const timestamp = Number(candle?.time ?? candle?.date?.getTime());
     if (!Number.isFinite(timestamp)) return true;
@@ -5803,6 +5828,7 @@ const PageBacktesting = {
   },
 
   toggleScissorsTool() {
+    if (this.propFirmMode) { toast("This is a sealed Prop Firm evaluation month. The start is already fixed — no cutting to a new point.", "info"); return; }
     if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     this.tool = this.tool === "scissors" ? "crosshair" : "scissors";
     this.stopPlay();
@@ -5819,6 +5845,7 @@ const PageBacktesting = {
   },
 
   cutReplayAt(index) {
+    if (this.propFirmMode) { toast("This is a sealed Prop Firm evaluation month. The start is already fixed.", "info"); return; }
     if (!this.canReplayAt(index)) return;
     this.pushReplayUndo();
     const cut = Math.max(0, Math.min(this.candles.length - 1, Math.round(index)));
@@ -5855,6 +5882,7 @@ const PageBacktesting = {
   },
 
   async jumpReplayToDate(value) {
+    if (this.propFirmMode) { toast("Jumping to a date isn't available in a sealed Prop Firm evaluation.", "info"); return; }
     if (!value) return;
     const ts = new Date(value).getTime();
     if (!Number.isFinite(ts)) return;
@@ -6109,7 +6137,7 @@ const PageBacktesting = {
   },
 
   async step(n) {
-    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!this.replayFeatureAllowed()) { window.SubscriptionSystem?.requestUpgrade("replay"); return; }
     if (this._stepping || this._placingOrder) return;
     if (MarketData.isLocal(this.symbol) && (this.dataSource !== "local-csv" || this._historyError)) return;
     const accountScope = this._chartAccountScope;
@@ -6181,7 +6209,7 @@ const PageBacktesting = {
   },
 
   startPlay() {
-    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!this.replayFeatureAllowed()) { window.SubscriptionSystem?.requestUpgrade("replay"); return; }
     if (MarketData.isLocal(this.symbol) && (!this.candles.length || this.dataSource !== "local-csv" || this._historyError)) return;
     const wasReplayActive = this.replayActive;
     if (!this.replayActive) {
@@ -6356,6 +6384,7 @@ const PageBacktesting = {
   },
 
   async goToReplayEnd() {
+    if (this.propFirmMode) { toast("Skipping to the end isn't available in a sealed Prop Firm evaluation — trade it forward candle by candle.", "info"); return; }
     if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
     if (MarketData.isLocal(this.symbol)) {
       this.stopPlay();
@@ -6383,7 +6412,7 @@ const PageBacktesting = {
   },
 
   goToReplayStart() {
-    if (!window.SubscriptionSystem?.canAccessFeature("replay")) { window.SubscriptionSystem.requestUpgrade("replay"); return; }
+    if (!this.replayFeatureAllowed()) { window.SubscriptionSystem?.requestUpgrade("replay"); return; }
     this.pushReplayUndo();
     const cut = this.replayCutIndex ?? this.crosshair?.index ?? Math.max(0, this.idx);
     this.stopPlay();
@@ -6402,6 +6431,7 @@ const PageBacktesting = {
   },
 
   exitReplayToLive() {
+    if (this.propFirmMode) { toast("This is a sealed historical evaluation — there's no live chart to exit to.", "info"); return; }
     this.pushReplayUndo();
     this.stopPlay();
     this.replayActive = false;
@@ -6708,7 +6738,7 @@ window.PageBacktesting = PageBacktesting;
 
 window.createBacktestingWorkspace = (() => {
   const template = Object.getOwnPropertyDescriptors(PageBacktesting);
-  return ({ store, api, storage, scope, practiceController, allowedSymbols } = {}) => {
+  return ({ store, api, storage, scope, practiceController, allowedSymbols, propFirmMode, evaluationWindow } = {}) => {
     const chart = {};
     for (const [key, original] of Object.entries(template)) {
       const descriptor = { ...original };
@@ -6718,6 +6748,10 @@ window.createBacktestingWorkspace = (() => {
     chart._store = store; chart._api = api;
     chart._chartAccountStorage = storage; chart._chartAccountScope = scope;
     chart.practiceController = practiceController; chart.allowedSymbols = allowedSymbols;
+    // Sealed Prop Firm evaluation: same chart engine, one fixed random month, no
+    // scissors/jump/skip-ahead. See replayFeatureAllowed()/evaluationBounds() below.
+    chart.propFirmMode = Boolean(propFirmMode && evaluationWindow);
+    chart.evaluationWindow = evaluationWindow || null;
     return chart;
   };
 })();

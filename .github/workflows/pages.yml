@@ -41,6 +41,7 @@ jobs:
           node tests/trades_sync.test.js
           node tests/fxn_asian_session_range.test.js
           node tests/prop_firm_session.test.js
+          node tests/prop_firm_evaluation_lock.test.js
           node tests/prop_account_management.test.js
           node tests/prop_workspace_lifecycle.test.js
           node tests/prop_practice_chart.test.js
