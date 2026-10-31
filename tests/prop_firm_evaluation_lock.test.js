@@ -172,6 +172,27 @@ const vm = require('node:vm');
   assert.ok(fresh.idx >= 0, 'first-ever chart open on a sealed account must land on a real candle, not -1');
   assert.ok(fresh.visibleCandles.length >= 1, 'the first candle of the locked month is revealed immediately, not a blank chart');
   console.log('prop_firm_evaluation_lock.test.js: first-open of a sealed account reveals its first candle passed');
+
+  // --- 5) Self-heal: an account whose SAVED state already has the pre-fix bad
+  // position (replayActive already true, replayTimestamp/idx pinned at the
+  // window's unclosed start) must not stay blank forever — the very next load
+  // must recover it, not just a brand-new account's first-ever open.
+  const broken = sandbox.createBacktestingWorkspace({
+    store: { state: { history: [], active_trades: [], settings: {} } },
+    api: { updateSettings: () => Promise.resolve({}) }, storage: storageStub, scope: 'prop-broken', allowedSymbols: ['XAUUSD'],
+    propFirmMode: true, evaluationWindow,
+  });
+  broken.symbol = 'XAUUSD';
+  broken.timeframe = '4h';
+  broken.updateReplayChrome = () => {};
+  broken.candles = [];
+  broken.idx = -1;
+  broken.replayActive = true; // already true from the old buggy run
+  broken.replayTimestamp = evaluationWindow.start; // the old bad (unclosed) anchor
+  await broken.loadRealHistory();
+  assert.ok(broken.idx >= 0, 'a previously-broken saved sealed account self-heals to a real candle on its next load');
+  assert.ok(broken.visibleCandles.length >= 1, 'a previously-broken saved sealed account shows its chart again, not a permanent blank screen');
+  console.log('prop_firm_evaluation_lock.test.js: previously-broken sealed account self-heals on next load passed');
 }
 
 })().catch((error) => { console.error(error); process.exit(1); });

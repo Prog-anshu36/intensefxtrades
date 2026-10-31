@@ -177,7 +177,10 @@ const PageBacktesting = {
     } else {
       this.idx = Math.min(Math.max(this.idx || this.candles.length - 1, 80), this.candles.length - 1);
     }
-    this.replayTimestamp = this.replayActive ? (anchorTs || this.candles[this.idx]?.date?.getTime() || null) : null;
+    // Self-heal: a sealed evaluation must never land before its first candle —
+    // this also repairs any account whose saved position predates this fix.
+    if (bounds && this.idx < 0 && this.candles.length) this.idx = 0;
+    this.replayTimestamp = this.replayActive ? (this.candles[this.idx]?.date?.getTime() || anchorTs || null) : null;
     if (this.replayActive) this.replayCutIndex = this.idx;
     this.syncReplayBuffers();
     this.viewEnd = this.clampViewEnd(this.idx + panOffset);
@@ -1515,7 +1518,11 @@ const PageBacktesting = {
       this.viewEnd = 0;
       return;
     }
-    this.idx = Math.max(MarketData.isLocal(this.symbol) && this.replayActive ? -1 : 0, Math.min(this.candles.length - 1, Math.round(Number(this.idx) || 0)));
+    // A sealed Prop Firm evaluation must always show its locked month's first
+    // candle immediately — it never waits in the "press Replay to reveal the
+    // first candle" state that the standalone Backtesting/live-replay flow uses.
+    const allowUnrevealed = MarketData.isLocal(this.symbol) && this.replayActive && !this.propFirmMode;
+    this.idx = Math.max(allowUnrevealed ? -1 : 0, Math.min(this.candles.length - 1, Math.round(Number(this.idx) || 0)));
     this.viewEnd = this.clampViewEnd(Number.isFinite(this.viewEnd) ? this.viewEnd : this.idx);
     if (this.mouseEngine && !this.mouseEngine.raf) {
       this.mouseEngine.targetCount = this.visibleCount;
