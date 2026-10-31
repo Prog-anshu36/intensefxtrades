@@ -45,7 +45,8 @@ const vm = require('node:vm');
     structuredClone, console,
     Store: { state: { history: [], active_trades: [], settings: {} } },
     API: {},
-    MarketData: { SYMBOLS: { XAUUSD: {} }, isLocal: (s) => s === 'XAUUSD', getMeta: () => ({ decimals: 2 }) },
+    MarketData: { SYMBOLS: { XAUUSD: {} }, isLocal: (s) => s === 'XAUUSD', getMeta: () => ({ decimals: 2 }),
+      TF_MINUTES: { "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080, "1M": 43200 } },
     Fmt: { price: (n) => Number(n).toFixed(2) },
     toast: (message) => toasts.push(message),
   };
@@ -107,4 +108,28 @@ const vm = require('node:vm');
   assert.ok(plainSurface.includes('id="scissorsToolBtn"') || plainSurface.includes('data-plan-feature="replay"'), 'the standalone Backtesting toolbar keeps its normal scissors/plan gating');
 
   console.log('prop_firm_evaluation_lock.test.js: chart management layer (speed-allowed, scissors/jump/end/live blocked) passed');
+
+  // --- 3) Multi-timeframe analysis must never reveal a not-yet-closed higher-TF
+  // candle. This is the pre-existing engine's own closed-time snap logic
+  // (unchanged here) — verified directly so it isn't assumed.
+  const minuteStart = evaluationWindow.start; // 2023-03-01T00:00:00Z
+  const oneMin = 60 * 1000, oneHour = 60 * oneMin;
+  // Practice clock sits at 00:37 into the month: the 1h candle for 00:00-01:00
+  // has not closed yet.
+  const practiceTs = minuteStart + 37 * oneMin;
+  chart.symbol = 'XAUUSD';
+  chart.timeframe = '1h';
+  chart.candles = [
+    { time: minuteStart - oneHour, date: new Date(minuteStart - oneHour) }, // 23:00-00:00 (closed)
+    { time: minuteStart, date: new Date(minuteStart) },                     // 00:00-01:00 (in progress at practiceTs)
+    { time: minuteStart + oneHour, date: new Date(minuteStart + oneHour) }, // 01:00-02:00 (fully in the future)
+  ];
+  const mtfIdx = chart.snapIndexToTimestamp(practiceTs);
+  assert.equal(mtfIdx, 0, 'switching to a higher timeframe snaps to the last fully-closed candle, not the in-progress one');
+  chart.idx = mtfIdx;
+  chart.replayActive = true;
+  chart.syncReplayBuffers();
+  assert.equal(chart.visibleCandles.length, 1, 'the in-progress and future higher-timeframe candles stay hidden after a timeframe switch');
+  assert.equal(chart.hiddenCandles.length, 2);
+  console.log('prop_firm_evaluation_lock.test.js: multi-timeframe switch hides not-yet-closed candles passed');
 }
