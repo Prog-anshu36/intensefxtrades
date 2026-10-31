@@ -153,7 +153,12 @@ const PageBacktesting = {
       ? (this.replayTimestamp ?? this.candles[this.idx]?.date?.getTime() ?? (bounds ? bounds.start + this.candleDuration() : null))
       : null;
     const options = MarketData.isLocal(symbol) && anchorTs != null ? { anchor: anchorTs - this.candleDuration() } : {};
-    if (bounds) { options.start = bounds.start; options.end = bounds.end; }
+    // Only the FUTURE edge of a sealed evaluation is fenced off — nothing at or
+    // after the locked month's end is ever fetched or revealed. Everything
+    // before it (the full real history leading up to that month) stays fully
+    // open, so a trader can scroll back through real market context exactly
+    // like a real prop-firm evaluation would show it.
+    if (bounds) { options.end = bounds.end; }
     const result = await MarketData.history(symbol, timeframe, this.historyCountForTimestamp(timeframe, anchorTs), options);
     if (symbol !== this.symbol || timeframe !== this.timeframe || requestId !== this._historyRequest) return;
     if (result.error && MarketData.isLocal(symbol) && attempt < 2) {
@@ -162,7 +167,7 @@ const PageBacktesting = {
       }, 1200 * (attempt + 1));
       return;
     }
-    if (bounds) { result.first_timestamp = bounds.start; result.last_timestamp = bounds.end; }
+    if (bounds) { result.last_timestamp = bounds.end; }
     this.datasetInfo = result;
     this._olderExhausted = false;
     this._historyError = result.error || null;
@@ -1741,12 +1746,12 @@ const PageBacktesting = {
     const bounds = this.evaluationBounds();
     if (direction < 0 && this._olderExhausted) return;
     if (direction > 0 && edge >= this.datasetInfo.last_timestamp) return;
-    if (bounds && direction < 0 && edge <= bounds.start) { this._olderExhausted = true; return; }
     this._localPageLoading = true;
     try {
       const rangeOpt = direction < 0 ? { end: edge - 1 } : { start: edge + 1 };
-      // Never fetch a single candle outside the sealed evaluation month.
-      if (bounds) { if (direction < 0) rangeOpt.start = bounds.start; else rangeOpt.end = bounds.end; }
+      // Real history before the sealed month stays fully scrollable; only the
+      // FUTURE edge (past the locked month's end) is ever fenced off.
+      if (bounds && direction > 0) rangeOpt.end = bounds.end;
       const result = await MarketData.history(symbol, timeframe, 2500, rangeOpt);
       if (symbol !== this.symbol || timeframe !== this.timeframe || generation !== this._historyRequest) return;
       if (result.error) { this._historyError = result.error; this.stopPlay(); this.rerender(); return; }
@@ -1757,8 +1762,14 @@ const PageBacktesting = {
         this.idx += rows.length;
         this.viewEnd += rows.length;
         if (this.replayCutIndex != null) this.replayCutIndex += rows.length;
-        // Keep replay near the middle of a bounded window when loading farther back.
-        const trimStart = Math.min(Math.max(0, this.idx - 5000), Math.max(0, this.candles.length - 10000));
+        // Keep a bounded window in memory. In a sealed evaluation the trader is
+        // paging back through real history to study context, not watching the
+        // live replay point — anchor the retained window on where they're
+        // actually looking (viewEnd), not the frozen replay position (idx), so
+        // each further page back makes real progress instead of being evicted
+        // again by the very next load.
+        const trimAnchor = this.propFirmMode ? Math.min(this.idx, this.viewEnd ?? this.idx) : this.idx;
+        const trimStart = Math.min(Math.max(0, trimAnchor - 5000), Math.max(0, this.candles.length - 10000));
         if (trimStart) {
           this.candles = this.candles.slice(trimStart);
           this.idx -= trimStart;

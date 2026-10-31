@@ -53,7 +53,7 @@ const vm = require('node:vm');
     toast: (message) => toasts.push(message),
     UI: { showToast() {} },
     document: { querySelector: () => null, getElementById: () => null },
-    setTimeout, clearTimeout,
+    setTimeout, clearTimeout, requestAnimationFrame: () => 0,
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
@@ -193,6 +193,65 @@ const vm = require('node:vm');
   assert.ok(broken.idx >= 0, 'a previously-broken saved sealed account self-heals to a real candle on its next load');
   assert.ok(broken.visibleCandles.length >= 1, 'a previously-broken saved sealed account shows its chart again, not a permanent blank screen');
   console.log('prop_firm_evaluation_lock.test.js: previously-broken sealed account self-heals on next load passed');
+
+  // --- 6) Real history BEFORE the sealed month must stay fully scrollable (a
+  // real prop-firm chart shows all prior market context); only candles AT OR
+  // AFTER the locked month's end must stay unreachable, forever.
+  const datasetStart = Date.UTC(2003, 0, 1); // dataset goes back to ~2003
+  const allCandles = [];
+  for (let t = datasetStart; t <= evaluationWindow.end + fourHour * 3; t += fourHour) {
+    allCandles.push({ time: t, open: 1, high: 1, low: 1, close: 1 });
+  }
+  // Mirrors the real backend's query semantics (backend/xauusd_data_provider.py
+  // history()): a plain start/end page is capped by `count`, exactly like the
+  // real paged fetches loadLocalPage makes — so this test exercises the real
+  // "keep scrolling back, one bounded page at a time" flow, not an unbounded one.
+  const fakeHistory = async (symbol, timeframe, count, options = {}) => {
+    let rows;
+    if (options.anchor != null) {
+      const beforeAll = allCandles.filter((c) => c.time <= (options.end != null ? Math.min(options.anchor, options.end) : options.anchor));
+      const before = beforeAll.slice(-Math.max(1, Math.floor(count / 2)));
+      const afterAll = allCandles.filter((c) => c.time > Math.max(options.anchor, options.start ?? -Infinity) && (options.end == null || c.time <= options.end));
+      const after = afterAll.slice(0, count - before.length);
+      rows = before.concat(after);
+    } else if (options.start != null) {
+      rows = allCandles.filter((c) => c.time >= options.start && (options.end == null || c.time <= options.end)).slice(0, count);
+    } else {
+      rows = allCandles.filter((c) => options.end == null || c.time <= options.end).slice(-count);
+    }
+    return { symbol, timeframe, source: 'local-csv', candles: rows.map((c) => ({ ...c, date: new Date(c.time) })),
+      first_timestamp: datasetStart, last_timestamp: evaluationWindow.end + fourHour * 3 };
+  };
+  sandbox.MarketData.history = fakeHistory;
+  const history = sandbox.createBacktestingWorkspace({
+    store: { state: { history: [], active_trades: [], settings: {} } },
+    api: { updateSettings: () => Promise.resolve({}) }, storage: storageStub, scope: 'prop-history', allowedSymbols: ['XAUUSD'],
+    propFirmMode: true, evaluationWindow,
+  });
+  history.symbol = 'XAUUSD';
+  history.timeframe = '4h';
+  history.updateReplayChrome = () => {};
+  history.candles = [];
+  history.idx = 0;
+  history.replayActive = false;
+  history.replayTimestamp = null;
+  await history.loadRealHistory();
+  assert.ok(history.candles[0].time > datasetStart, 'the initial fetch does not eagerly pull the entire multi-year dataset');
+  // Scroll backward repeatedly, panning the camera to the front each time (as
+  // the real UI does while a trader drags/scrolls back) — must reach all the
+  // way to the real dataset start, never stopping at the sealed month's own
+  // start or getting stuck once the in-memory buffer fills up.
+  for (let i = 0; i < 40 && history.candles[0].time > datasetStart; i++) {
+    history.viewEnd = history.visibleCount - 1; // pan the view to the oldest loaded candle
+    await history.loadLocalPage(-1);
+  }
+  assert.equal(history.candles[0].time, datasetStart, 'scrolling back reaches the real history before the sealed month, not just the month itself');
+  assert.ok(!history._olderExhausted || history.candles[0].time === datasetStart, 'backward scrolling is never cut off at the evaluation window start');
+  // Forward loading must still never cross the sealed month's end.
+  const beforeLen = history.candles.length;
+  await history.loadLocalPage(1);
+  assert.ok(history.candles.every((c) => c.time <= evaluationWindow.end), 'no candle at or after the sealed month end is ever loaded, however far forward is requested');
+  console.log('prop_firm_evaluation_lock.test.js: full real history before the sealed month is scrollable; future edge stays fenced passed');
 }
 
 })().catch((error) => { console.error(error); process.exit(1); });
