@@ -144,9 +144,14 @@ const PageBacktesting = {
     this.dataSource = "loading";
     const bounds = this.evaluationBounds();
     // First time this sealed account's chart ever opens: start it exactly at the
-    // locked month's first candle, as if scissors had already cut there.
+    // locked month's first candle, as if scissors had already cut there. The anchor
+    // must sit at or after that candle's CLOSE (snapIndexToTimestamp only reveals a
+    // candle once it has fully closed), so seed one full candle duration past the
+    // window's start rather than at the start instant itself.
     if (bounds && !this.replayActive) this.replayActive = true;
-    const anchorTs = this.replayActive ? (this.replayTimestamp ?? this.candles[this.idx]?.date?.getTime() ?? bounds?.start) : null;
+    const anchorTs = this.replayActive
+      ? (this.replayTimestamp ?? this.candles[this.idx]?.date?.getTime() ?? (bounds ? bounds.start + this.candleDuration() : null))
+      : null;
     const options = MarketData.isLocal(symbol) && anchorTs != null ? { anchor: anchorTs - this.candleDuration() } : {};
     if (bounds) { options.start = bounds.start; options.end = bounds.end; }
     const result = await MarketData.history(symbol, timeframe, this.historyCountForTimestamp(timeframe, anchorTs), options);

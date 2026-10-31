@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
+(async () => {
+
 // --- 1) prop-firm-session.js: every new attempt gets a random locked month ---
 {
   const sandbox = {
@@ -49,6 +51,9 @@ const vm = require('node:vm');
       TF_MINUTES: { "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440, "1w": 10080, "1M": 43200 } },
     Fmt: { price: (n) => Number(n).toFixed(2) },
     toast: (message) => toasts.push(message),
+    UI: { showToast() {} },
+    document: { querySelector: () => null, getElementById: () => null },
+    setTimeout, clearTimeout,
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
@@ -132,4 +137,41 @@ const vm = require('node:vm');
   assert.equal(chart.visibleCandles.length, 1, 'the in-progress and future higher-timeframe candles stay hidden after a timeframe switch');
   assert.equal(chart.hiddenCandles.length, 2);
   console.log('prop_firm_evaluation_lock.test.js: multi-timeframe switch hides not-yet-closed candles passed');
+
+  // --- 4) First-ever open of a sealed account must reveal its first candle, not
+  // blank the chart. Regression for a bug where the initial anchor was seeded at
+  // the window's start INSTANT (candle not yet closed) instead of its close, so
+  // snapIndexToTimestamp returned -1 and visibleCandles.length was 0.
+  const fresh = sandbox.createBacktestingWorkspace({
+    store: { state: { history: [], active_trades: [], settings: {} } },
+    api: { updateSettings: () => Promise.resolve({}) }, storage: storageStub, scope: 'prop-fresh', allowedSymbols: ['XAUUSD'],
+    propFirmMode: true, evaluationWindow,
+  });
+  fresh.symbol = 'XAUUSD';
+  fresh.timeframe = '4h';
+  fresh.updateReplayChrome = () => {}; // DOM chrome irrelevant to this data-layer regression
+  fresh.candles = [];
+  fresh.idx = 0;
+  fresh.replayActive = false;
+  fresh.replayTimestamp = null;
+  const fourHour = 4 * 60 * 60 * 1000;
+  const monthCandles = [];
+  for (let t = evaluationWindow.start; t < evaluationWindow.start + fourHour * 5; t += fourHour) {
+    monthCandles.push({ time: t, date: new Date(t), open: 1, high: 1, low: 1, close: 1 });
+  }
+  sandbox.API.getMarketHistory = () => Promise.resolve({
+    symbol: 'XAUUSD', timeframe: '4h', source: 'local-csv', candles: monthCandles,
+    first_timestamp: evaluationWindow.start, last_timestamp: evaluationWindow.end,
+  });
+  sandbox.MarketData.history = async (symbol, timeframe, count, options = {}) => {
+    const clamp = (c) => (options.start != null ? c.filter((x) => x.time >= options.start) : c);
+    return { symbol, timeframe, source: 'local-csv', candles: clamp(monthCandles),
+      first_timestamp: evaluationWindow.start, last_timestamp: evaluationWindow.end };
+  };
+  await fresh.loadRealHistory();
+  assert.ok(fresh.idx >= 0, 'first-ever chart open on a sealed account must land on a real candle, not -1');
+  assert.ok(fresh.visibleCandles.length >= 1, 'the first candle of the locked month is revealed immediately, not a blank chart');
+  console.log('prop_firm_evaluation_lock.test.js: first-open of a sealed account reveals its first candle passed');
 }
+
+})().catch((error) => { console.error(error); process.exit(1); });
