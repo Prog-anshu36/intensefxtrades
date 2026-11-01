@@ -458,3 +458,17 @@ ul.ticks li::before{content:"";flex:0 0 18px;height:18px;margin-top:3px;border-r
 .honest ul.ticks{margin:0}
 .plan ul{align-content:start}
 .plan .btn{letter-spacing:.07em;font-size:12px;padding:0 14px;text-align:center;white-space:nowrap}
+
+/* ---------- homepage prop-firm practice callout ---------- */
+.practice-callout{position:relative;background:var(--bg-0)}
+.pc-box{border:1px solid rgba(226,176,74,.38);border-radius:var(--r-3);padding:clamp(28px,5vw,64px);text-align:center;background:radial-gradient(ellipse 70% 90% at 50% 0,rgba(226,176,74,.10),transparent 70%),linear-gradient(160deg,#08112a,#060a13 70%);box-shadow:0 40px 80px -40px rgba(0,0,0,.9),0 0 70px -30px rgba(226,176,74,.35)}
+.pc-box .eyebrow{color:var(--gold)}
+.pc-box .eyebrow::before{background:linear-gradient(90deg,transparent,var(--gold))}
+.pc-title{font-size:clamp(24px,3.6vw,46px);max-width:24ch;margin:0 auto 22px;text-wrap:balance;color:#fff}
+.pc-lede{margin:0 auto 18px;max-width:68ch}
+.pc-note{margin:0 auto 28px;max-width:68ch;font-size:14px;color:var(--ink-3)}
+.pc-note strong{color:var(--ink-2)}
+.pc-box .cta-row{justify-content:center}
+
+/* founder / co-founder block: keep [hidden] effective against display:grid */
+.people[hidden]{display:none}
