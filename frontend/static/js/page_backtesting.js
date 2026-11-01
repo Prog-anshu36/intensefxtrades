@@ -191,6 +191,13 @@ const PageBacktesting = {
     this.viewEnd = this.clampViewEnd(this.idx + panOffset);
     this.sanitizeChartCamera();
     this.syncMouseEngineCamera();
+    // Real candle data has arrived — if the Session Navigator never got a real
+    // anchor (it ran before this), give it one now so "Go To NY"/Prev/Next NY
+    // search around the account's actual loaded history instead of today's
+    // real-world date, which may not exist anywhere in this chart's data.
+    if (this.sessionNavigator && !this.sessionNavigator.date && this.candles[this.idx]) {
+      this.sessionNavigator.date = this.sessionDateValue(this.candles[this.idx].date.getTime(), this.sessionNavigator.selectedSessionType);
+    }
     this.rerender();
   },
 
@@ -2089,7 +2096,14 @@ const PageBacktesting = {
     const current = this.candles[this.idx];
     this.sessionPanelHidden = saved?.navigatorHidden ?? this.sessionPanelHidden;
     this.sessionNavigator.selectedSessionType = saved?.navigatorSession || this.sessionNavigator.selectedSessionType || "new-york";
-    this.sessionNavigator.date = this.sessionNavigator.date || this.sessionDateValue(current?.date?.getTime(), this.sessionNavigator.selectedSessionType);
+    // This runs before real history has loaded (this.candles is still empty),
+    // so only lock in a date here when there's an actual candle to anchor it
+    // to. Otherwise defaulting now would fall through to today's real date —
+    // meaningless (and un-findable) once the real chart data for a sealed
+    // evaluation month arrives. loadRealHistory() fills this in once it can.
+    if (!this.sessionNavigator.date && current) {
+      this.sessionNavigator.date = this.sessionDateValue(current.date.getTime(), this.sessionNavigator.selectedSessionType);
+    }
     return this.sessionEngine;
   },
 
@@ -5824,6 +5838,11 @@ const PageBacktesting = {
   canReplayAt(index) {
     const system = window.SubscriptionSystem;
     if (!this.replayFeatureAllowed()) { system?.requestUpgrade("replay"); return false; }
+    // A sealed evaluation's own history (e.g. jumping to a session from months
+    // or years before the locked month) is not a plan upsell surface — every
+    // plan can see all of its own real history. Only the plan's own standalone
+    // Backtesting/live replay is restricted to a permitted date range.
+    if (this.propFirmMode) return true;
     const candle = this.candles[Math.max(0, Math.min(this.candles.length - 1, Math.round(index ?? this.idx)))];
     const timestamp = Number(candle?.time ?? candle?.date?.getTime());
     if (!Number.isFinite(timestamp)) return true;

@@ -73,6 +73,12 @@ const vm = require('node:vm');
   assert.equal(bounds.end, evaluationWindow.end);
   // No subscription module loaded at all (worst case) — a sealed evaluation still works for every plan.
   assert.equal(chart.replayFeatureAllowed(), true, 'Prop Firm mode bypasses the Purple-only Replay gate');
+  // "Go To NY"/Prev/Next NY jump to sessions anywhere in the sealed account's own
+  // full real history, which can be years before the locked month — that must
+  // never be blocked by the subscription plan's own permitted-replay-date-range
+  // upsell gate (no SubscriptionSystem.getPermittedReplayRange is even defined
+  // here, so this also proves it's never called in propFirmMode).
+  assert.equal(chart.canReplayAt(0), true, 'Prop Firm mode bypasses the plan\'s permitted-replay-date-range gate entirely');
 
   chart.candles = [{ time: evaluationWindow.start, date: new Date(evaluationWindow.start) }];
   chart.idx = 0;
@@ -172,6 +178,16 @@ const vm = require('node:vm');
   assert.ok(fresh.idx >= 0, 'first-ever chart open on a sealed account must land on a real candle, not -1');
   assert.ok(fresh.visibleCandles.length >= 1, 'the first candle of the locked month is revealed immediately, not a blank chart');
   console.log('prop_firm_evaluation_lock.test.js: first-open of a sealed account reveals its first candle passed');
+
+  // --- 4b) Session Navigator ("Go To NY"/Prev/Next NY) must anchor to the
+  // sealed account's own real data, not today's real-world date. The engine
+  // sets this before history ever loads (candles empty then), so it used to
+  // fall through to Date.now() and get stuck there forever.
+  assert.ok(fresh.sessionNavigator?.date, 'the Session Navigator date is set once real history has loaded');
+  const monthKey = new Date(evaluationWindow.start).toISOString().slice(0, 7);
+  assert.ok(fresh.sessionNavigator.date.startsWith(monthKey) || fresh.sessionNavigator.date < new Date().toISOString().slice(0, 10),
+    'the Session Navigator date is anchored to the sealed month, not today\'s real-world date');
+  console.log('prop_firm_evaluation_lock.test.js: Session Navigator anchors to real sealed-month data, not today passed');
 
   // --- 5) Self-heal: an account whose SAVED state already has the pre-fix bad
   // position (replayActive already true, replayTimestamp/idx pinned at the
