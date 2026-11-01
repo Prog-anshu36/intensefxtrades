@@ -45,7 +45,7 @@ const Router = {
         const label = plan ? plan.name + " · " + plan.tier : "Plan required";
         item.dataset.lockedFeature = lockedFeature;
         item.dataset.planLabel = label;
-        item.title = (system?.FEATURES?.[lockedFeature]?.label || item.dataset.page) + " · " + label;
+  item.title = (system?.FEATURES?.[lockedFeature]?.label || item.dataset.page) + " · " + label;
         item.setAttribute("aria-label", item.textContent.trim() + ", locked: " + label);
       } else {
         delete item.dataset.lockedFeature;
@@ -55,10 +55,48 @@ const Router = {
     });
   },
 
+  // Live countdown next to the plan badge for a time-limited VIP grant (e.g. a
+  // promo key good for a few hours). Ticks every second; once it reaches zero
+  // it refreshes the real subscription record so the plan reverts correctly
+  // (normalizePlan() already treats an expired current_period_end as Blue).
+  updatePlanCountdown() {
+    const el = document.getElementById("userPlanCountdown");
+    if (!el) return;
+    const sub = window.IntenseFXAuth?.getSubscription?.();
+    const end = sub?.current_period_end ? Date.parse(sub.current_period_end) : NaN;
+    if (sub?.provider !== "vip" || !Number.isFinite(end)) {
+      el.hidden = true;
+      el.textContent = "";
+      this._planExpiryHandled = false;
+      return;
+    }
+    const remainingMs = end - Date.now();
+    if (remainingMs <= 0) {
+      el.hidden = true;
+      el.textContent = "";
+      if (!this._planExpiryHandled) {
+        this._planExpiryHandled = true;
+        window.IntenseFXAuth?.refreshSubscription?.().then(() => window.dispatchEvent(new Event("intensefx:subscription-changed")));
+      }
+      return;
+    }
+    this._planExpiryHandled = false;
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    el.textContent = days > 0 ? `${days}d ${pad(hours)}h left` : `${pad(hours)}:${pad(minutes)}:${pad(seconds)} left`;
+    el.hidden = false;
+  },
+
   init() {
     this.updatePlanNavigation();
+    this.updatePlanCountdown();
+    if (!this._planCountdownTimer) this._planCountdownTimer = setInterval(() => this.updatePlanCountdown(), 1000);
     document.getElementById("userPlanBadge")?.addEventListener("click", () => this.go("subscription"));
-    window.addEventListener("intensefx:subscription-changed", () => this.updatePlanNavigation());
+    window.addEventListener("intensefx:subscription-changed", () => { this.updatePlanNavigation(); this.updatePlanCountdown(); });
     document.querySelectorAll(".nav-item[data-page]").forEach((item) => {
       item.setAttribute("role", "button");
       item.setAttribute("tabindex", item.classList.contains("disabled") ? "-1" : "0");
