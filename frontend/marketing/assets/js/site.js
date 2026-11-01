@@ -210,6 +210,14 @@
       if (!good) { fields.find((f) => f.getAttribute("aria-invalid") === "true")?.focus(); return say("bad", "Please fix the highlighted fields."); }
       if ($(".hp", form).value) return; // honeypot
       const data = Object.fromEntries(fields.map((f) => [f.name, f.value.trim()]));
+      if (mode === "endpoint" && /formsubmit\.co/.test(form.dataset.endpoint || "")) {
+        // FormSubmit-specific control fields: a readable subject/layout for the
+        // inbox, and _captcha off since its page captcha doesn't apply to this
+        // JSON/AJAX submission path.
+        data._subject = "IntenseFX Trades — new contact form message";
+        data._template = "table";
+        data._captcha = "false";
+      }
       if (mode === "mailto") {
         const to = form.dataset.email;
         location.href = `mailto:${to}?subject=${encodeURIComponent("IntenseFX Trades enquiry from " + data.name)}&body=${encodeURIComponent(data.message + "\n\n" + data.name + " <" + data.email + ">")}`;
