@@ -110,7 +110,7 @@ const PageBacktesting = {
     const settings = this.store.state.settings;
     this.symbol = settings.symbol || "BTCUSD";
     this.timeframe = settings.timeframe || "1m";
-    this.speed = settings.replay_speed || this.speed;
+    this.speed = this.clampReplaySpeed(settings.replay_speed || this.speed);
     this.replayActive = !!settings.replay_active;
     if (!this.replayFeatureAllowed()) this.replayActive = false;
     this.replayTimestamp = this.replayActive ? (settings.replay_timestamp || null) : null;
@@ -957,11 +957,11 @@ const PageBacktesting = {
       </div>
       <div class="speed-row">
         <span>Speed</span>
-        <input type="range" id="speedSlider" min="2.5" max="1000" step="2.5" value="${this.speed * 10}">
+        <input type="range" id="speedSlider" min="2.5" max="${Math.round(speedCap * 10)}" step="2.5" value="${this.speed * 10}">
         <span class="mono" id="replaySpeedLabel">${this.speed.toFixed(1)}x</span>
       </div>
       <div class="replay-speed-presets">
-        ${speeds.map((speed) => `<button class="${Math.abs(this.speed - speed) < 0.01 ? "active" : ""} ${speed > speedCap ? "locked" : ""}" data-replay-speed="${speed}" ${speed > speedCap ? `title="${window.SubscriptionSystem?.planForReplaySpeed?.(speed)?.name || "Upgrade"} plan or higher"` : ""}>${speed}x${speed > speedCap ? " 🔒" : ""}</button>`).join("")}
+        ${speeds.map((speed) => `<button class="${Math.abs(this.speed - speed) < 0.01 ? "active" : ""} ${speed > speedCap ? "locked" : ""}" data-replay-speed="${speed}" ${speed > speedCap ? `aria-disabled="true" title="${window.SubscriptionSystem?.planForReplaySpeed?.(speed)?.name || "Upgrade"} plan or higher"` : ""}>${speed}x${speed > speedCap ? " 🔒" : ""}</button>`).join("")}
       </div>
       ${this.propFirmMode ? "" : `<div class="replay-date-row">
         <input type="datetime-local" id="replayDateInput" value="${replayDate}">
@@ -1609,7 +1609,7 @@ const PageBacktesting = {
     try {
       const saved = JSON.parse(this.chartStorage().getItem("tfb_replay_engine_v1") || "null");
       if (!saved || saved.symbol !== this.symbol) return;
-      this.speed = saved.speed || this.speed;
+      this.speed = this.clampReplaySpeed(saved.speed || this.speed);
       this.replayBookmarks = Array.isArray(saved.bookmarks) ? saved.bookmarks : [];
       if (saved.replayActive && saved.timestamp) {
         this.replayActive = true;
@@ -4487,7 +4487,11 @@ const PageBacktesting = {
     container.querySelector("#btnBookmarkClear")?.addEventListener("click", () => this.clearReplayBookmarks());
     container.querySelector("#btnPlay")?.addEventListener("click", () => this.togglePlay());
     container.querySelector("#speedSlider")?.addEventListener("input", (e) => this.setReplaySpeed(parseInt(e.target.value, 10) / 10, { keepDom: true }));
-    container.querySelectorAll("[data-replay-speed]").forEach((btn) => btn.addEventListener("click", () => this.setReplaySpeed(parseFloat(btn.dataset.replaySpeed))));
+    container.querySelectorAll("[data-replay-speed]").forEach((btn) => btn.addEventListener("click", () => {
+      const speed = parseFloat(btn.dataset.replaySpeed);
+      if (speed > this.replaySpeedCap()) { this.notifyReplaySpeedLocked(speed); return; }
+      this.setReplaySpeed(speed);
+    }));
     container.querySelector("#btnReplayDate")?.addEventListener("click", () => this.jumpReplayToDate(container.querySelector("#replayDateInput")?.value));
     container.querySelector("#replayProgress")?.addEventListener("input", (e) => this.seekReplayToIndex(parseInt(e.target.value, 10)));
     container.querySelector("#sessionDateInput")?.addEventListener("change", (e) => { this.sessionNavigator.date = e.target.value; });
@@ -5914,6 +5918,23 @@ const PageBacktesting = {
     this.rerender();
   },
 
+  replaySpeedCap() {
+    const cap = window.SubscriptionSystem?.getReplaySpeedCap?.() ?? 1;
+    return Number.isFinite(cap) && cap > 0 ? cap : 1;
+  },
+
+  // Single source of truth for the speed actually allowed on the current plan.
+  clampReplaySpeed(speed) {
+    const value = Number(speed);
+    const wanted = Number.isFinite(value) && value > 0 ? value : 1;
+    return Math.max(0.25, Math.min(100, wanted, this.replaySpeedCap()));
+  },
+
+  notifyReplaySpeedLocked(speed) {
+    const required = window.SubscriptionSystem?.planForReplaySpeed?.(speed);
+    toast(`${speed}x replay speed needs ${required ? `${required.name} · ${required.tier}` : "a higher plan"}. Your speed stays at ${this.speed}x.`, "info");
+  },
+
   setReplaySpeed(speed, options = {}) {
     if (!Number.isFinite(speed) || speed <= 0) return;
     const requested = Math.max(0.25, Math.min(100, speed));
@@ -6296,10 +6317,12 @@ const PageBacktesting = {
 
   startReplayLoop() {
     const token = ++this.playLoopToken;
+    this.speed = this.clampReplaySpeed(this.speed);
     const tick = async () => {
       if (!this.playing || token !== this.playLoopToken) return;
       await this.step(1);
       if (!this.playing || token !== this.playLoopToken) return;
+      this.speed = this.clampReplaySpeed(this.speed);
       this.playTimer = setTimeout(tick, Math.max(20, 1000 / this.speed));
     };
     this.playTimer = setTimeout(tick, Math.max(20, 1000 / this.speed));
