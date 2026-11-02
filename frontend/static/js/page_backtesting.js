@@ -938,6 +938,7 @@ const PageBacktesting = {
     const replayDate = current ? new Date(current.date.getTime() - current.date.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
     const speeds = [0.25, 0.5, 1, 2, 5, 10, 20, 50, 100];
     const speedCap = window.SubscriptionSystem?.getReplaySpeedCap?.() ?? 1;
+    const skipLimit = this.candleSkipLimit();
     const progressMax = Math.max(0, this.candles.length - 1);
     const progressPct = progressMax > 0 ? Math.round((this.idx / progressMax) * 100) : 0;
     return `<div class="tv-panel tv-replay-panel">
@@ -946,8 +947,10 @@ const PageBacktesting = {
         <button class="replay-btn" id="btnPrev" title="Step one candle backward">Step −</button>
         <button class="replay-btn" id="btnNext" title="Step one candle forward">Step +</button>
         <button class="replay-btn ${this.playing ? "playing" : ""}" id="btnPlay" title="Play or pause one historical candle at a time">${this.playing ? "Pause" : "Play"}</button>
-        <button class="replay-btn" id="btnBack10" title="Move back ten candles">−10</button>
-        <button class="replay-btn" id="btnF10" title="Move forward ten candles">+10</button>
+        ${skipLimit ? `<button class="replay-btn" id="btnBack10" title="Move back ${skipLimit} candles">−${skipLimit}</button>
+        <button class="replay-btn" id="btnF10" title="Move forward ${skipLimit} candles">+${skipLimit}</button>`
+          : `<button class="replay-btn" id="btnBack10" title="Fast-forwarding candles needs Purple · Pro or higher" data-plan-feature="candleSkip">🔒 −10</button>
+        <button class="replay-btn" id="btnF10" title="Fast-forwarding candles needs Purple · Pro or higher" data-plan-feature="candleSkip">🔒 +10</button>`}
         <button class="replay-btn" id="btnReplayStart" title="Return to the evaluation start candle">Start</button>
         ${this.propFirmMode ? "" : `<button class="replay-btn" id="btnEnd" title="Process candles through the dataset end">End</button>
         <button class="replay-btn" id="btnReplayLive" title="Exit replay and show the latest candle">Live</button>`}
@@ -1420,14 +1423,17 @@ const PageBacktesting = {
     const session = this.currentSessionStats();
     const openCount = this.store.state.active_trades.filter((t) => t.symbol === this.symbol).length;
     const speedCap = window.SubscriptionSystem?.getReplaySpeedCap?.() ?? 1;
+    const skipLimit = this.candleSkipLimit();
     return `<div class="tv-fullscreen-replay" id="fullscreenReplayDock">
       <button class="replay-btn" id="fsExitFullscreen" title="Exit fullscreen">Exit fullscreen</button>
       <span class="tv-fullscreen-replay-state">${this.propFirmMode ? "Sealed evaluation" : this.playing ? "Replay running" : this.replayActive ? "Replay ready" : "Live mode"}${session ? ` · ${this.escapeHtml(session.shortName)}` : ""}</span>
       <button class="replay-btn" id="fsBtnPrev" title="Previous candle">Prev</button>
       <button class="replay-btn ${this.playing ? "playing active" : ""}" id="fsBtnPlay" title="Start or pause replay">${this.playing ? "Pause" : "Play"}</button>
       <button class="replay-btn" id="fsBtnNext" title="Next candle">Next</button>
-      <button class="replay-btn" id="fsBtnBack10" title="Back 10 candles">-10</button>
-      <button class="replay-btn" id="fsBtnF10" title="Forward 10 candles">+10</button>
+      ${skipLimit ? `<button class="replay-btn" id="fsBtnBack10" title="Back ${skipLimit} candles">-${skipLimit}</button>
+      <button class="replay-btn" id="fsBtnF10" title="Forward ${skipLimit} candles">+${skipLimit}</button>`
+        : `<button class="replay-btn" id="fsBtnBack10" title="Fast-forwarding candles needs Purple · Pro or higher" data-plan-feature="candleSkip">🔒 -10</button>
+      <button class="replay-btn" id="fsBtnF10" title="Fast-forwarding candles needs Purple · Pro or higher" data-plan-feature="candleSkip">🔒 +10</button>`}
       ${this.propFirmMode ? "" : `<button class="replay-btn ${this.tool === "scissors" ? "playing active" : ""}" id="fsScissorsToolBtn" title="Scroll anywhere on the chart, then click a candle to cut there and start a random replay">✂️ Scissors</button>`}
       <select id="fsReplaySpeed" title="Replay speed">
         ${[0.25, 0.5, 1, 2, 5, 10, 20, 50, 100].map((speed) => `<option value="${speed}" ${speed > speedCap ? "disabled" : ""} ${Math.abs(this.speed - speed) < 0.01 ? "selected" : ""}>${speed}x${speed > speedCap ? " 🔒" : ""}</option>`).join("")}
@@ -4452,8 +4458,8 @@ const PageBacktesting = {
     container.querySelector("#fsBtnPlay")?.addEventListener("click", () => this.togglePlay());
     container.querySelector("#fsBtnPrev")?.addEventListener("click", () => this.step(-1));
     container.querySelector("#fsBtnNext")?.addEventListener("click", () => this.step(1));
-    container.querySelector("#fsBtnBack10")?.addEventListener("click", () => this.step(-10));
-    container.querySelector("#fsBtnF10")?.addEventListener("click", () => this.step(10));
+    container.querySelector("#fsBtnBack10")?.addEventListener("click", () => { const n = this.candleSkipLimit(); if (n) this.step(-n); });
+    container.querySelector("#fsBtnF10")?.addEventListener("click", () => { const n = this.candleSkipLimit(); if (n) this.step(n); });
     container.querySelector("#fsReplayReset")?.addEventListener("click", () => this.resetReplay());
     container.querySelector("#fsReplayLive")?.addEventListener("click", () => this.exitReplayToLive());
     container.querySelector("#fsCloseAllPositions")?.addEventListener("click", () => this.closeAllPositions());
@@ -4470,8 +4476,8 @@ const PageBacktesting = {
     container.querySelector("#pendingPriceInput")?.addEventListener("input", (e) => { this.pendingPrice = Number(e.target.value) || null; this.syncOrderPrices(); });
     container.querySelector("#btnPrev")?.addEventListener("click", () => this.step(-1));
     container.querySelector("#btnNext")?.addEventListener("click", () => this.step(1));
-    container.querySelector("#btnBack10")?.addEventListener("click", () => this.step(-10));
-    container.querySelector("#btnF10")?.addEventListener("click", () => this.step(10));
+    container.querySelector("#btnBack10")?.addEventListener("click", () => { const n = this.candleSkipLimit(); if (n) this.step(-n); });
+    container.querySelector("#btnF10")?.addEventListener("click", () => { const n = this.candleSkipLimit(); if (n) this.step(n); });
     container.querySelector("#btnReplayStart")?.addEventListener("click", () => this.goToReplayStart());
     container.querySelector("#btnEnd")?.addEventListener("click", () => this.goToReplayEnd());
     container.querySelector("#btnReplayLive")?.addEventListener("click", () => this.exitReplayToLive());
@@ -5827,6 +5833,15 @@ const PageBacktesting = {
   // plan caps there); outside Prop Firm mode, Replay itself stays a Purple+ feature.
   replayFeatureAllowed() {
     return this.propFirmMode || Boolean(window.SubscriptionSystem?.canAccessFeature("replay"));
+  },
+
+  // How many candles the -N/+N fast-forward buttons move at once: 0 (locked)
+  // on Green and below, 5 on Purple, 10 on Red and Golden VIP. Unlike
+  // replayFeatureAllowed()/evaluationBounds(), this is NOT bypassed in
+  // propFirmMode — the plan gate applies the same way on a sealed Prop Firm
+  // evaluation as it does on the standalone Backtesting chart.
+  candleSkipLimit() {
+    return window.SubscriptionSystem?.getCandleSkipCap?.() ?? 0;
   },
 
   // {start,end} ms of the sealed evaluation month, or null outside Prop Firm mode.

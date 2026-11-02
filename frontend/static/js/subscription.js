@@ -20,23 +20,24 @@
     extendedHistoricalReplay: { label: "Extended historical replay", required: "red" },
     aiCoach: { label: "AI Coach", required: "red" },
     additionalAccount: { label: "Additional trading accounts", required: "green" },
+    candleSkip: { label: "Fast-forward multiple candles", required: "purple" },
   };
   const PLANS = {
     blue: { code: "blue", name: "Blue", tier: "Free", color: COLORS.blue, price: 0,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView"]), accountLimit: 1, replaySpeedCap: 1,
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView"]), accountLimit: 1, replaySpeedCap: 1, candleSkipCap: 0,
       bullets: ["Dashboard, trades and journal", "Chart workspace", "One demo trading account"] },
     green: { code: "green", name: "Green", tier: "Starter", color: COLORS.green, price: 49,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "additionalAccount"]), accountLimit: Infinity, replaySpeedCap: 3,
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "additionalAccount"]), accountLimit: Infinity, replaySpeedCap: 3, candleSkipCap: 0,
       bullets: ["Everything in Blue", "Analysis and performance", "Backtesting up to 3x speed", "Additional trading accounts"] },
     purple: { code: "purple", name: "Purple", tier: "Pro", color: COLORS.purple, price: 149,
-      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount"]), accountLimit: Infinity, replaySpeedCap: 5,
-      bullets: ["Everything in Green", "Replay and technical indicators up to 5x speed", "Trading Analysis", "Replay history limited to one year"] },
+      features: new Set(["dashboard", "trades", "generalSettings", "tradingView", "analysis", "performance", "backtesting", "replay", "tradeAnalysis", "technicalIndicators", "additionalAccount", "candleSkip"]), accountLimit: Infinity, replaySpeedCap: 5, candleSkipCap: 5,
+      bullets: ["Everything in Green", "Replay and technical indicators up to 5x speed", "Trading Analysis", "Replay history limited to one year", "Fast-forward up to 5 candles"] },
     red: { code: "red", name: "Red", tier: "Elite", color: COLORS.red, price: 199,
-      features: new Set(Object.keys(FEATURES)), accountLimit: Infinity, replaySpeedCap: 10,
-      bullets: ["Everything in Purple", "AI Coach and premium settings", "Replay and backtesting up to 10x speed", "All available replay history"] },
+      features: new Set(Object.keys(FEATURES)), accountLimit: Infinity, replaySpeedCap: 10, candleSkipCap: 10,
+      bullets: ["Everything in Purple", "AI Coach and premium settings", "Replay and backtesting up to 10x speed", "All available replay history", "Fast-forward up to 10 candles"] },
   };
   const ORDER = ["blue", "green", "purple", "red"];
-  const GOLDEN_PASS = { code: 'golden_vip', name: 'Golden VIP', tier: 'Pass', color: '#efc75e', price: 249, features: new Set(Object.keys(FEATURES)), replaySpeedCap: 100 };
+  const GOLDEN_PASS = { code: 'golden_vip', name: 'Golden VIP', tier: 'Pass', color: '#efc75e', price: 249, features: new Set(Object.keys(FEATURES)), replaySpeedCap: 100, candleSkipCap: 10 };
   function purchaseQuote(product, months = 1) {
     const item = product === 'golden_vip' ? GOLDEN_PASS : PLANS[product];
     if (!item || ![1,3,12].includes(months)) throw new Error('Choose a valid access term.');
@@ -96,6 +97,10 @@
     for (const code of ORDER) if (PLANS[code].replaySpeedCap >= speed) return PLANS[code];
     return GOLDEN_PASS;
   }
+  // How many candles the chart's -N/+N fast-forward buttons move at once: 0
+  // (locked) on Blue/Green, 5 on Purple, 10 on Red and Golden VIP. Applies on
+  // both the standalone Backtesting chart and a sealed Prop Firm evaluation.
+  function getCandleSkipCap(plan = getUserPlan()) { return plan?.candleSkipCap ?? PLANS.blue.candleSkipCap; }
   function getPermittedReplayRange(instrument, availability, plan = getUserPlan()) {
     const start = timestampMillis(availability?.start ?? availability?.first_timestamp);
     const end = timestampMillis(availability?.end ?? availability?.last_timestamp);
@@ -164,6 +169,6 @@
 
   window.SubscriptionSystem = { PLANS, FEATURES, ORDER, GOLDEN_PASS, purchaseQuote, normalizePlan, getUserPlan, getUserEntitlements,
     canAccessFeature, requiredPlan, canCreateAccount, getPermittedReplayRange, canAccessHistoricalData, canAccessReplayRange,
-    guardFeature, protectFeatureControls, getVipPlanCode, redeemVipKey, requestUpgrade, getReplaySpeedCap, planForReplaySpeed };
+    guardFeature, protectFeatureControls, getVipPlanCode, redeemVipKey, requestUpgrade, getReplaySpeedCap, planForReplaySpeed, getCandleSkipCap };
 })();
 
