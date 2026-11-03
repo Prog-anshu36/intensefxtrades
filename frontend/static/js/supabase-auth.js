@@ -106,21 +106,35 @@
   async function loadSdk() {
     if (window.supabase?.createClient) return window.supabase;
     if (authClientLoad) return authClientLoad;
-    authClientLoad = new Promise((resolve, reject) => {
-      const existing = document.querySelector('script[data-supabase-sdk]');
-      if (existing) {
-        existing.addEventListener("load", () => window.supabase?.createClient ? resolve(window.supabase) : reject(new Error("Supabase Auth library did not initialize.")), { once: true });
-        existing.addEventListener("error", () => reject(new Error("Supabase Auth library could not be loaded.")), { once: true });
-        return;
-      }
+    const sources = [
+      "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.js",
+      "https://unpkg.com/@supabase/supabase-js@2.57.4/dist/umd/supabase.js",
+    ];
+    const loadSource = (src) => new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.js";
+      const timeout = window.setTimeout(() => {
+        script.remove();
+        reject(new Error("Supabase Auth library request timed out."));
+      }, 12000);
+      const finish = (callback) => {
+        window.clearTimeout(timeout);
+        callback();
+      };
+      script.src = src;
       script.async = true;
       script.dataset.supabaseSdk = "true";
-      script.onload = () => window.supabase?.createClient ? resolve(window.supabase) : reject(new Error("Supabase Auth library did not initialize."));
-      script.onerror = () => reject(new Error("Supabase Auth library could not be loaded."));
+      script.onload = () => finish(() => window.supabase?.createClient ? resolve(window.supabase) : reject(new Error("Supabase Auth library did not initialize.")));
+      script.onerror = () => finish(() => reject(new Error("Supabase Auth library could not be loaded.")));
       document.head.append(script);
     });
+    authClientLoad = (async () => {
+      let lastError;
+      for (const src of sources) {
+        try { return await loadSource(src); }
+        catch (error) { lastError = error; }
+      }
+      throw lastError || new Error("Supabase Auth library could not be loaded.");
+    })();
     return authClientLoad;
   }
   async function fetchAccountData() {
@@ -286,6 +300,7 @@
     const authCallback = new URLSearchParams(window.location.search).has("code");
     attachControls();
     setMode("login");
+    busy(false);
     state.initialized = true;
     if (!configured) return { configured: false, session: null };
     if (!configValid) {
