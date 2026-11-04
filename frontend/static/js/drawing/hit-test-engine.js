@@ -155,7 +155,7 @@
         }
         return best<=this.tolerance ? {hitType:'line',distance:best}:null;
       }
-      if ([DrawingTypes.RECTANGLE, DrawingTypes.ELLIPSE].includes(drawing.type) && pts.length > 1) {
+      if ([DrawingTypes.RECTANGLE, DrawingTypes.ELLIPSE, DrawingTypes.PRICE_DATE_RANGE].includes(drawing.type) && pts.length > 1) {
         const minX = drawing.type === DrawingTypes.RECTANGLE && drawing.properties?.extendLeft ? 0 : Math.min(pts[0].x, pts[1].x);
         const maxX = drawing.type === DrawingTypes.RECTANGLE && drawing.properties?.extendRight ? (this.engine.coordinateManager.adapter.getMetrics?.()?.chartWidth || this.engine.coordinateManager.getChartBounds().width) : Math.max(pts[0].x, pts[1].x);
         const minY = Math.min(pts[0].y, pts[1].y);

@@ -754,7 +754,7 @@ const PageBacktesting = {
       brush: `<svg ${common}><path d="M4 17c4-7 7 3 11-5 1.7-3.2 3.2-4.6 5-4"/><path d="M4 20c2 0 3-.8 3-3"/></svg>`,
       priceRange: `<svg ${common}><path d="M12 5v14M8 8l4-4 4 4M8 16l4 4 4-4"/></svg>`,
       dateRange: `<svg ${common}><path d="M5 12h14M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>`,
-      measure: `<svg ${common}><path d="M5 19L19 5"/><path d="M7 17l-2-2M10 14l-2-2M13 11l-2-2M16 8l-2-2"/></svg>`,
+      measure: `<svg ${common}><path d="M4 17l3 3L20 7l-3-3z"/><path d="M13.75 7.25l1.8 1.8M10.5 10.5l2.8 2.8M7.25 13.75l1.8 1.8"/></svg>`,
       longPosition: `<svg ${common}><path d="M6 17h12"/><path d="M6 12h12"/><path d="M6 7h12"/><path d="M8 12l3-5 3 5"/><path d="M8 12l3 5 3-5"/><path d="M18 7v5h-5"/></svg>`,
       shortPosition: `<svg ${common}><path d="M6 17h12"/><path d="M6 12h12"/><path d="M6 7h12"/><path d="M8 12l3-5 3 5"/><path d="M8 12l3 5 3-5"/><path d="M18 17v-5h-5"/></svg>`,
       magnet: `<svg ${common}><path d="M7 4v7a5 5 0 0010 0V4"/><path d="M7 4h4M13 4h4"/></svg>`,
@@ -2904,10 +2904,11 @@ const PageBacktesting = {
     } else if (["trendLine", "ray", "extendedLine", "arrow", "fibRetracement", "riskReward", "priceRange", "dateRange"].includes(drawing.type)) {
       const [a, b] = pts;
       if (!a || !b) return ctx.restore();
-      if (drawing.type !== 'fibRetracement') this.strokeObjectLine(ctx, a, b, drawing.type, properties);
+      if (drawing.type !== 'fibRetracement' && drawing.type !== 'riskReward') this.strokeObjectLine(ctx, a, b, drawing.type, properties);
       if (drawing.type === "arrow") this.drawArrowHead(ctx, a, b, properties);
       if (drawing.type === "fibRetracement") this.drawFibLevels(ctx, pts, drawing);
-      if (["riskReward", "priceRange", "dateRange"].includes(drawing.type)) this.drawMeasurement(ctx, pts, drawing);
+      if (drawing.type === "riskReward") this.drawMeasureBox(ctx, pts, drawing);
+      else if (["priceRange", "dateRange"].includes(drawing.type)) this.drawMeasurement(ctx, pts, drawing);
     } else if (drawing.type === "horizontalLine") {
       const y = pts[0].y;
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this._canvasW || 400, y); ctx.stroke();
@@ -3039,6 +3040,95 @@ const PageBacktesting = {
     ctx.moveTo(a.x, a.y); ctx.lineTo(c.x, c.y);
     ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + px, b.y + py);
     ctx.stroke();
+  },
+
+  // "3h 5m", "1d 2h", "40m" — time between the two measure anchors.
+  formatMeasureDuration(ms) {
+    const total = Math.round(Math.abs(Number(ms) || 0) / 60000);
+    if (!total) return "0m";
+    const d = Math.floor(total / 1440), h = Math.floor((total % 1440) / 60), m = total % 60;
+    return [d && `${d}d`, h && `${h}h`, m && `${m}m`].filter(Boolean).join(" ");
+  },
+
+  // Numbers shown by the Measure tool: price change, %, ticks, bars, time and volume.
+  measureStats(drawing) {
+    const anchors = drawing.anchors || [];
+    const priceA = Number(anchors[0]?.price), priceB = Number(anchors[1]?.price);
+    const timeA = Number(anchors[0]?.time ?? anchors[0]?.timestamp), timeB = Number(anchors[1]?.time ?? anchors[1]?.timestamp);
+    if (![priceA, priceB, timeA, timeB].every(Number.isFinite)) return null;
+    const coords = this.chartCoordinates();
+    const indexA = Math.round(coords.timeToIndex(timeA)), indexB = Math.round(coords.timeToIndex(timeB));
+    const decimals = MarketData.getMeta(this.symbol)?.decimals ?? 2;
+    const diff = priceB - priceA;
+    const lo = Math.max(0, Math.min(indexA, indexB));
+    const hi = Math.min(this.candles.length - 1, this.getReplayLimit(), Math.max(indexA, indexB));
+    let volume = 0;
+    for (let i = lo; i <= hi; i += 1) volume += Number(this.candles[i]?.volume) || 0;
+    return {
+      up: diff >= 0,
+      diffText: diff.toFixed(decimals),
+      pctText: (priceA ? (diff / priceA) * 100 : 0).toFixed(2),
+      ticks: Math.round(diff / Math.pow(10, -decimals)),
+      bars: Number.isFinite(indexA) && Number.isFinite(indexB) ? Math.abs(indexB - indexA) : 0,
+      duration: this.formatMeasureDuration(timeB - timeA),
+      volume,
+    };
+  },
+
+  // TradingView-style Measure: shaded box, centre cross with arrows and a stats bubble.
+  drawMeasureBox(ctx, pts, drawing) {
+    const [a, b] = pts;
+    if (!a || !b || !drawing) return;
+    const stats = this.measureStats(drawing);
+    if (!stats) return;
+    const up = stats.up;
+    const fill = up ? "rgba(41,98,255,0.20)" : "rgba(242,54,69,0.20)";
+    const line = up ? "#6c9bff" : "#ff7a85";
+    const bubble = up ? "#2962ff" : "#f23645";
+    const left = Math.min(a.x, b.x), right = Math.max(a.x, b.x), top = Math.min(a.y, b.y), bottom = Math.max(a.y, b.y);
+    const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+    const dirX = b.x >= a.x ? 1 : -1, dirY = b.y >= a.y ? 1 : -1;
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.setLineDash([]);
+    ctx.fillStyle = fill;
+    ctx.fillRect(left, top, right - left, bottom - top);
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, cy); ctx.lineTo(right, cy);
+    ctx.moveTo(cx, top); ctx.lineTo(cx, bottom);
+    ctx.moveTo(b.x - dirX * 6, cy - 4); ctx.lineTo(b.x, cy); ctx.lineTo(b.x - dirX * 6, cy + 4);
+    ctx.moveTo(cx - 4, b.y - dirY * 6); ctx.lineTo(cx, b.y); ctx.lineTo(cx + 4, b.y - dirY * 6);
+    ctx.stroke();
+    const lines = [
+      `${stats.diffText} (${stats.pctText}%) ${stats.ticks}`,
+      `${stats.bars} bars, ${stats.duration}`,
+    ];
+    if (stats.volume > 0) lines.push(`Vol ${this.shortVolume(stats.volume)}`);
+    ctx.font = "600 12px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const padX = 9, lineH = 16, boxH = lines.length * lineH + 10;
+    const boxW = Math.ceil(Math.max(...lines.map((text) => ctx.measureText(text).width))) + padX * 2;
+    const maxX = this._chartFrame?.metrics?.chartWidth || this._canvasW || 400;
+    const maxY = (this._canvasH || 300) - 28;
+    let bx = Math.min(Math.max(4, cx - boxW / 2), Math.max(4, maxX - boxW - 4));
+    let by = up ? top - boxH - 8 : bottom + 8;
+    if (by < 4) by = Math.min(bottom + 8, maxY - boxH);
+    if (by + boxH > maxY) by = Math.max(4, top - boxH - 8);
+    const r = 5;
+    ctx.fillStyle = bubble;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by); ctx.lineTo(bx + boxW - r, by); ctx.quadraticCurveTo(bx + boxW, by, bx + boxW, by + r);
+    ctx.lineTo(bx + boxW, by + boxH - r); ctx.quadraticCurveTo(bx + boxW, by + boxH, bx + boxW - r, by + boxH);
+    ctx.lineTo(bx + r, by + boxH); ctx.quadraticCurveTo(bx, by + boxH, bx, by + boxH - r);
+    ctx.lineTo(bx, by + r); ctx.quadraticCurveTo(bx, by, bx + r, by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    lines.forEach((text, i) => ctx.fillText(text, bx + boxW / 2, by + 5 + lineH * i + lineH / 2));
+    ctx.restore();
   },
 
   drawMeasurement(ctx, pts, drawing) {
