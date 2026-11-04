@@ -10,12 +10,26 @@
 --
 -- As with earlier shared codes only the one-way SHA-256 hash is stored; the
 -- plaintext keys appear nowhere in the database, this file or frontend code.
+-- This file is self-contained on top of 20261028094229: it also (re)creates the
+-- columns/claims layout from 20261101035300 if missing and makes sure the two
+-- promo codes NEWFX and FIRST9 exist, so one run fixes any earlier gap.
+-- Matching is now case-insensitive for codes stored under their UPPERCASE hash
+-- (NEWFX, FIRST9): 'newfx' and 'Newfx' redeem and share one per-account count.
 -- Mobile keyboards often capitalise the first letter, so each key is stored in
 -- three spellings (lowercase, Capitalised, UPPERCASE). Product per key:
 --   e24dd221… (+2 case variants) -> golden_vip
 --   5a6760b9… (+2 case variants) -> golden_vip
 --   1a80b069… (+2 case variants) -> red
 --   07ed4007… (+2 case variants) -> purple
+alter table public.vip_access_codes
+  add column if not exists duration_hours integer check(duration_hours is null or duration_hours > 0),
+  add column if not exists max_redemptions_per_account integer not null default 1 check(max_redemptions_per_account > 0),
+  add column if not exists price_inr integer not null default 0 check(price_inr >= 0);
+alter table public.vip_access_claims drop constraint if exists vip_access_claims_pkey;
+alter table public.vip_access_claims add column if not exists id bigint generated always as identity;
+alter table public.vip_access_claims add primary key (id);
+create index if not exists vip_access_claims_user_key_idx on public.vip_access_claims(user_id, key_hash);
+
 alter table public.vip_access_codes
   add column if not exists no_expiry boolean not null default false;
 -- NULL = unlimited redemptions per account. Existing rows keep their numeric limit.
@@ -27,7 +41,7 @@ declare
   uid uuid:=auth.uid(); hash text; product text; plan text; ends timestamptz;
   attempts_count integer; sub public.subscriptions%rowtype;
   private_key public.vip_redemptions%rowtype; shared boolean:=false;
-  duration_h integer; max_redemptions integer; redemption_count integer; no_exp boolean;
+  duration_h integer; max_redemptions integer; redemption_count integer; no_exp boolean; alt text;
 begin
   if uid is null then raise exception 'Authentication required'; end if;
   if length(trim(redemption_key))<3 or length(redemption_key)>256 then return jsonb_build_object('ok',false,'reason','invalid'); end if;
@@ -41,6 +55,15 @@ begin
   if not found then raise exception 'Subscription record is missing'; end if;
   hash:=encode(sha256(convert_to(trim(redemption_key),'UTF8')),'hex');
   select product_code,duration_hours,max_redemptions_per_account,no_expiry into product,duration_h,max_redemptions,no_exp from public.vip_access_codes where key_hash=hash and active;
+  if not found then
+    -- Promo codes are stored under their UPPERCASE hash; accept any capitalisation.
+    -- Claims are recorded under that canonical hash so limits are shared.
+    alt:=encode(sha256(convert_to(upper(trim(redemption_key)),'UTF8')),'hex');
+    if alt<>hash then
+      select product_code,duration_hours,max_redemptions_per_account,no_expiry into product,duration_h,max_redemptions,no_exp from public.vip_access_codes where key_hash=alt and active;
+      if found then hash:=alt; end if;
+    end if;
+  end if;
   if found then
     shared:=true;
     select count(*) into redemption_count from public.vip_access_claims where user_id=uid and key_hash=hash;
@@ -87,3 +110,12 @@ insert into public.vip_access_codes (key_hash, product_code, duration_hours, max
 on conflict (key_hash) do update set
   product_code=excluded.product_code, duration_hours=null, max_redemptions_per_account=null,
   price_inr=0, active=true, no_expiry=true;
+
+-- The two promo codes. Inserted only if missing, so any change you made to them
+-- in the table is left alone.
+--   NEWFX   -> Red · Elite,   6 hours,  free, redeemable twice per account
+--   FIRST9  -> Purple · Pro, 24 hours, ₹9,   redeemable once per account
+insert into public.vip_access_codes (key_hash, product_code, duration_hours, max_redemptions_per_account, price_inr, active, no_expiry) values
+  ('d7cb7932594d754ff9acc29954bdd4f7ccbc9200edd365db1a1f372b1642df1e', 'red', 6, 2, 0, true, false),
+  ('a97be70dfd0ec05f5129e42560d7f4bf1687cd75efd706fc9edeb00f14df5369', 'purple', 24, 1, 9, true, false)
+on conflict (key_hash) do nothing;
