@@ -35,6 +35,7 @@ jobs:
           node tests/supabase_auth.test.js
           node tests/billing_navigation.test.js
           node tests/subscription_page.test.js
+          node tests/promo_codes_ui.test.js
           node tests/billing_core.test.js
           node tests/checkout_accounts.test.js
           node tests/billing_checkout.test.js

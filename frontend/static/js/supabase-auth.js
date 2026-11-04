@@ -158,6 +158,7 @@
     if (pillAvatar) pillAvatar.textContent = displayName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("") || "U";
     if (el("authAccountName")) el("authAccountName").textContent = displayName;
     if (el("authAccountEmail")) el("authAccountEmail").textContent = user?.email || "";
+    if (user && !state.devChecked) { state.devChecked = true; checkDeveloper().then((ok) => { state.isDeveloper = ok; if (ok && el("authAccountName") && !el("authDevBadge")) { const b = document.createElement("span"); b.id = "authDevBadge"; b.className = "dev-badge"; b.textContent = "DEV"; el("authAccountName").after(b); } }); }
     if (el("authProfileName")) el("authProfileName").value = state.profile?.full_name || user?.user_metadata?.full_name || "";
     if (el("authAccountAvatar")) el("authAccountAvatar").textContent = displayName[0]?.toUpperCase() || "U";
     const trustedPlan = window.SubscriptionSystem?.normalizePlan?.(state.subscription) || "blue";
@@ -359,6 +360,19 @@
     }
   }
   window.addEventListener("intensefx:subscription-changed", renderAccount);
+  async function checkDeveloper() {
+    if (!state.client || !state.session) return false;
+    try { const { data, error } = await state.client.rpc("is_developer"); return !error && data === true; } catch (_) { return false; }
+  }
+  async function devCall(fn, args) {
+    if (!state.client || !state.session) return { ok: false, reason: "forbidden" };
+    const { data, error } = await state.client.rpc(fn, args);
+    if (error) return { ok: false, reason: "error" };
+    return data || { ok: false, reason: "error" };
+  }
+  const devCreatePromo = o => devCall("dev_create_promo_code", { p_code: o.code, p_product: o.product, p_duration_hours: o.hours, p_unlimited_time: !!o.unlimitedTime, p_max_per_account: o.perAccount, p_note: o.note || null });
+  const devListPromos = () => devCall("dev_list_promo_codes", {});
+  const devSetPromoActive = (hash, active) => devCall("dev_set_promo_active", { p_key_hash: hash, p_active: !!active });
   async function redeemVipKey(key) {
     if (!state.client || !state.session) return { ok: false, message: "Sign in with a configured account before redeeming a VIP key." };
     const { data, error } = await state.client.rpc("redeem_vip_key", { redemption_key: key });
@@ -380,5 +394,5 @@
     if (data?.error) throw new Error(data.error);
     return data;
   }
-  window.IntenseFXAuth = { initialize, billingRequest, refreshSubscription: fetchAccountData, redeemVipKey, getUser: () => state.session?.user || null, getPlan: () => window.SubscriptionSystem?.getUserPlan?.().code || state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
+  window.IntenseFXAuth = { initialize, checkDeveloper, devCreatePromo, devListPromos, devSetPromoActive, billingRequest, refreshSubscription: fetchAccountData, redeemVipKey, getUser: () => state.session?.user || null, getPlan: () => window.SubscriptionSystem?.getUserPlan?.().code || state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
 })();

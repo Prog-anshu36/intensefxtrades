@@ -1784,3 +1784,17 @@ body.resizing-chart-bottom-panel .tv-bottom-resize-handle::after {
 .sidebar.collapsed .account-hub-launcher { padding:10px 4px; min-width:0; overflow:hidden; }
 .sidebar.collapsed .account-hub-launcher b { display:none; }
 .sidebar.collapsed .account-hub-launcher span { font-size:8px; letter-spacing:0; }
+
+/* Promo codes + developer mode */
+.dev-badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:#efc75e;color:#1b1608;font-size:10px;font-weight:800;letter-spacing:.08em;vertical-align:middle}
+.dev-promo-panel{display:block}
+.dev-promo-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:14px;align-items:end}
+.dev-promo-form label{display:grid;gap:4px;font-size:12px;opacity:.9}
+.dev-promo-form input[type=text],.dev-promo-form input[type=number],.dev-promo-form select{padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:inherit;font:inherit;min-width:0}
+.dev-promo-form .dev-inline{display:flex;gap:6px}.dev-promo-form .dev-check{display:flex;align-items:center;gap:8px}.dev-promo-form .dev-wide{grid-column:1/-1}
+.dev-promo-form button,.dev-promo-list button{padding:8px 14px;border-radius:8px;border:0;background:#2962ff;color:#fff;font-weight:700;cursor:pointer}
+#devPromoMessage{font-size:12px}#devPromoMessage[data-kind=error]{color:#f23645}#devPromoMessage[data-kind=success]{color:#26a69a}
+.dev-promo-list{margin-top:14px;overflow-x:auto;font-size:13px}.dev-promo-list table{width:100%;border-collapse:collapse}
+.dev-promo-list th,.dev-promo-list td{text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.1)}.dev-promo-list small{display:block;opacity:.7}.dev-promo-list .is-off{opacity:.5}
+.dev-promo-list button{background:transparent;border:1px solid currentColor;padding:4px 10px}
+#promoCodeMessage[data-kind=error]{color:#f23645}#promoCodeMessage[data-kind=success]{color:#26a69a}

@@ -335,3 +335,6 @@ body.light-mode .tv-bottom-resize-handle { background:var(--bg-card-alt); }
 body.light-mode .tv-bottom-resize-handle::after { background:#b7c4d6; }
 
 
+
+body.light .dev-promo-form input[type=text],body.light .dev-promo-form input[type=number],body.light .dev-promo-form select,html[data-theme=light] .dev-promo-form input[type=text],html[data-theme=light] .dev-promo-form input[type=number],html[data-theme=light] .dev-promo-form select{border-color:rgba(0,0,0,.2);background:#fff}
+body.light .dev-promo-list th,body.light .dev-promo-list td,html[data-theme=light] .dev-promo-list th,html[data-theme=light] .dev-promo-list td{border-color:rgba(0,0,0,.12)}
