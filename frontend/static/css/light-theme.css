@@ -163,4 +163,175 @@ body.light-mode .command-palette,
 body.light-mode .toast,
 body.light-mode .notification-panel { background:#fff; color:#1a263a; border-color:#d6deea; }
 
+/* Components that predate the shared colour tokens used fixed dark values.
+   Keep this layer last so the complete application remains readable in light mode. */
+body.light-mode .subscription-page,
+body.light-mode .subscription-heading h2,
+body.light-mode .subscription-gate h2 { color:var(--text-primary); }
+body.light-mode .subscription-heading p,
+body.light-mode .subscription-gate p,
+body.light-mode .ui-subscription-copy { color:var(--text-secondary); }
+body.light-mode .subscription-kicker { color:#5376ad; }
+body.light-mode .subscription-current {
+  border-color:color-mix(in srgb,var(--plan-color) 35%,#c9d5e6);
+  background:color-mix(in srgb,var(--plan-color) 8%,#fff);
+  box-shadow:var(--shadow-sm);
+}
+body.light-mode .subscription-current small,
+body.light-mode .subscription-current em { color:var(--text-tertiary); }
+body.light-mode .subscription-card {
+  border-color:var(--border);
+  background:linear-gradient(155deg,color-mix(in srgb,var(--plan-color) 7%,#fff),#fff 58%);
+  color:var(--text-primary);
+  box-shadow:var(--shadow-sm);
+}
+body.light-mode .subscription-card.is-current { box-shadow:0 0 0 1px color-mix(in srgb,var(--plan-color) 20%,transparent),var(--shadow-md); }
+body.light-mode .subscription-price { color:var(--text-primary); }
+body.light-mode .subscription-price small,
+body.light-mode .subscription-card ul,
+body.light-mode .subscription-no-checkout { color:var(--text-secondary); }
+body.light-mode .subscription-cta,
+body.light-mode .subscription-secondary {
+  border-color:color-mix(in srgb,var(--plan-color) 48%,#cbd6e6);
+  background:color-mix(in srgb,var(--plan-color) 10%,#fff);
+}
+body.light-mode .subscription-footnote,
+body.light-mode .subscription-comparison,
+body.light-mode .subscription-manage {
+  border-color:var(--border);
+  background:var(--bg-card);
+  color:var(--text-secondary);
+  box-shadow:var(--shadow-sm);
+}
+body.light-mode .subscription-footnote b,
+body.light-mode .subscription-manage b { color:var(--text-primary); }
+body.light-mode .subscription-manage span,
+body.light-mode .subscription-comparison thead th:first-child,
+body.light-mode .subscription-comparison tbody th,
+body.light-mode .subscription-comparison tbody td small { color:var(--text-secondary); }
+body.light-mode .subscription-comparison th,
+body.light-mode .subscription-comparison td { border-color:var(--border-soft); }
+body.light-mode .subscription-comparison tbody td.excluded { color:#8b98aa; }
+body.light-mode .subscription-gate {
+  background:color-mix(in srgb,var(--plan-color) 6%,#fff);
+  border-color:color-mix(in srgb,var(--plan-color) 40%,#cbd6e6);
+}
+body.light-mode .subscription-manage button { background:var(--bg-card-alt); border-color:var(--border); color:var(--text-secondary); }
+body.light-mode .user-plan-badge { background:color-mix(in srgb,var(--plan-color,#4388ff) 9%,#fff); border-color:color-mix(in srgb,var(--plan-color,#4388ff) 38%,#cbd6e6); }
+body.light-mode .user-plan-badge #userPlanCountdown { color:color-mix(in srgb,var(--plan-color,#4388ff) 82%,#23344f); }
+
+body.light-mode .vip-key-panel {
+  border-color:#bfd0e9;
+  background:linear-gradient(115deg,rgba(67,136,255,.1),#fff 58%);
+  box-shadow:var(--shadow-sm);
+}
+body.light-mode .vip-key-panel h3 { color:var(--text-primary); }
+body.light-mode .vip-key-panel p,
+body.light-mode .vip-key-entry span { color:var(--text-secondary); }
+body.light-mode .vip-key-entry input { background:#fff; border-color:#c7d3e4; color:var(--text-primary); }
+body.light-mode .golden-vip-pass { background:linear-gradient(115deg,rgba(179,133,32,.15),rgba(255,255,255,.98)); }
+
+body.light-mode .desktop-workspace-bar { background:rgba(239,244,251,.92); border-color:#d8e2ef; }
+body.light-mode .desktop-ws-btn,
+body.light-mode .desktop-ws-icon,
+body.light-mode .desktop-tab,
+body.light-mode .desktop-tab-add {
+  border-color:#cbd7e7;
+  background:linear-gradient(180deg,#fff,#f1f5fa);
+  color:#526078;
+  box-shadow:0 1px 0 #fff inset,0 4px 10px rgba(28,42,66,.06);
+}
+body.light-mode .desktop-ws-btn:hover,
+body.light-mode .desktop-ws-icon:hover,
+body.light-mode .desktop-tab:hover { background:#eaf2fd; border-color:#8eafe2; color:#1f3d69; }
+body.light-mode .desktop-tabs { border-bottom-color:#cfd9e7; background:linear-gradient(180deg,#f8fafd,#edf2f8); }
+body.light-mode .desktop-tabs::after { opacity:.6; }
+body.light-mode .desktop-tab.active { color:#183d73; border-color:#76a2e9; background:linear-gradient(180deg,#eaf3ff,#dceaff); box-shadow:0 7px 18px rgba(37,99,235,.12),0 0 0 1px rgba(91,147,255,.1) inset; }
+body.light-mode .desktop-tab i:hover { color:#b4232f; background:rgba(242,54,69,.12); }
+body.light-mode .desktop-tab-add { color:#2865c7; }
+body.light-mode .desktop-tab-add:hover { color:#176f52; background:linear-gradient(180deg,#e8f8f0,#d9f1e5); }
+
+body.light-mode #sidebar > div:has(> #pagesBackup) {
+  border-color:#cfdae9;
+  background:linear-gradient(145deg,#f9fbff,#eaf1fa);
+  box-shadow:var(--shadow-sm);
+}
+body.light-mode #sidebar > div:has(> #pagesBackup) > div:first-child { color:var(--text-secondary); }
+body.light-mode #sidebar #pagesBackup,
+body.light-mode #sidebar #pagesRestore { background:#fff; border-color:#c9d7e9; color:#345071; }
+body.light-mode #sidebar #pagesBackup:hover,
+body.light-mode #sidebar #pagesRestore:hover { background:#edf4ff; border-color:#6999e8; color:#173d70; }
+
+body.light-mode .auth-gate { background:radial-gradient(circle at 50% 15%,rgba(61,127,255,.13),transparent 34%),var(--bg-app); }
+body.light-mode .auth-card { color:var(--text-primary); box-shadow:0 24px 80px rgba(28,42,66,.16); }
+body.light-mode .auth-card::after { background:rgba(255,255,255,.96); }
+body.light-mode .auth-brand-copy strong,
+body.light-mode .auth-heading { color:var(--text-primary); }
+body.light-mode .auth-brand-copy small,
+body.light-mode .auth-lead,
+body.light-mode .auth-field,
+body.light-mode .auth-links,
+body.light-mode .auth-terms { color:var(--text-secondary); }
+body.light-mode .auth-field input { background:#fff; border-color:#c8d4e4; color:var(--text-primary); }
+body.light-mode .auth-google,
+body.light-mode .auth-secondary { background:#fff; border-color:#c8d4e4; color:var(--text-primary); }
+body.light-mode .auth-google:hover,
+body.light-mode .auth-secondary:hover { background:#f0f5fc; }
+body.light-mode .auth-divider { color:var(--text-tertiary); }
+body.light-mode .auth-divider::before,
+body.light-mode .auth-divider::after { background:#d7e0ec; }
+body.light-mode .auth-notice { background:#eff5ff; border-color:#c7d8f2; color:#36527a; }
+body.light-mode .auth-account-popover { background:#fff; border-color:var(--border); box-shadow:var(--shadow-lg); color:var(--text-primary); }
+
+body.light-mode .tv-icon-action,
+body.light-mode .tv-statusbar,
+body.light-mode .tv-indicator-strip,
+body.light-mode .tv-session-status,
+body.light-mode .tv-order-card,
+body.light-mode .tv-watchlist,
+body.light-mode .tv-object-settings,
+body.light-mode .tv-tool-help,
+body.light-mode .tv-drawing-manager,
+body.light-mode .bt-bottom-tabs,
+body.light-mode .bt-panel,
+body.light-mode .journal-form,
+body.light-mode .journal-field,
+body.light-mode .trade-detail-panel {
+  background:var(--bg-card);
+  border-color:var(--border);
+  color:var(--text-primary);
+}
+body.light-mode .tv-icon-action,
+body.light-mode .tv-status-item,
+body.light-mode .tv-status-item b,
+body.light-mode .tv-detail-title b,
+body.light-mode .tv-key-stats b,
+body.light-mode .tv-clock,
+body.light-mode .tv-tool-help p,
+body.light-mode .tv-tool-help summary small,
+body.light-mode .tv-drawing-opacity-control,
+body.light-mode .tv-drawing-opacity-control output,
+body.light-mode .tv-opacity-field output,
+body.light-mode .journal-form label { color:var(--text-secondary); }
+body.light-mode .tv-icon-action:hover,
+body.light-mode .tv-watch-row:hover,
+body.light-mode .tv-watch-row.active,
+body.light-mode .tv-range-row button:hover { background:var(--bg-hover); color:var(--text-primary); }
+body.light-mode .tv-status-sep,
+body.light-mode .tv-divider { background:var(--border); }
+body.light-mode .tv-tool-help button,
+body.light-mode .tv-tool-help input,
+body.light-mode .tv-object-settings button,
+body.light-mode .tv-object-settings input,
+body.light-mode .tv-object-settings select { background:#fff; color:var(--text-primary); border-color:#c8d4e4; }
+body.light-mode .propfirm-page input,
+body.light-mode .propfirm-page select,
+body.light-mode .prop-workspace-header select { color-scheme:light; }
+body.light-mode .prop-account-overview .prop-radar { background:linear-gradient(125deg,#edf5ff,#dcecff); border-color:#b6d0ef; color:var(--text-primary); }
+body.light-mode .prop-account-overview .prop-radar :is(h3,b,summary) { color:var(--text-primary); }
+body.light-mode .prop-account-overview .prop-radar svg text { fill:var(--text-secondary); }
+body.light-mode .prop-account-overview .prop-radar-value { fill:rgba(61,127,255,.19); stroke:#3478f6; }
+body.light-mode .tv-bottom-resize-handle { background:var(--bg-card-alt); }
+body.light-mode .tv-bottom-resize-handle::after { background:#b7c4d6; }
+
 
