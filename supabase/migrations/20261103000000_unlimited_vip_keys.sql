@@ -47,8 +47,8 @@ begin
   if length(trim(redemption_key))<3 or length(redemption_key)>256 then return jsonb_build_object('ok',false,'reason','invalid'); end if;
   insert into public.vip_access_attempts values(uid,now(),1)
     on conflict(user_id) do update set
-      attempts=case when public.vip_access_attempts.window_started>now()-interval '10 minutes' then public.vip_access_attempts.attempts+1 else 1 end,
-      window_started=case when public.vip_access_attempts.window_started>now()-interval '10 minutes' then public.vip_access_attempts.window_started else now() end
+      attempts=case when public.vip_access_attempts.window_started>now()-interval '1 minute' then public.vip_access_attempts.attempts+1 else 1 end,
+      window_started=case when public.vip_access_attempts.window_started>now()-interval '1 minute' then public.vip_access_attempts.window_started else now() end
     returning attempts into attempts_count;
   if attempts_count>5 then return jsonb_build_object('ok',false,'reason','rate_limited'); end if;
   select * into sub from public.subscriptions where user_id=uid for update;
