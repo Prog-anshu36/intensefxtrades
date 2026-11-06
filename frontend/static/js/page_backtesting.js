@@ -1372,8 +1372,11 @@ const PageBacktesting = {
     const selectedName = selectedDef?.name || "Session";
     const dateValue = this.sessionNavigator.date || this.sessionDateValue(null, selectedType);
     const defs = Object.values(config.definitions);
+    const fxn = this.getFxnIndicator();
+    const fxnEnabled = !!fxn?.config?.enabled;
+    const fxnAvailable = window.SubscriptionSystem?.canAccessFeature?.("technicalIndicators") !== false;
     return `<div class="replay-card tv-session-panel">
-      <div class="tv-panel-head"><b>Session Navigator</b><button class="tv-mini-panel-btn" id="sessionPanelHideBtn" title="Hide Session Navigator">Hide</button></div>
+      <div class="tv-panel-head"><b>Session Navigator</b><span class="tv-session-fxn-link" title="Asia, London and New York session boundaries follow FXN's saved settings and DST handling">FXN-linked · IST</span><button class="tv-mini-panel-btn" id="sessionFxnToggle" ${fxnAvailable ? '' : 'data-plan-feature="technicalIndicators"'} title="${fxnAvailable ? 'Show or hide the FXN session overlay' : 'FXN indicator requires Purple · Pro'}">FXN ${fxnEnabled ? 'ON' : 'OFF'}</button><button class="tv-mini-panel-btn" id="sessionPanelHideBtn" title="Hide Session Navigator">Hide</button></div>
       <div class="tv-session-status"><b>${this.escapeHtml(currentText)}</b><span>${this.escapeHtml(currentMeta)}</span></div>
       <div class="tv-session-quick">
         ${defs.map((def) => `<button class="replay-btn ${def.id === selectedType ? "active" : ""}" data-session-quick="${def.id}" title="Jump to next ${this.escapeHtml(def.name)}">${this.escapeHtml(def.shortName)}</button>`).join("")}
@@ -4590,6 +4593,10 @@ const PageBacktesting = {
     });
     container.querySelector("#sessionPanelHideBtn")?.addEventListener("click", () => this.setSessionPanelHidden(true));
     container.querySelector("#sessionPanelRestoreBtn")?.addEventListener("click", () => this.setSessionPanelHidden(false));
+    const sessionFxnToggle = container.querySelector("#sessionFxnToggle");
+    if (sessionFxnToggle && window.SubscriptionSystem?.canAccessFeature("technicalIndicators")) sessionFxnToggle.addEventListener("click", () => {
+      this.updateFxnSettings({ enabled: !this.getFxnIndicator()?.config?.enabled });
+    });
     container.querySelector("#btnGoSession")?.addEventListener("click", () => this.jumpToSelectedSession());
     container.querySelector("#btnNextSession")?.addEventListener("click", () => this.jumpRelativeSession(1));
     container.querySelector("#btnPrevSession")?.addEventListener("click", () => this.jumpRelativeSession(-1));

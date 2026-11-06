@@ -1834,6 +1834,8 @@ body.settings-watermark-off .tv-chart-watermark { display: none !important; }
 
 .replay-card { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); padding: 14px; }
 .tv-session-panel { display: grid; gap: 10px; }
+.tv-session-panel .tv-panel-head { flex-wrap: wrap; }
+.tv-session-fxn-link { margin-left: auto; white-space: nowrap; color: #72a0ff !important; font-weight: 700; }
 .tv-session-status {
   display: flex;
   align-items: center;
