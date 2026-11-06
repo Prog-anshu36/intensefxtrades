@@ -19,7 +19,7 @@
     if(data.type==='worker-ready'){clearTimeout(workerTimer);resolveWorker();return;}
     if(data.type==='status'){setStatus(data.text);return;}
     const item=pending.get(data.id);if(!item)return;pending.delete(data.id);item.cleanup();
-    if(data.error){const status=document.getElementById('pagesStorageStatus');if(status)status.textContent=data.error;console.error('Browser API:',data.error);item.reject(Error(data.error));}else item.resolve(data.result);
+    if(data.error){const status=document.getElementById('pagesStorageStatus');if(status)status.textContent=data.error;console.error('Browser API:',data.error);item.reject(Error(data.error));}else { item.resolve(data.result); if(item.method && item.method !== 'GET' && item.path.startsWith('/api/')) window.dispatchEvent(new CustomEvent('intensefx:workspace-mutated',{detail:{path:item.path}})); }
   };
   worker.onerror=event=>failWorker(Error(event.message || 'Browser trading engine failed to start.'));
   worker.onmessageerror=()=>failWorker(Error('The browser could not read a workspace response. Please retry.'));
@@ -35,7 +35,7 @@
       const onAbort=()=>fail(new DOMException('Aborted','AbortError'));
       timer=setTimeout(()=>fail(Error('Workspace startup or request timed out. Check your connection and retry.')),180000);
       options.signal?.addEventListener('abort',onAbort,{once:true});
-      pending.set(id,{resolve,reject,timer,cleanup});
+      pending.set(id,{resolve,reject,timer,cleanup,method:options.method||'GET',path});
       worker.postMessage({id,path,method:options.method||'GET',body:options.body||null,contentType:new Headers(options.headers).get('Content-Type')||'application/json',headers:Object.fromEntries(new Headers(options.headers))});
     });
     if(options.signal?.aborted)throw new DOMException('Aborted','AbortError');

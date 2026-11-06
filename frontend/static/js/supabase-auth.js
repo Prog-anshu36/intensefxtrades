@@ -394,5 +394,5 @@
     if (data?.error) throw new Error(data.error);
     return data;
   }
-  window.IntenseFXAuth = { initialize, checkDeveloper, devCreatePromo, devListPromos, devSetPromoActive, billingRequest, refreshSubscription: fetchAccountData, redeemVipKey, getUser: () => state.session?.user || null, getPlan: () => window.SubscriptionSystem?.getUserPlan?.().code || state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
+  window.IntenseFXAuth = { initialize, checkDeveloper, devCreatePromo, devListPromos, devSetPromoActive, billingRequest, refreshSubscription: fetchAccountData, redeemVipKey, getUser: () => state.session?.user || null, getClient: () => state.client, getPlan: () => window.SubscriptionSystem?.getUserPlan?.().code || state.subscription?.plan_code || "blue", getSubscription: () => state.subscription, showGate, setMode };
 })();

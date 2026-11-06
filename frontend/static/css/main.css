@@ -522,6 +522,10 @@ input { font-family: inherit; }
 }
 
 .topbar-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-width: 0; position: relative; z-index: 1; }
+.cloud-history-status { color: var(--text-muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.cloud-history-status[data-state="saving"] { color: var(--accent); }
+.cloud-history-status[data-state="saved"] { color: #22c55e; }
+.cloud-history-status[data-state="error"] { color: #ef4444; }
 .icon-btn {
   width: 36px; height: 36px; border-radius: 10px;
   background: linear-gradient(180deg, rgba(30, 36, 51, .92), rgba(15, 19, 29, .92));

@@ -88,6 +88,7 @@
       this._scope = accountScope();
       try { localStorage.setItem(this.storageKey(), JSON.stringify({ version: 1, selectedId: this.selectedId, attempts: this.attempts })); }
       catch (_) { /* Private mode or full storage: current session remains usable in memory. */ }
+      window.IntenseFXCloudHistory?.schedule?.();
       this.syncChartBadge();
     },
     selected() { return this.attempts.find(a => a.id === this.selectedId) || null; },

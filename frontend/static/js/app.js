@@ -263,6 +263,7 @@ async function startWorkspace() {
   workspaceStarted = true;
   try {
     await Store.init();
+    await window.IntenseFXCloudHistory?.initialize?.();
   } catch (error) {
     workspaceStarted = false;
     const splash = document.getElementById("appSplash");
