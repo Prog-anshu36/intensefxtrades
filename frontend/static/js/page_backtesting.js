@@ -6664,6 +6664,15 @@ const PageBacktesting = {
   previewOrder(type) {
     const candle = this.candles[this.idx];
     if (!candle || this._placingOrder || (MarketData.isLocal(this.symbol) && (this.dataSource !== 'local-csv' || this._historyError))) return;
+    const practiceCheck = this.practiceController?.canTradeAt?.(candle.time + this.candleDuration(), this.symbol);
+    if (practiceCheck && !practiceCheck.ok) {
+      // Never create a confirmation overlay for a replay position that cannot
+      // legally trade. A stale overlay previously made Buy/Sell appear stuck.
+      this.orderDraft = null;
+      toast(practiceCheck.message, "error");
+      this.rerender();
+      return;
+    }
     this.stopPlay();
     if (!this.practiceController && typeof UI !== "undefined" && !UI.getSetting?.("confirmBeforeOrder")) {
       this.placeTrade(type);
@@ -6721,13 +6730,30 @@ const PageBacktesting = {
   async confirmOrderDraft() {
     const draft = this.orderDraft;
     if (!draft || this._placingOrder) return;
+    const candle = this.candles[this.idx];
+    const practiceCheck = candle && this.practiceController?.canTradeAt?.(candle.time + this.candleDuration(), this.symbol);
+    if (practiceCheck && !practiceCheck.ok) {
+      // Replay moved (or its evaluation clock advanced) after the preview was
+      // opened. Discard it rather than trapping the trader behind a stale
+      // confirmation bar; they can preview again at the current candle.
+      this.orderDraft = null;
+      toast(practiceCheck.message, "error");
+      this.rerender();
+      return;
+    }
     const sameContext = draft.symbol === this.symbol && draft.timeframe === this.timeframe && draft.time === this.candles[this.idx]?.time && draft.orderTab === this.orderTab && draft.entry === Number(this.orderPrice(draft.type));
     const direction = draft.type === 'BUY' ? 1 : -1;
     const valid = Number.isFinite(draft.entry) && draft.entry > 0 && Number.isFinite(draft.lots) && draft.lots > 0 &&
       (draft.sl == null || (Number.isFinite(draft.sl) && draft.sl > 0 && direction * (draft.entry - draft.sl) > 0)) &&
       (draft.tp == null || (Number.isFinite(draft.tp) && draft.tp > 0 && direction * (draft.tp - draft.entry) > 0));
     if (!sameContext || !valid) {
-      draft.error = !sameContext ? 'Chart time or order entry changed. Cancel and preview again.' : 'SL and TP must be on the correct sides of entry; prices and lots must be positive.';
+      if (!sameContext) {
+        this.orderDraft = null;
+        toast('Replay position changed. Preview a new order at the current candle.', 'info');
+        this.rerender();
+        return;
+      }
+      draft.error = 'SL and TP must be on the correct sides of entry; prices and lots must be positive.';
       this.rerender();
       return;
     }
@@ -6746,7 +6772,7 @@ const PageBacktesting = {
     if (!c) return;
     const practiceCheck = this.practiceController?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) {
-      if (draft) { draft.error = practiceCheck.message; this.rerender(); }
+      if (draft && this.orderDraft === draft) this.orderDraft = null;
       toast(practiceCheck.message, "error"); return;
     }
     const meta = MarketData.getMeta(this.symbol);
