@@ -2,7 +2,7 @@
 (() => {
   "use strict";
   const RETRIES = [1000, 3000, 8000];
-  const state = { started: false, dirty: false, saving: false, timer: null, lastPayload: "", userId: null };
+  const state = { started: false, dirty: false, saving: false, timer: null, lastPayload: "", userId: null, revision: 0 };
 
   const iso = (value) => {
     const date = new Date(value || 0);
@@ -131,21 +131,34 @@
   }
   async function save(attempt = 0) {
     if (!state.started || !state.dirty || state.saving || !navigator.onLine) return;
-    state.saving = true; status("Saving…", "saving");
+    state.saving = true;
+    const revisionAtStart = state.revision;
+    status("Saving…", "saving");
     try {
       const snapshot = await backup();
       const serial = JSON.stringify(snapshot);
       if (serial !== state.lastPayload) await writeSnapshot(snapshot);
-      state.lastPayload = serial; state.dirty = false; status("Saved", "saved");
+      state.lastPayload = serial;
+      // A mutation can arrive while a network write is in flight. Do not clear
+      // it here: queue one more pass with the newer browser workspace instead.
+      state.dirty = state.revision !== revisionAtStart;
+      status(state.dirty ? "Saving latest change…" : "Saved", state.dirty ? "saving" : "saved");
     } catch (error) {
       state.dirty = true;
       if (attempt < RETRIES.length) window.setTimeout(() => save(attempt + 1), RETRIES[attempt]);
       else status("Cloud sync pending", "error");
       console.warn("Cloud history sync failed", error);
-    } finally { state.saving = false; }
+    } finally {
+      state.saving = false;
+      if (state.dirty && attempt === 0) {
+        window.clearTimeout(state.timer);
+        state.timer = window.setTimeout(() => save(), 0);
+      }
+    }
   }
   function schedule() {
     if (!state.started) return;
+    state.revision += 1;
     state.dirty = true; window.clearTimeout(state.timer);
     state.timer = window.setTimeout(() => save(), 800);
   }
@@ -167,6 +180,8 @@
     window.addEventListener("intensefx:workspace-mutated", schedule);
     window.addEventListener("intensefx:prop-evaluation-mutated", schedule);
     window.addEventListener("online", schedule);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") schedule(); });
+    window.addEventListener("pagehide", () => { schedule(); save(); });
   }
   window.IntenseFXCloudHistory = { initialize, schedule, save };
 })();
