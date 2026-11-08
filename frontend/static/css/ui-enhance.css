@@ -1798,3 +1798,9 @@ body.resizing-chart-bottom-panel .tv-bottom-resize-handle::after {
 .dev-promo-list th,.dev-promo-list td{text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.1)}.dev-promo-list small{display:block;opacity:.7}.dev-promo-list .is-off{opacity:.5}
 .dev-promo-list button{background:transparent;border:1px solid currentColor;padding:4px 10px}
 #promoCodeMessage[data-kind=error]{color:#f23645}#promoCodeMessage[data-kind=success]{color:#26a69a}
+
+/* Golden VIP: custom evaluation month picker */
+.propfirm-eval-month-note{font-size:12px;opacity:.75;margin:4px 0 10px}
+.propfirm-eval-month-picker{display:block;margin:4px 0 10px;font-size:13px}
+.propfirm-eval-month-picker select{display:block;margin-top:4px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:inherit;font:inherit;width:100%}
+.propfirm-eval-month-picker small{display:block;margin-top:4px;opacity:.7}

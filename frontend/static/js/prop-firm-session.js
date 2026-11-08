@@ -35,6 +35,10 @@
     let pool = EVAL_MONTHS.filter(m => !used.has(`${m.year}-${m.month}`));
     if (!pool.length) pool = EVAL_MONTHS; // every month already used on this account: allow repeats again
     const { year, month } = pickWeighted(pool);
+    return evaluationWindowFor(year, month);
+  }
+  // Golden VIP only: pick any supported month yourself instead of a random one.
+  function evaluationWindowFor(year, month) {
     const start = Date.UTC(year, month, 1, 0, 0, 0);
     const end = Date.UTC(year, month + 1, 1, 0, 0, 0) - 1; // last millisecond of the month
     return { start, end, year, month, label: new Date(start).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) };
@@ -92,6 +96,7 @@
       this._scope = scope;
       this.currentMarketTime = null;
       this.creating = false;
+      this.customMonth = null;
       this.workspaceError = null;
       try {
         const stored = JSON.parse(localStorage.getItem(this.storageKey()) || "{}");
@@ -113,6 +118,8 @@
     selected() { return this.attempts.find(a => a.id === this.selectedId) || null; },
     practiceAttempt() { return this.attempts.find(a => !a.archived && (a.status === "active" || a.status === "phase-ready")) || null; },
     rulesFor(attempt) { return attempt?.rules || MODELS[attempt?.model || this.model]; },
+    isGoldenVip() { return window.SubscriptionSystem?.getUserPlan?.()?.productCode === 'golden_vip'; },
+    evalMonthOptions() { return EVAL_MONTHS; },
     rename(id, name) {
       const attempt = this.attempts.find(a => a.id === id);
       const clean = String(name || '').trim();
@@ -187,6 +194,14 @@
       const dailyLossPct = model === 'standard' ? Number(options.dailyLossPct ?? this.standardDailyLoss) : rules.dailyLossPct;
       const minDays = model === 'standard' ? Number(options.minDays ?? this.standardMinDays) : rules.minDays;
       if ((model === 'standard' && (![3,5].includes(dailyLossPct) || ![0,3].includes(minDays)))) return {ok:false, message:'Choose a supported Standard rule variant.'};
+      // Golden VIP can pick its own month instead of a random one; everyone
+      // else's choice is ignored (re-checked here, not just hidden in the UI).
+      let evaluationWindow = null;
+      if (options.customMonth && this.isGoldenVip()) {
+        const [y, m] = String(options.customMonth).split("-").map(Number);
+        if (EVAL_MONTHS.some(em => em.year === y && em.month === m)) evaluationWindow = evaluationWindowFor(y, m);
+      }
+      if (!evaluationWindow) evaluationWindow = randomEvaluationWindow(this.attempts.map(a => a.evaluationWindow).filter(Boolean));
       const state = window.PropPracticeWorkspace ? {} : (window.Store?.state || {});
       const now = Date.now();
       const attempt = { id: `practice-${now}-${Math.random().toString(36).slice(2, 8)}`, model, startingBalance: amount,
@@ -194,7 +209,7 @@
         name: `${rules.name} ${this.attempts.length + 1}`, phase: 1, status: "active", startedAt: new Date(now).toISOString(), phaseStartedAt: new Date(now).toISOString(),
         deadlineAt: new Date(now + 14 * DAY_MS).toISOString(), phaseBaselineKeys: this.baselineKeys(state), dailyBaselines: {},
         lastMarketTimestamp: null, breachReason: "", completedAt: null,
-        evaluationWindow: randomEvaluationWindow(this.attempts.map(a => a.evaluationWindow).filter(Boolean)) };
+        evaluationWindow };
       this.attempts.unshift(attempt);
       this.currentMarketTime = null;
       this.selectedId = attempt.id;
@@ -360,7 +375,15 @@
       return this.renderPortal(createMarkup,attempt,rules,summary);
     },
     renderCreation() {
-      return `<section class="propfirm-card propfirm-create"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">CREATE ACCOUNT</span><h3>Add a practice account</h3><p>Create multiple independent rounds. Each account keeps its own balance, trades, replay, drawings, and objectives.</p></div><span class="propfirm-badge">XAUUSD PRACTICE</span></div><div class="propfirm-plan-grid">${Object.entries(MODELS).map(([code, model]) => `<button type="button" class="propfirm-plan-card ${code === "pro" ? "pro" : "standard"} ${this.model === code ? "selected" : ""}" data-select-model="${code}" aria-pressed="${this.model === code}"><span class="propfirm-plan-kicker">${code === "pro" ? "2 STEP PRO" : "2 STEP STANDARD"}</span><b class="propfirm-plan-title">${code === "pro" ? "Lean, Fast Efficient" : "Maximum Drawdown Space"}</b><span class="propfirm-plan-summary">${code === "pro" ? "Lower daily loss limit · built for focused traders" : "More breathing room · higher overall drawdown"}</span><span class="propfirm-plan-metrics"><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Daily loss limit <b>${code === "standard" ? this.standardDailyLoss : model.dailyLossPct}%</b></span><span>Max drawdown <b>${model.maxLossPct}% static</b></span><span>Leverage reference <b>up to 1:100</b></span><span>Min. trading days <b>${code === "standard" ? this.standardMinDays : model.minDays} / phase</b></span></span><span class="propfirm-plan-select">${this.model === code ? "Selected" : "Select this model"} <i>→</i></span></button>`).join("")}</div><div class="propfirm-create-grid"><label>Challenge model<select id="propFirmModel"><option value="standard" ${this.model === "standard" ? "selected" : ""}>2 Step Standard</option><option value="pro" ${this.model === "pro" ? "selected" : ""}>2 Step Pro</option></select></label><label>Virtual starting balance<select id="propFirmSize">${MODELS[this.model].sizes.map(size => `<option value="${size}" ${Number(this.size) === size ? "selected" : ""}>${money(size)}</option>`).join("")}</select></label><label ${this.model !== 'standard' ? 'hidden' : ''}>Standard daily loss<select id="propStandardLoss"><option value="3" ${this.standardDailyLoss === 3 ? 'selected' : ''}>3%</option><option value="5" ${this.standardDailyLoss === 5 ? 'selected' : ''}>5%</option></select></label><label ${this.model !== 'standard' ? 'hidden' : ''}>Minimum trading days<select id="propStandardDays"><option value="0" ${this.standardMinDays === 0 ? 'selected' : ''}>0 per phase</option><option value="3" ${this.standardMinDays === 3 ? 'selected' : ''}>3 per phase</option></select></label><button class="propfirm-primary" id="propFirmStart">Create practice account <span>→</span></button></div><div class="propfirm-rule-preview" id="propFirmRulePreview">${this.model === "standard" ? `Phase 1 target 8% · Phase 2 target 5% · Daily loss ${this.standardDailyLoss}% · Max loss 10% · ${this.standardMinDays} minimum trading days per phase` : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · No minimum trading days"} · 14 calendar days per phase</div></section>`;
+      return `<section class="propfirm-card propfirm-create"><div class="propfirm-section-head"><div><span class="propfirm-eyebrow">CREATE ACCOUNT</span><h3>Add a practice account</h3><p>Create multiple independent rounds. Each account keeps its own balance, trades, replay, drawings, and objectives.</p></div><span class="propfirm-badge">XAUUSD PRACTICE</span></div><div class="propfirm-plan-grid">${Object.entries(MODELS).map(([code, model]) => `<button type="button" class="propfirm-plan-card ${code === "pro" ? "pro" : "standard"} ${this.model === code ? "selected" : ""}" data-select-model="${code}" aria-pressed="${this.model === code}"><span class="propfirm-plan-kicker">${code === "pro" ? "2 STEP PRO" : "2 STEP STANDARD"}</span><b class="propfirm-plan-title">${code === "pro" ? "Lean, Fast Efficient" : "Maximum Drawdown Space"}</b><span class="propfirm-plan-summary">${code === "pro" ? "Lower daily loss limit · built for focused traders" : "More breathing room · higher overall drawdown"}</span><span class="propfirm-plan-metrics"><span>Phase 1 target <b>${model.targets[1]}%</b></span><span>Phase 2 target <b>${model.targets[2]}%</b></span><span>Daily loss limit <b>${code === "standard" ? this.standardDailyLoss : model.dailyLossPct}%</b></span><span>Max drawdown <b>${model.maxLossPct}% static</b></span><span>Leverage reference <b>up to 1:100</b></span><span>Min. trading days <b>${code === "standard" ? this.standardMinDays : model.minDays} / phase</b></span></span><span class="propfirm-plan-select">${this.model === code ? "Selected" : "Select this model"} <i>→</i></span></button>`).join("")}</div><div class="propfirm-create-grid"><label>Challenge model<select id="propFirmModel"><option value="standard" ${this.model === "standard" ? "selected" : ""}>2 Step Standard</option><option value="pro" ${this.model === "pro" ? "selected" : ""}>2 Step Pro</option></select></label><label>Virtual starting balance<select id="propFirmSize">${MODELS[this.model].sizes.map(size => `<option value="${size}" ${Number(this.size) === size ? "selected" : ""}>${money(size)}</option>`).join("")}</select></label><label ${this.model !== 'standard' ? 'hidden' : ''}>Standard daily loss<select id="propStandardLoss"><option value="3" ${this.standardDailyLoss === 3 ? 'selected' : ''}>3%</option><option value="5" ${this.standardDailyLoss === 5 ? 'selected' : ''}>5%</option></select></label><label ${this.model !== 'standard' ? 'hidden' : ''}>Minimum trading days<select id="propStandardDays"><option value="0" ${this.standardMinDays === 0 ? 'selected' : ''}>0 per phase</option><option value="3" ${this.standardMinDays === 3 ? 'selected' : ''}>3 per phase</option></select></label></div>${this.renderEvalMonthPicker()}<div class="propfirm-create-grid"><button class="propfirm-primary" id="propFirmStart">Create practice account <span>→</span></button></div><div class="propfirm-rule-preview" id="propFirmRulePreview">${this.model === "standard" ? `Phase 1 target 8% · Phase 2 target 5% · Daily loss ${this.standardDailyLoss}% · Max loss 10% · ${this.standardMinDays} minimum trading days per phase` : "Phase 1 and 2 target 6% · Daily loss 3% · Max loss 6% · No minimum trading days"} · 14 calendar days per phase</div></section>`;
+    },
+    renderEvalMonthPicker() {
+      const names = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      if (!this.isGoldenVip()) {
+        return `<p class="propfirm-eval-month-note">Evaluation month: picked at random from 2021–2025 (plus Jan 2026), weighted toward the most recent years. <b>Golden VIP</b> can choose any month instead.</p>`;
+      }
+      const months = this.evalMonthOptions();
+      return `<label class="propfirm-eval-month-picker"><span class="propfirm-badge" style="margin-bottom:6px;display:inline-block">GOLDEN VIP</span><br>Evaluation month<select id="propEvalMonth"><option value="">Random (default)</option>${months.map(m => `<option value="${m.year}-${m.month}" ${this.customMonth === `${m.year}-${m.month}` ? "selected" : ""}>${names[m.month]} ${m.year}</option>`).join("")}</select><small>Choose any of the ${months.length} supported months instead of a random one, for this account.</small></label>`;
     },
     renderAccounts() {
       const rows = this.filteredAccounts(), f = this.filters;
@@ -444,8 +467,9 @@
       }));
       model?.addEventListener("change", () => { this.model=model.value; if (!MODELS[this.model].sizes.includes(this.size)) this.size=MODELS[this.model].sizes[0]; this.refreshView(); });
       size?.addEventListener("change", () => { this.size = Number(size.value); });
+      container.querySelector("#propEvalMonth")?.addEventListener("change", event => { this.customMonth = event.target.value || null; });
       container.querySelector("#propFirmStart")?.addEventListener("click", () => {
-        const result = this.create(model?.value || this.model, Number(size?.value || this.size));
+        const result = this.create(model?.value || this.model, Number(size?.value || this.size), { customMonth: this.isGoldenVip() ? this.customMonth : null });
         if (!result.ok) { window.UI?.showToast?.(result.message, "info"); return; }
         this.creating=false;
         window.Router.go("prop-firm-session");
