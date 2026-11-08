@@ -28,7 +28,8 @@ const vm = require('node:vm');
     assert.ok(win && Number.isFinite(win.start) && Number.isFinite(win.end), 'every attempt gets an evaluation window');
     assert.ok(win.start < win.end, 'window has a real span');
     const startDate = new Date(win.start), endDate = new Date(win.end);
-    assert.ok(startDate.getUTCFullYear() >= 2021 && startDate.getUTCFullYear() <= 2025, 'window falls between 2021 and 2025');
+    const y = startDate.getUTCFullYear();
+    assert.ok((y >= 2021 && y <= 2025) || (y === 2026 && startDate.getUTCMonth() === 0), 'window falls between 2021 and 2025, or Jan 2026');
     assert.equal(startDate.getUTCDate(), 1, 'window starts on the 1st of a month');
     assert.equal(startDate.getUTCHours(), 0);
     const nextMonthStart = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, 1);
@@ -38,6 +39,34 @@ const vm = require('node:vm');
   }
   assert.ok(seen.size > 1, 'random month assignment actually varies across accounts');
   console.log('prop_firm_evaluation_lock.test.js: random sealed month assignment passed');
+
+  // No repeat within one account until the 61-month pool is exhausted.
+  page.attempts = [];
+  const months = new Set();
+  for (let i = 0; i < 61; i++) {
+    const win = page.create('standard', 5000).attempt.evaluationWindow;
+    const key = `${win.year}-${win.month}`;
+    assert.ok(!months.has(key), `month ${key} repeated before the pool was exhausted`);
+    months.add(key);
+  }
+  assert.equal(months.size, 61, 'all 61 supported months get used exactly once');
+
+  // 2025 + Jan 2026 are ~30% more likely than any other single month.
+  page.attempts = [];
+  const counts = {};
+  const trials = 30000;
+  for (let i = 0; i < trials; i++) {
+    page.attempts = [];
+    const win = page.create('standard', 5000).attempt.evaluationWindow;
+    const key = `${win.year}-${win.month}`;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  const recentKeys = Object.keys(counts).filter(k => k.startsWith('2025-') || k === '2026-0');
+  const otherKeys = Object.keys(counts).filter(k => !recentKeys.includes(k));
+  const avgRecent = recentKeys.reduce((a, k) => a + counts[k], 0) / recentKeys.length;
+  const avgOther = otherKeys.reduce((a, k) => a + counts[k], 0) / otherKeys.length;
+  const ratio = avgRecent / avgOther;
+  assert.ok(ratio > 1.15 && ratio < 1.45, `recent months should be sampled ~1.3x as often (got ${ratio.toFixed(2)}x)`);
 }
 
 // --- 2) page_backtesting.js: the shared chart engine's Prop Firm management layer ---

@@ -11,14 +11,33 @@
 
   // A real prop firm evaluation trades one fixed, unseen stretch of history — never
   // a window the trader chose. Each account is sealed to one random calendar month
-  // between 2021 and 2025 (inclusive), from the supported local XAUUSD dataset.
-  function randomEvaluationWindow() {
-    const years = [2021, 2022, 2023, 2024, 2025];
-    const year = years[Math.floor(Math.random() * years.length)];
-    const month = Math.floor(Math.random() * 12); // 0-11
+  // from the supported local XAUUSD dataset (full months, 2021 through Jan 2026).
+  // The two most recent years (2025 and Jan 2026) are 30% more likely to be picked
+  // than any other month, and a month already used on one of this account's own
+  // practice accounts is never repeated (until every month has been used once).
+  const EVAL_MONTHS = (() => {
+    const months = [];
+    for (let year = 2021; year <= 2025; year++) for (let month = 0; month < 12; month++) months.push({ year, month });
+    months.push({ year: 2026, month: 0 }); // Jan 2026: the only complete month of that year in the dataset.
+    return months;
+  })();
+  const RECENT_BOOST = 1.3;
+  const isRecentEvalMonth = m => m.year === 2025 || (m.year === 2026 && m.month === 0);
+  function pickWeighted(pool) {
+    const weights = pool.map(m => isRecentEvalMonth(m) ? RECENT_BOOST : 1);
+    const total = weights.reduce((a, b) => a + b, 0);
+    let roll = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) { roll -= weights[i]; if (roll <= 0) return pool[i]; }
+    return pool[pool.length - 1];
+  }
+  function randomEvaluationWindow(usedMonths = []) {
+    const used = new Set(usedMonths.map(m => `${m.year}-${m.month}`));
+    let pool = EVAL_MONTHS.filter(m => !used.has(`${m.year}-${m.month}`));
+    if (!pool.length) pool = EVAL_MONTHS; // every month already used on this account: allow repeats again
+    const { year, month } = pickWeighted(pool);
     const start = Date.UTC(year, month, 1, 0, 0, 0);
     const end = Date.UTC(year, month + 1, 1, 0, 0, 0) - 1; // last millisecond of the month
-    return { start, end, label: new Date(start).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) };
+    return { start, end, year, month, label: new Date(start).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) };
   }
 
   function timestamp(value) {
@@ -175,7 +194,7 @@
         name: `${rules.name} ${this.attempts.length + 1}`, phase: 1, status: "active", startedAt: new Date(now).toISOString(), phaseStartedAt: new Date(now).toISOString(),
         deadlineAt: new Date(now + 14 * DAY_MS).toISOString(), phaseBaselineKeys: this.baselineKeys(state), dailyBaselines: {},
         lastMarketTimestamp: null, breachReason: "", completedAt: null,
-        evaluationWindow: randomEvaluationWindow() };
+        evaluationWindow: randomEvaluationWindow(this.attempts.map(a => a.evaluationWindow).filter(Boolean)) };
       this.attempts.unshift(attempt);
       this.currentMarketTime = null;
       this.selectedId = attempt.id;
