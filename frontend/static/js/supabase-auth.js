@@ -290,6 +290,9 @@
     if (!state.client) return;
     const button = el("authSignout"); button.disabled = true;
     try {
+      // Flush any pending cloud sync (e.g. a reset/delete just before Sign out)
+      // so it lands in Supabase before this tab's session and workspace close.
+      try { await window.IntenseFXCloudHistory?.save?.(); } catch (_) { /* best-effort flush */ }
       const { error } = await state.client.auth.signOut();
       if (error) throw error;
       state.session = null; state.profile = null; state.subscription = null;
