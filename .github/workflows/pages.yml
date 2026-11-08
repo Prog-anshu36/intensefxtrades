@@ -41,6 +41,7 @@ jobs:
           node tests/billing_checkout.test.js
           node tests/trades_sync.test.js
           node tests/fxn_asian_session_range.test.js
+          node tests/session_navigator_next_prev.test.js
           node tests/prop_firm_session.test.js
           node tests/prop_firm_evaluation_lock.test.js
           node tests/candle_skip_limit.test.js

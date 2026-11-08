@@ -6159,7 +6159,14 @@ const PageBacktesting = {
     const sessionType = this.selectedSessionType();
     const dateKey = this.sessionDateValue(ts, sessionType);
     const current = this.fxnSessionOnIstDate(dateKey, sessionType);
-    const cutoff = direction < 0 && current && current.start <= ts && ts < current.end ? current.start : ts;
+    // dateKey (and so `current`) is always the session for the calendar day
+    // we're anchored to, whether ts sits before it (we just landed on its
+    // floor candle), inside it, or after it. Anchor to THAT session's own
+    // start rather than the raw candle timestamp, so offset 0 in the loop
+    // below — which is always `current` itself — never gets reselected as
+    // its own "next"/"previous" (ts is typically a few minutes/hours before
+    // the session's real start, which otherwise looks "> ts").
+    const cutoff = current ? current.start : ts;
     let session = null;
     const date = new Date(`${dateKey}T12:00:00.000Z`);
     for (let offset = 0; offset <= 30 && !session; offset += 1) {
@@ -6168,7 +6175,7 @@ const PageBacktesting = {
       const candidateKey = candidateDate.toISOString().slice(0, 10);
       const candidate = this.fxnSessionOnIstDate(candidateKey, sessionType);
       if (!candidate || !this.sessionHasLoadedCandles(candidate)) continue;
-      if (direction > 0 ? candidate.start > ts : candidate.start < cutoff) session = candidate;
+      if (direction > 0 ? candidate.start > cutoff : candidate.start < cutoff) session = candidate;
     }
     if (!this.sessionHasLoadedCandles(session)) {
       const label = this.sessionShortLabel(sessionType);
