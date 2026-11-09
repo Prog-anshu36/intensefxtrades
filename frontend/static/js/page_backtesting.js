@@ -5943,9 +5943,11 @@ const PageBacktesting = {
   // on Green and below, 5 on Purple, 10 on Red and Golden VIP. Unlike
   // replayFeatureAllowed()/evaluationBounds(), this is NOT bypassed in
   // propFirmMode — the plan gate applies the same way on a sealed Prop Firm
-  // evaluation as it does on the standalone Backtesting chart.
+  // evaluation as it does on the standalone Backtesting chart. Every plan
+  // gets at least +5 candles (see candleSkipCap in subscription.js); Red and
+  // Golden VIP go further, up to +10.
   candleSkipLimit() {
-    return window.SubscriptionSystem?.getCandleSkipCap?.() ?? 0;
+    return window.SubscriptionSystem?.getCandleSkipCap?.() ?? 5;
   },
 
   // {start,end} ms of the sealed evaluation month, or null outside Prop Firm mode.
