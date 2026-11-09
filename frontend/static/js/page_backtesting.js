@@ -2963,7 +2963,10 @@ const PageBacktesting = {
       pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
       ctx.stroke();
     }
-    if (selected) this.drawSelectionHandles(ctx, pts, drawing);
+    // The Measure tool's box/arrow/bubble already show the measured span —
+    // TradingView's own measure tool has no edit handles either, so leave
+    // the clean overlay alone instead of drawing square resize handles on it.
+    if (selected && drawing.type !== "riskReward") this.drawSelectionHandles(ctx, pts, drawing);
     ctx.restore();
   },
 
