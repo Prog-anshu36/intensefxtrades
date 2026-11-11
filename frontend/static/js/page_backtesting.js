@@ -6804,9 +6804,14 @@ const PageBacktesting = {
     const sl = draft ? draft.sl : this.slEnabled ? (type === "BUY" ? entry - this.slPips * meta.pip : entry + this.slPips * meta.pip) : null;
     const tp = draft ? draft.tp : this.tpEnabled ? (type === "BUY" ? entry + this.tpPips * meta.pip : entry - this.tpPips * meta.pip) : null;
     const lots = draft ? draft.lots : this.lots;
+    // Everything from here on runs inside try/finally: _placingOrder must
+    // never be left stuck true by a stray exception (including from
+    // syncOrderPrices() re-rendering the open/closed trade tables), or the
+    // Buy/Sell buttons silently stop responding to every future click with
+    // no error shown, until the page is reloaded.
     this._placingOrder = true;
-    this.syncOrderPrices();
     try {
+    this.syncOrderPrices();
     let result;
     // Establish the chosen historical start before the first order locks time.
     this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
@@ -6825,6 +6830,10 @@ const PageBacktesting = {
       toast(error.message || "Order could not be placed.", "error");
     } finally {
       this._placingOrder = false;
+      // Re-enable the buttons here too, not only via rerender() below — a
+      // later throw (e.g. a broken full rerender) must not leave Buy/Sell
+      // looking stuck even though the lock itself was released correctly.
+      try { this.syncOrderPrices(); } catch (_) { /* best-effort */ }
     }
     this.rerender();
   },
@@ -6837,50 +6846,77 @@ const PageBacktesting = {
   },
 
   syncOrderPrices() {
-    const candle = this.candles[this.idx];
-    const ready = !!candle && (!MarketData.isLocal(this.symbol) || (this.dataSource === "local-csv" && !this._historyError));
-    const decimals = MarketData.getMeta(this.symbol).decimals;
-    ["BUY", "SELL"].forEach((side) => {
-      const button = this.container?.querySelector(side === "BUY" ? "#btnBuy" : "#btnSell");
-      if (!button) return;
-      button.disabled = !ready || !!this._placingOrder;
-      const price = button.querySelector(".bt-px-value");
-      if (price) price.textContent = ready ? Fmt.price(this.orderPrice(side, candle), decimals) : "--";
-    });
-    const time = this.container?.querySelector(".tv-order-card .tv-panel-head span");
-    if (time) time.textContent = candle ? Fmt.dateTime(candle.date) : "";
-    const trades = this.store.state.active_trades.filter(t => t.symbol === this.symbol);
-    const body = this.container?.querySelector(".bt-tabs-body");
-    if (body) body.innerHTML = this.bottomTab === "open" ? this.renderOpenTable(trades) : this.renderClosedTable(this.store.state.history.filter(t => t.symbol === this.symbol));
-    const openTab = this.container?.querySelector('[data-bottomtab="open"]');
-    if (openTab) openTab.textContent = `Open (${trades.length})`;
-    const closedTab = this.container?.querySelector('[data-bottomtab="closed"]');
-    if (closedTab) closedTab.textContent = `Closed (${this.store.state.history.filter(t => t.symbol === this.symbol).length})`;
+    // Buy/Sell must always end up enabled/disabled correctly, even if a
+    // malformed trade record makes the table below throw — otherwise one
+    // bad record can wedge the order buttons for the whole session.
+    try {
+      const candle = this.candles[this.idx];
+      const ready = !!candle && (!MarketData.isLocal(this.symbol) || (this.dataSource === "local-csv" && !this._historyError));
+      const decimals = MarketData.getMeta(this.symbol).decimals;
+      ["BUY", "SELL"].forEach((side) => {
+        const button = this.container?.querySelector(side === "BUY" ? "#btnBuy" : "#btnSell");
+        if (!button) return;
+        button.disabled = !ready || !!this._placingOrder;
+        const price = button.querySelector(".bt-px-value");
+        if (price) price.textContent = ready ? Fmt.price(this.orderPrice(side, candle), decimals) : "--";
+      });
+      const time = this.container?.querySelector(".tv-order-card .tv-panel-head span");
+      if (time) time.textContent = candle ? Fmt.dateTime(candle.date) : "";
+    } catch (error) {
+      console.error("syncOrderPrices: button sync failed", error);
+    }
+    try {
+      const trades = this.store.state.active_trades.filter(t => t.symbol === this.symbol);
+      const body = this.container?.querySelector(".bt-tabs-body");
+      if (body) body.innerHTML = this.bottomTab === "open" ? this.renderOpenTable(trades) : this.renderClosedTable(this.store.state.history.filter(t => t.symbol === this.symbol));
+      const openTab = this.container?.querySelector('[data-bottomtab="open"]');
+      if (openTab) openTab.textContent = `Open (${trades.length})`;
+      const closedTab = this.container?.querySelector('[data-bottomtab="closed"]');
+      if (closedTab) closedTab.textContent = `Closed (${this.store.state.history.filter(t => t.symbol === this.symbol).length})`;
+    } catch (error) {
+      console.error("syncOrderPrices: trade table render failed", error);
+    }
   },
 
   async closeActive() {
+    if (this._closingTrade) return;
     const trade = this.store.state.active_trades.find((t) => t.symbol === this.symbol);
     const c = this.candles[this.idx];
     if (!trade || !c) return;
     const practiceCheck = this.practiceController?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
-    await this.api.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL", closed_at: new Date(c.time + this.candleDuration()).toISOString() });
-    await this.store.refresh({fresh:true});
-    this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
-    toast("Position closed", "info");
+    this._closingTrade = true;
+    try {
+      await this.api.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL", closed_at: new Date(c.time + this.candleDuration()).toISOString() });
+      await this.store.refresh({fresh:true});
+      this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
+      toast("Position closed", "info");
+    } catch (error) {
+      toast(error?.message || "Position could not be closed. Please retry.", "error");
+    } finally {
+      this._closingTrade = false;
+    }
     this.rerender();
   },
 
   async closeAllPositions() {
+    if (this._closingTrade) return;
     const c = this.candles[this.idx];
     const trades = this.store.state.active_trades.filter((t) => t.symbol === this.symbol);
     if (!c || !trades.length) return;
     const practiceCheck = this.practiceController?.canTradeAt?.(c.time + this.candleDuration(), this.symbol);
     if (practiceCheck && !practiceCheck.ok) { toast(practiceCheck.message, "error"); return; }
-    await Promise.all(trades.map((trade) => this.api.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL_CLOSE_ALL", closed_at: new Date(c.time + this.candleDuration()).toISOString() })));
-    await this.store.refresh({fresh:true});
-    this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
-    toast(`${trades.length} position${trades.length === 1 ? "" : "s"} closed`, "info");
+    this._closingTrade = true;
+    try {
+      await Promise.all(trades.map((trade) => this.api.closeTrade({ id: trade.id, exit: c[trade.type === "BUY" ? "bid" : "ask"]?.close ?? c.close, reason: "MANUAL_CLOSE_ALL", closed_at: new Date(c.time + this.candleDuration()).toISOString() })));
+      await this.store.refresh({fresh:true});
+      this.practiceController?.onMarketCandle?.(c.time + this.candleDuration(), this.store.state);
+      toast(`${trades.length} position${trades.length === 1 ? "" : "s"} closed`, "info");
+    } catch (error) {
+      toast(error?.message || "Positions could not be closed. Please retry.", "error");
+    } finally {
+      this._closingTrade = false;
+    }
     this.rerender();
   },
 
