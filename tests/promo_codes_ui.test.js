@@ -37,5 +37,39 @@ function load(auth) {
   assert.match(mount3.innerHTML, /DEVELOPER MODE/);
   assert.match(mount3.innerHTML, /id="devPromoForm"/);
   assert.match(mount3.innerHTML, /Never expires/);
+
+  // Regression: afterRender() must retry the developer-panel check once
+  // sign-in finishes, not just once at the moment the page first rendered —
+  // otherwise landing directly on Plans before auth is ready permanently
+  // hides the panel for a real developer account.
+  {
+    const docListeners = {}, winListeners = {};
+    let isDev = false;
+    const auth = { checkDeveloper: async () => isDev, devListPromos: async () => ({ ok: true, codes: [] }) };
+    const window = { addEventListener(type, fn) { winListeners[type] = fn; }, IntenseFXAuth: auth };
+    const document = { addEventListener(type, fn) { docListeners[type] = fn; } };
+    const context = { window, document, Date, Number, String, Boolean, Set, Object, Intl, Promise };
+    vm.runInNewContext(fs.readFileSync('frontend/static/js/subscription.js', 'utf8'), context);
+    vm.runInNewContext(`${fs.readFileSync('frontend/static/js/page_subscription.js', 'utf8')}\nglobalThis.page = PageSubscription;`, context);
+    const page = context.page;
+    const els = {};
+    const stub = () => ({ addEventListener() {}, set innerHTML(v) {}, value: '', checked: false });
+    let mountHtml = '';
+    const mount = { isConnected: true, set innerHTML(v) { mountHtml = v; }, get innerHTML() { return mountHtml; }, querySelector: id => els[id] || (els[id] = stub()) };
+    const containerEls = { '#devPromoMount': mount };
+    const container = { querySelector: sel => containerEls[sel] || stub(), querySelectorAll: () => [] };
+    page.vipMessage = ''; page.vipMessageKind = ''; page.promoMessage = ''; page.promoMessageKind = '';
+    page.afterRender(container);
+    await new Promise(r => setImmediate(r));
+    assert.equal(mountHtml, '', 'not a developer yet (session still loading): panel stays hidden');
+    assert.equal(typeof docListeners['intensefx:authenticated'], 'function', 'retries on sign-in completing');
+    assert.equal(typeof winListeners['intensefx:subscription-changed'], 'function', 'retries on a subscription change too');
+
+    isDev = true;
+    docListeners['intensefx:authenticated']();
+    await new Promise(r => setImmediate(r));
+    assert.match(mountHtml, /DEVELOPER MODE/, 'panel appears once sign-in actually finishes, without a page reload');
+  }
+
   console.log('promo codes ui tests passed');
 })();

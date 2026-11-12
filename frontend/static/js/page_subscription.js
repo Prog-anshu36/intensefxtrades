@@ -111,6 +111,14 @@ const PageSubscription = {
     });
     promoInput?.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); container.querySelector("#promoCodeRedeem")?.click(); } });
     this.mountDeveloperPanel(container.querySelector("#devPromoMount"));
+    // Auth can still be loading the session when this page first renders
+    // (e.g. landing directly on Plans, or a refresh here) — checkDeveloper()
+    // correctly reports "not a developer" with no session yet, and nothing
+    // used to retry once sign-in actually finished. Retry then, and on any
+    // later subscription change (e.g. a promo code just redeemed elsewhere).
+    const retryDevPanel = () => this.mountDeveloperPanel(container.querySelector("#devPromoMount"));
+    document.addEventListener("intensefx:authenticated", retryDevPanel);
+    window.addEventListener("intensefx:subscription-changed", retryDevPanel);
     container.querySelectorAll("[data-subscription-plan]").forEach(button => button.addEventListener("click", () => {
       const code = button.dataset.subscriptionPlan;
       if (!window.SubscriptionSystem.PLANS[code] && code!=="golden_vip") return;
