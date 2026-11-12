@@ -46,6 +46,7 @@ jobs:
           node tests/order_buttons_never_stuck.test.js
           node tests/prop_firm_evaluation_lock.test.js
           node tests/prop_firm_golden_vip_custom_month.test.js
+          node tests/prop_firm_instant_and_auto_phase2.test.js
           node tests/candle_skip_limit.test.js
           node tests/replay_speed_lock.test.js
           node tests/measure_tool.test.js

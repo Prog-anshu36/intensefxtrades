@@ -40,11 +40,11 @@ addClosed(1, day(1), 200);
 assert.equal(attempt.status, 'active', 'target alone does not bypass minimum active days');
 addClosed(2, day(2), 200);
 assert.equal(attempt.status, 'active');
+assert.equal(page.summary(attempt).tradedDays.length, 2);
 addClosed(3, day(3), 1);
-assert.equal(attempt.status, 'phase-ready', 'phase 1 requires both target and three active days');
-assert.equal(page.summary(attempt).tradedDays.length, 3);
-
-assert.equal(page.advance(attempt.id).ok, true);
+// Like a real evaluation: hitting the phase 1 target advances the account
+// to phase 2 immediately — no manual "Start Phase 2" click required.
+assert.equal(attempt.status, 'active', 'phase 1 requires both target and three active days, then auto-advances');
 assert.equal(attempt.phase, 2);
 assert.equal(attempt.phaseBaselineKeys.length, 3, 'phase 1 trades are excluded from phase 2 scoring');
 assert.equal(page.summary(attempt).pnl, 0);
